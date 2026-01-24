@@ -152,6 +152,16 @@ while IFS= read -r -d '' test_file; do
     click="$(cat "${test_file%.coi}.click" | tr -d ' \t\r\n')"
   fi
 
+  pointer=""
+  if [ -f "${test_file%.coi}.pointer" ]; then
+    pointer="$(cat "${test_file%.coi}.pointer" | tr -d ' \t\r\n')"
+  fi
+
+  scroll=""
+  if [ -f "${test_file%.coi}.scroll" ]; then
+    scroll="$(cat "${test_file%.coi}.scroll" | tr -d ' \t\r\n')"
+  fi
+
   run_env=(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames")
   if [ "$layout_dump_set" -eq 1 ]; then
     run_env+=(COI_DESKTOP_LAYOUT_DUMP="$layout_dump")
@@ -164,6 +174,12 @@ while IFS= read -r -d '' test_file; do
   fi
   if [ -n "$click" ]; then
     run_env+=(COI_DESKTOP_CLICK="$click")
+  fi
+  if [ -n "$pointer" ]; then
+    run_env+=(COI_DESKTOP_POINTER="$pointer")
+  fi
+  if [ -n "$scroll" ]; then
+    run_env+=(COI_DESKTOP_SCROLL="$scroll")
   fi
 
   set +e

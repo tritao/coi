@@ -275,8 +275,11 @@ struct DesktopClassStyle {
 
     bool bg_none = false;
 
-    bool clip_x = false;
-    bool clip_y = false;
+    bool has_clip = false;
+    // These map to Clay's clip config horizontal/vertical flags which also control scrollability.
+    // If both are false but has_clip is true, we still get scissoring (overflow hidden).
+    bool scroll_x = false;
+    bool scroll_y = false;
 
     bool has_border = false;
     Clay_BorderWidth border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
@@ -343,16 +346,31 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
             return;
         }
         if (t == "clip") {
-            st.clip_x = true;
-            st.clip_y = true;
+            st.has_clip = true;
             return;
         }
         if (t == "clip-x") {
-            st.clip_x = true;
+            st.has_clip = true;
             return;
         }
         if (t == "clip-y") {
-            st.clip_y = true;
+            st.has_clip = true;
+            return;
+        }
+        if (t == "scroll") {
+            st.has_clip = true;
+            st.scroll_x = true;
+            st.scroll_y = true;
+            return;
+        }
+        if (t == "scroll-x") {
+            st.has_clip = true;
+            st.scroll_x = true;
+            return;
+        }
+        if (t == "scroll-y") {
+            st.has_clip = true;
+            st.scroll_y = true;
             return;
         }
         if (t == "border") {
@@ -461,6 +479,12 @@ struct ClayEngine {
     static inline void* mem = nullptr;
     static inline size_t mem_size = 0;
     static inline Clay_TextElementConfig* text_cfg = nullptr;
+    static inline Clay_Vector2 pointer_pos = Clay_Vector2{0, 0};
+    static inline bool pointer_down = false;
+    // Clay_UpdateScrollContainers expects scroll deltas where negative Y scrolls "down" (because scrollPosition is clamped <= 0).
+    static inline Clay_Vector2 scroll_delta = Clay_Vector2{0, 0};
+    static inline float frame_dt = 1.0f / 60.0f;
+    static inline bool enable_drag_scroll = true;
 
     static void error_handler(Clay_ErrorData data) {
         std::cerr << "[Clay] error " << (int)data.errorType << ": ";
@@ -519,6 +543,20 @@ struct ClayEngine {
         });
     }
 
+    static void set_input(float x, float y, bool down, float scroll_x, float scroll_y, float dt) {
+        pointer_pos = Clay_Vector2{x, y};
+        pointer_down = down;
+        scroll_delta.x += scroll_x;
+        scroll_delta.y += scroll_y;
+        if (dt > 0.0f) frame_dt = dt;
+    }
+
+    static void pre_layout_update() {
+        Clay_SetPointerState(pointer_pos, pointer_down);
+        Clay_UpdateScrollContainers(enable_drag_scroll, scroll_delta, frame_dt);
+        scroll_delta = Clay_Vector2{0, 0};
+    }
+
     static void shutdown() {
         // clay has no explicit shutdown; free the backing arena memory
         if (mem) {
@@ -555,11 +593,11 @@ struct ClayEngine {
             .childAlignment = Clay_ChildAlignment{ax, ay},
             .layoutDirection = dir,
         };
-        if (st.clip_x || st.clip_y) {
+        if (st.has_clip) {
             decl.clip = Clay_ClipElementConfig{
-                .horizontal = st.clip_x,
-                .vertical = st.clip_y,
-                .childOffset = Clay_Vector2{0, 0},
+                .horizontal = st.scroll_x,
+                .vertical = st.scroll_y,
+                .childOffset = (st.scroll_x || st.scroll_y) ? Clay_GetScrollOffset() : Clay_Vector2{0, 0},
             };
         }
         if (st.has_border && (st.border_width.left || st.border_width.right || st.border_width.top || st.border_width.bottom ||
@@ -584,16 +622,20 @@ struct ClayEngine {
         return decl;
     }
 
+    static Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_root, int32_t id) {
+        Clay_ElementDeclaration decl = declaration_for_node(n, is_root);
+        decl.userData = (void*)(intptr_t)id;
+        return decl;
+    }
+
     static void build_node(int32_t id, bool is_root) {
         auto it = coi::ui::g_nodes.find(id);
         if (it == coi::ui::g_nodes.end()) return;
         const auto& n = it->second;
         if (n.tag == "comment") return;
 
-        Clay_ElementDeclaration decl = declaration_for_node(n, is_root);
-        decl.userData = (void*)(intptr_t)id;
         Clay_ElementId eid = element_id(id);
-        CLAY(eid, decl) {
+        CLAY(eid, (ClayEngine::declaration_for_node(n, is_root, id))) {
             if (!n.text.empty()) {
                 Clay_String t = clay_string(n.text);
                 void* prev = text_cfg ? text_cfg->userData : nullptr;
@@ -610,6 +652,7 @@ struct ClayEngine {
         if (!ctx) return Clay_RenderCommandArray{};
         Clay_SetCurrentContext(ctx);
         Clay_SetLayoutDimensions(Clay_Dimensions{w, h});
+        pre_layout_update();
         Clay_BeginLayout();
         build_node(0, true);
         return Clay_EndLayout();
@@ -758,6 +801,8 @@ struct SokolRunner {
     static inline float mouse_x = 0.0f;
     static inline float mouse_y = 0.0f;
     static inline bool mouse_down = false;
+    static inline float scroll_x = 0.0f;
+    static inline float scroll_y = 0.0f;
     static inline bool click_pending = false;
     static inline float click_x = 0.0f;
     static inline float click_y = 0.0f;
@@ -768,6 +813,12 @@ struct SokolRunner {
         case SAPP_EVENTTYPE_MOUSE_MOVE:
             mouse_x = ev->mouse_x;
             mouse_y = ev->mouse_y;
+            break;
+        case SAPP_EVENTTYPE_MOUSE_SCROLL:
+            // sokol_app scroll deltas typically follow browser semantics (positive Y == scroll down),
+            // but Clay expects negative scrollDelta.y to move content down (scrollPosition is clamped <= 0).
+            scroll_x -= ev->scroll_x;
+            scroll_y -= ev->scroll_y;
             break;
         case SAPP_EVENTTYPE_MOUSE_DOWN:
             mouse_down = true;
@@ -797,6 +848,9 @@ struct SokolRunner {
         coi::desktop::flush();
 
 #if defined(COI_DESKTOP_CLAY)
+        ClayEngine::set_input(mouse_x, mouse_y, mouse_down, scroll_x, scroll_y, (float)dt);
+        scroll_x = 0.0f;
+        scroll_y = 0.0f;
         Clay_RenderCommandArray render_commands = ClayEngine::layout((float)sapp_width(), (float)sapp_height());
         const bool clay_ok = (ClayEngine::ctx != nullptr);
         if (!clay_ok) layout_tree((float)sapp_width(), (float)sapp_height());
@@ -1191,6 +1245,7 @@ struct SokolRunner {
 inline bool g_layout_dumped = false;
 inline bool g_click_done = false;
 inline bool g_render_dumped = false;
+inline bool g_scroll_done = false;
 
 inline bool parse_xy(const char* s, float& x, float& y) {
     if (!s || !*s) return false;
@@ -1413,7 +1468,39 @@ inline void maybe_simulate_click() {
     g_click_done = true;
 }
 
+inline void maybe_simulate_scroll() {
+    const char* s = std::getenv("COI_DESKTOP_SCROLL");
+    if (!s || !*s) return;
+    if (g_scroll_done && std::string(s) != std::string("always")) return;
+
+    float dx = 0.0f, dy = 0.0f;
+    if (!parse_xy(s, dx, dy)) return;
+
+    float px = 1.0f, py = 1.0f;
+    const char* p = std::getenv("COI_DESKTOP_POINTER");
+    if (p && *p) (void)parse_xy(p, px, py);
+
+#if defined(COI_DESKTOP_CLAY)
+    float w = 0.0f, h = 0.0f;
+    parse_viewport(w, h);
+    // Prime scroll container mappings and pointer-over state.
+    ClayEngine::set_input(px, py, false, 0.0f, 0.0f, 1.0f / 60.0f);
+    (void)ClayEngine::layout(w, h);
+    // Apply scroll. Env deltas follow "positive means scroll down/right" (browser-like);
+    // Clay expects negative scrollDelta.y to move content down.
+    ClayEngine::set_input(px, py, false, -dx, -dy, 1.0f / 60.0f);
+    (void)ClayEngine::layout(w, h);
+#else
+    (void)dx;
+    (void)dy;
+    (void)px;
+    (void)py;
+#endif
+    g_scroll_done = true;
+}
+
 inline void flush() {
+    maybe_simulate_scroll();
     maybe_simulate_click();
     coi::ui::flush();
 
