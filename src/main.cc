@@ -1204,6 +1204,7 @@ int main(int argc, char **argv)
             out << "        if (!env || !*env) return;\n";
             out << "        if (g_dumped && std::string(env) != std::string(\"always\")) return;\n";
             out << "        g_dumped = true;\n";
+            out << "        std::cout << \"--- COI_DESKTOP_DUMP ---\\\\n\";\n";
             out << "        // Dump a simple tree snapshot to stdout.\n";
             out << "        auto dump = [&](auto&& self, int32_t id, int depth) -> void {\n";
             out << "            auto it = g_nodes.find(id);\n";
@@ -1220,6 +1221,7 @@ int main(int argc, char **argv)
             out << "            for (int32_t c : n.children) self(self, c, depth + 1);\n";
             out << "        };\n";
             out << "        dump(dump, 0, 0);\n";
+            out << "        std::cout << std::flush;\n";
             out << "    }\n";
             out << "    inline void create_element_deferred(webcc::handle h, webcc::string_view tag) { auto& n = ensure_node(h); n.tag = webcc::string(tag.data(), tag.length()); }\n";
             out << "    inline void create_comment_deferred(webcc::handle h, webcc::string_view text) { auto& n = ensure_node(h); n.tag = \"comment\"; n.text = webcc::string(text.data(), text.length()); }\n";
@@ -1564,16 +1566,19 @@ int main(int argc, char **argv)
             out << "    coi::ui::flush();\n";
             out << "    return 0;\n";
             out << "}\n";
-        }
-        else
-        {
+        } else {
             out << "int main() {\n";
             out << "    app = new " << final_app_config.root_component << "();\n";
             out << "    app->view();\n";
             out << "    coi::ui::flush();\n";
+            out << "    const char* frames_env = std::getenv(\"COI_DESKTOP_FRAMES\");\n";
+            out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
+            out << "    if (frames == 0) return 0;\n";
             out << "    using clock = std::chrono::steady_clock;\n";
             out << "    auto last = clock::now();\n";
-            out << "    while (true) {\n";
+            out << "    int i = 0;\n";
+            out << "    while (frames < 0 || i < frames) {\n";
+            out << "        i++;\n";
             out << "        auto now = clock::now();\n";
             out << "        double dt = std::chrono::duration<double>(now - last).count();\n";
             out << "        last = now;\n";
