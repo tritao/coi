@@ -1357,6 +1357,8 @@ int main(int argc, char **argv)
 			            const bool has_fontstash = fs::exists(fontstash_dir / "fontstash.h") && fs::exists(fontstash_dir / "stb_truetype.h");
 			            fs::path clay_dir = exe_dir / "deps" / "clay";
 			            const bool has_clay = fs::exists(clay_dir / "clay.h");
+			            fs::path stb_dir = exe_dir / "deps" / "stb";
+			            const bool has_stb_write = fs::exists(stb_dir / "stb_image_write.h");
 
 		            fs::path abs_output_cc = fs::absolute(output_cc);
 		            fs::path abs_output_dir = fs::absolute(final_output_dir);
@@ -1375,6 +1377,10 @@ int main(int argc, char **argv)
 			                if (has_fontstash) {
 			                    cmd += " -I" + fontstash_dir.string();
 			                    cmd += " -DCOI_DESKTOP_FONTSTASH";
+			                }
+			                if (has_stb_write) {
+			                    cmd += " -I" + stb_dir.string();
+			                    cmd += " -DCOI_DESKTOP_CAPTURE";
 			                }
 #if defined(__linux__) || defined(__unix__)
 			                cmd += " -DCOI_DESKTOP_SOKOL";
