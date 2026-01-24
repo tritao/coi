@@ -10,6 +10,21 @@ if [[ ! -x "$COI_BIN" ]]; then
   exit 1
 fi
 
+# Ensure the binary supports the capture flags (developers often forget to rebuild ./coi after changes).
+if ! "$COI_BIN" --help 2>/dev/null | grep -q -- "--capture"; then
+  echo "[visual] ./coi doesn't support --capture yet; rebuilding..."
+  if [[ ! -x "$ROOT_DIR/build.sh" ]]; then
+    echo "error: missing build script: $ROOT_DIR/build.sh"
+    exit 1
+  fi
+  "$ROOT_DIR/build.sh" >/dev/null
+  if ! "$COI_BIN" --help 2>/dev/null | grep -q -- "--capture"; then
+    echo "error: ./coi still doesn't advertise --capture after rebuild"
+    echo "hint: run: $ROOT_DIR/build.sh"
+    exit 1
+  fi
+fi
+
 MODE="compare" # compare | update
 SCENE_FILTER=""
 
@@ -143,4 +158,3 @@ for entry in "${scenes[@]}"; do
 done
 
 exit "$fail"
-
