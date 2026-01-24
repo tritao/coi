@@ -1329,13 +1329,32 @@ inline void dump_render() {
 
             int32_t hid = (int32_t)(cmd->id ^ 0xC01D0000u);
             auto itn = coi::ui::g_nodes.find(hid);
-            if (itn == coi::ui::g_nodes.end()) continue;
-            const auto& n = itn->second;
-            const webcc::string* cls = attr(n, "class");
+            if (itn != coi::ui::g_nodes.end()) {
+                const auto& n = itn->second;
+                const webcc::string* cls = attr(n, "class");
 
-            std::cout << "RECT id=" << hid << " tag=" << n.tag.c_str();
-            if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
-            std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+                std::cout << "RECT id=" << hid << " tag=" << n.tag.c_str();
+                if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+                std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+                continue;
+            }
+
+            // Clay emits "betweenChildren" borders as anonymous RECTANGLE commands. Expose those in the dump.
+            const int32_t owner = cmd->userData ? (int32_t)(intptr_t)cmd->userData : 0;
+            if (owner != 0) {
+                auto ito = coi::ui::g_nodes.find(owner);
+                if (ito != coi::ui::g_nodes.end()) {
+                    const auto& n = ito->second;
+                    DesktopClassStyle st = parse_desktop_class_style(n, owner == 0);
+                    if (st.has_border && st.border_width.betweenChildren > 0) {
+                        const webcc::string* cls = attr(n, "class");
+                        std::cout << "RECT_BETWEEN owner=" << owner << " tag=" << n.tag.c_str();
+                        if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+                        std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height);
+                        std::cout << " color=" << (int)c.r << "," << (int)c.g << "," << (int)c.b << "," << (int)c.a << "\n";
+                    }
+                }
+            }
         } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_TEXT) {
             const auto& t = cmd->renderData.text;
             const int32_t owner = cmd->userData ? (int32_t)(intptr_t)cmd->userData : 0;
