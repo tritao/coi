@@ -1,0 +1,12 @@
+component App {
+    view {
+        <div class="root col pad-0 gap-0 fill">
+            <div class="t w-100 h-30 pad-0">Hello</div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

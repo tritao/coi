@@ -539,7 +539,10 @@ struct ClayEngine {
         CLAY(eid, decl) {
             if (!n.text.empty()) {
                 Clay_String t = clay_string(n.text);
+                void* prev = text_cfg ? text_cfg->userData : nullptr;
+                if (text_cfg) text_cfg->userData = (void*)(intptr_t)id;
                 CLAY_TEXT(t, text_cfg);
+                if (text_cfg) text_cfg->userData = prev;
             }
             for (int32_t c : n.children) build_node(c, false);
         }
@@ -1081,24 +1084,65 @@ inline void dump_render() {
     if (!ClayEngine::ctx) return;
 
     std::cout << "--- COI_DESKTOP_RENDER_DUMP ---\n";
+    auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+    auto escape = [](const char* s, int32_t len) -> std::string {
+        std::string out;
+        out.reserve((size_t)len);
+        for (int32_t i = 0; i < len; i++) {
+            char c = s[i];
+            if (c == '\\') {
+                out += "\\\\";
+            } else if (c == '"') {
+                out += "\\\"";
+            } else if (c == '\n') {
+                out += "\\n";
+            } else if (c == '\r') {
+                out += "\\r";
+            } else if (c == '\t') {
+                out += "\\t";
+            } else {
+                out.push_back(c);
+            }
+        }
+        return out;
+    };
     for (int32_t i = 0; i < render_commands.length; i++) {
         Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
         if (!cmd) continue;
-        if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) continue;
         const auto& bb = cmd->boundingBox;
-        const auto& c = cmd->renderData.rectangle.backgroundColor;
-        if (c.a <= 0.0f) continue;
 
-        int32_t hid = (int32_t)(cmd->id ^ 0xC01D0000u);
-        auto itn = coi::ui::g_nodes.find(hid);
-        if (itn == coi::ui::g_nodes.end()) continue;
-        const auto& n = itn->second;
-        const webcc::string* cls = attr(n, "class");
+        if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
+            const auto& c = cmd->renderData.rectangle.backgroundColor;
+            if (c.a <= 0.0f) continue;
 
-        auto iround = [](float v) -> int { return (int)std::lround((double)v); };
-        std::cout << "RECT id=" << hid << " tag=" << n.tag.c_str();
-        if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
-        std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+            int32_t hid = (int32_t)(cmd->id ^ 0xC01D0000u);
+            auto itn = coi::ui::g_nodes.find(hid);
+            if (itn == coi::ui::g_nodes.end()) continue;
+            const auto& n = itn->second;
+            const webcc::string* cls = attr(n, "class");
+
+            std::cout << "RECT id=" << hid << " tag=" << n.tag.c_str();
+            if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+            std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+        } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_TEXT) {
+            const auto& t = cmd->renderData.text;
+            const int32_t owner = cmd->userData ? (int32_t)(intptr_t)cmd->userData : 0;
+            const auto itn = (owner != 0) ? coi::ui::g_nodes.find(owner) : coi::ui::g_nodes.end();
+
+            std::cout << "TEXT";
+            if (itn != coi::ui::g_nodes.end()) {
+                const auto& n = itn->second;
+                const webcc::string* cls = attr(n, "class");
+                std::cout << " owner=" << owner << " tag=" << n.tag.c_str();
+                if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+            } else if (owner != 0) {
+                std::cout << " owner=" << owner;
+            }
+            std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height);
+            std::cout << " color=" << (int)t.textColor.r << "," << (int)t.textColor.g << "," << (int)t.textColor.b << "," << (int)t.textColor.a;
+            std::cout << " font=" << (int)t.fontId << " size=" << (int)t.fontSize << " ls=" << (int)t.letterSpacing << " lh=" << (int)t.lineHeight;
+            std::cout << " text=\"" << escape(t.stringContents.chars, t.stringContents.length) << "\"\n";
+        }
     }
     std::cout << std::flush;
 #endif
