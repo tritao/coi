@@ -210,10 +210,6 @@ inline void scroll_to_top() {}
     #endif
     #if defined(COI_DESKTOP_CAPTURE)
         #include "stb_image_write.h"
-        #if defined(__linux__) || defined(__unix__)
-            #include <X11/Xlib.h>
-            #include <X11/Xutil.h>
-        #endif
     #endif
 #endif
 
@@ -881,7 +877,6 @@ struct SokolRunner {
     static inline std::vector<uint8_t> capture_pixels_flipped;
     static inline int exit_code = 0;
     static inline bool capture_debug = false;
-    static inline bool capture_pending_after_commit = false;
 
     static inline bool parse_wh(const char* s, int& w, int& h) {
         if (!s || !*s) return false;
@@ -1014,7 +1009,6 @@ struct SokolRunner {
         capture_pixels.clear();
         capture_pixels_flipped.clear();
         capture_index = 0;
-        capture_pending_after_commit = false;
 
         if (capture_debug) {
             std::cerr << "[capture] enabled dir=" << capture_dir.string()
@@ -1031,7 +1025,6 @@ struct SokolRunner {
     }
 
     static void capture_shutdown() {
-        capture_pending_after_commit = false;
         if (capture_view.id != SG_INVALID_ID) {
             sg_destroy_view(capture_view);
             capture_view.id = SG_INVALID_ID;
@@ -1105,16 +1098,12 @@ struct SokolRunner {
     static void capture_maybe(const sg_pass_action& action, double dt) {
         (void)dt;
         if (!capture_enabled) return;
+        if (capture_mode != CaptureMode::Offscreen) return;
         if (capture_max >= 0 && capture_index >= capture_max) return;
         if (capture_every > 1 && (frames % capture_every) != 0) return;
 
         if (capture_debug) {
             std::cerr << "[capture] capture_maybe frame=" << frames << " idx=" << capture_index << std::endl;
-        }
-
-        if (capture_mode == CaptureMode::X11) {
-            capture_pending_after_commit = true;
-            return;
         }
 
         capture_ensure_target();
@@ -1328,82 +1317,40 @@ struct SokolRunner {
         capture_index++;
     }
 
-    static uint8_t mask_to_u8(uint32_t pixel, uint32_t mask) {
-        if (!mask) return 0;
-        uint32_t m = mask;
-#if defined(__GNUC__) || defined(__clang__)
-        const int shift = __builtin_ctz(m);
-#else
-        int shift = 0;
-        while ((m & 1u) == 0u) { m >>= 1u; shift++; }
-        m = mask;
-#endif
-        m >>= shift;
-        int bits = 0;
-        while (m & 1u) { bits++; m >>= 1u; }
-        uint32_t v = (pixel & mask) >> shift;
-        if (bits <= 0) return 0;
-        if (bits >= 8) {
-            v >>= (bits - 8);
-            return (uint8_t)v;
-        }
-        const uint32_t maxv = (1u << bits) - 1u;
-        v = (v * 255u + (maxv / 2u)) / maxv;
-        return (uint8_t)v;
-    }
-
-    static bool capture_x11_read_rgba(std::vector<uint8_t>& out_rgba, int w, int h) {
-#if defined(__linux__) || defined(__unix__)
-        Display* dpy = (Display*)sapp_x11_get_display();
-        Window win = (Window)(uintptr_t)sapp_x11_get_window();
-        if (!dpy || !win) return false;
-        XImage* img = XGetImage(dpy, win, 0, 0, (unsigned int)w, (unsigned int)h, AllPlanes, ZPixmap);
-        if (!img) return false;
-        out_rgba.resize((size_t)w * (size_t)h * 4u);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                const unsigned long p = XGetPixel(img, x, y);
-                const uint8_t r = mask_to_u8((uint32_t)p, (uint32_t)img->red_mask);
-                const uint8_t g = mask_to_u8((uint32_t)p, (uint32_t)img->green_mask);
-                const uint8_t b = mask_to_u8((uint32_t)p, (uint32_t)img->blue_mask);
-                const size_t idx = ((size_t)y * (size_t)w + (size_t)x) * 4u;
-                out_rgba[idx + 0] = r;
-                out_rgba[idx + 1] = g;
-                out_rgba[idx + 2] = b;
-                out_rgba[idx + 3] = 255;
-            }
-        }
-        XDestroyImage(img);
-        return true;
-#else
-        (void)out_rgba;
-        (void)w;
-        (void)h;
-        return false;
-#endif
-    }
-
-    static void capture_after_commit() {
+    static void capture_maybe_swapchain(double dt) {
+        (void)dt;
         if (!capture_enabled) return;
         if (capture_mode != CaptureMode::X11) return;
-        if (!capture_pending_after_commit) return;
-        capture_pending_after_commit = false;
         if (capture_max >= 0 && capture_index >= capture_max) return;
+        if (capture_every > 1 && (frames % capture_every) != 0) return;
 
-        if (capture_w <= 0) capture_w = sapp_width();
-        if (capture_h <= 0) capture_h = sapp_height();
+        int w = capture_w > 0 ? capture_w : sapp_width();
+        int h = capture_h > 0 ? capture_h : sapp_height();
+        const int sw = sapp_width();
+        const int sh = sapp_height();
+        if (w > sw) w = sw;
+        if (h > sh) h = sh;
+        if (w <= 0) w = 1;
+        if (h <= 0) h = 1;
 
         if (capture_debug) {
-            std::cerr << "[capture] after_commit x11 read " << capture_w << "x" << capture_h << std::endl;
+            std::cerr << "[capture] swapchain read " << w << "x" << h << " (win " << sw << "x" << sh << ")" << std::endl;
         }
 
-        if (!capture_x11_read_rgba(capture_pixels_flipped, capture_w, capture_h)) {
-            std::cerr << "[capture] X11 read failed; disabling capture\n";
-            capture_enabled = false;
-            return;
+        capture_pixels.resize((size_t)w * (size_t)h * 4u);
+        capture_pixels_flipped.resize(capture_pixels.size());
+
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, capture_pixels.data());
+
+        const size_t stride = (size_t)w * 4u;
+        for (int y = 0; y < h; y++) {
+            const uint8_t* src = capture_pixels.data() + (size_t)(h - 1 - y) * stride;
+            uint8_t* dst = capture_pixels_flipped.data() + (size_t)y * stride;
+            std::memcpy(dst, src, stride);
         }
-        const int stride = capture_w * 4;
-        capture_write_outputs(capture_pixels_flipped.data(), capture_w, capture_h, stride);
+
+        capture_write_outputs(capture_pixels_flipped.data(), w, h, (int)stride);
     }
 #endif
 
@@ -1912,14 +1859,16 @@ struct SokolRunner {
         }
         sdtx_draw();
 
+#if defined(COI_DESKTOP_CAPTURE)
+        // In X11 capture mode, read back the swapchain framebuffer before ending the pass.
+        capture_maybe_swapchain(dt);
+#endif
         sg_end_pass();
 #if defined(COI_DESKTOP_CAPTURE)
+        // In offscreen capture mode, render to a separate target after ending the swapchain pass.
         capture_maybe(pass, dt);
 #endif
         sg_commit();
-#if defined(COI_DESKTOP_CAPTURE)
-        capture_after_commit();
-#endif
 
         frames++;
         if (frames_limit > 0 && frames >= frames_limit) {

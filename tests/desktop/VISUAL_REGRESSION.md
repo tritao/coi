@@ -2,7 +2,7 @@
 
 COI’s desktop runtime can capture screenshots and a tolerant 64‑bit dHash per frame.
 
-On Linux the default capture mode is `COI_DESKTOP_CAPTURE_MODE=x11` (read back pixels from the X11 window after present) because it works reliably in headless setups (including `xvfb-run`). You can force offscreen rendering with `COI_DESKTOP_CAPTURE_MODE=offscreen`.
+On Linux the default capture mode is `COI_DESKTOP_CAPTURE_MODE=x11` (read back pixels from the swapchain framebuffer via `glReadPixels`) because it works reliably in headless setups (including `xvfb-run`). You can force offscreen rendering with `COI_DESKTOP_CAPTURE_MODE=offscreen`.
 
 ## Create a baseline
 
