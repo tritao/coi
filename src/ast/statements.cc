@@ -155,7 +155,7 @@ std::string Assignment::to_webcc()
         {
             // Bulk optimization: unregister handlers only, then clear parent's innerHTML
             result += "    for (auto& " + var + " : " + name + ") { " + var + "._remove_view(true); }\n";
-            result += "    webcc::dom::set_inner_html(" + parent_var + ", \"\");\n";
+            result += "    coi::ui::set_inner_html(" + parent_var + ", \"\");\n";
         }
         else
         {
@@ -173,7 +173,7 @@ std::string Assignment::to_webcc()
         result += "for (auto& " + var + " : " + name + ") {\n";
         result += info.item_creation_code;
         result += "}\n";
-        result += "if (--g_view_depth == 0) webcc::flush();";
+        result += "if (--g_view_depth == 0) coi::ui::flush();";
         return result;
     }
 
@@ -222,7 +222,7 @@ std::string IndexAssignment::to_webcc()
             result += "{ int _idx = " + idx + ";\n";
             result += "  webcc::handle _node = " + arr + "[_idx]._get_root_element();\n";
             result += "  webcc::handle _ref = (_idx + 1 < (int)" + arr + ".size()) ? " + arr + "[_idx + 1]._get_root_element() : webcc::handle{0};\n";
-            result += "  webcc::dom::move_before(" + parent_var + ", _node, _ref);\n";
+            result += "  coi::ui::move_before(" + parent_var + ", _node, _ref);\n";
             result += "}";
             return result;
         }
@@ -347,7 +347,7 @@ std::string ExpressionStatement::to_webcc()
                     {
                         // Bulk optimization: unregister handlers only, then clear parent's innerHTML
                         result = "for (auto& " + var + " : " + arr_name + ") { " + var + "._remove_view(true); }\n";
-                        result += "webcc::dom::set_inner_html(" + parent_var + ", \"\");\n";
+                        result += "coi::ui::set_inner_html(" + parent_var + ", \"\");\n";
                     }
                     else
                     {

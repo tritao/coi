@@ -165,6 +165,9 @@ Open `http://localhost:8000` in your browser.
 | `coi dev` | Build and start dev server |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
+> [!NOTE]
+> Experimental native desktop builds are available via `--target desktop`. See `docs/desktop.md`.
+
 ### Project Structure
 
 ```

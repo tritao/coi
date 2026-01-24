@@ -217,8 +217,9 @@ static void collect_used_types(const Component &comp, std::set<std::string> &typ
     }
 }
 
-// Determine which headers are needed based on used types
-static std::set<std::string> get_required_headers(const std::vector<Component> &components)
+// Determine which headers are needed based on used types.
+// For non-web targets, callers can disable implicit web runtime headers (dom/system/input).
+static std::set<std::string> get_required_headers(const std::vector<Component> &components, bool include_web_runtime_headers = true)
 {
     static auto type_to_header = build_type_to_header();
 
@@ -229,10 +230,13 @@ static std::set<std::string> get_required_headers(const std::vector<Component> &
     }
 
     std::set<std::string> headers;
-    // Always include dom, system, and input (needed for basic DOM operations, main loop, and key state)
-    headers.insert("dom");
-    headers.insert("system");
-    headers.insert("input");
+    if (include_web_runtime_headers)
+    {
+        // For the web target we always need dom/system/input for rendering + main loop + key state.
+        headers.insert("dom");
+        headers.insert("system");
+        headers.insert("input");
+    }
 
     for (const auto &type : used_types)
     {
@@ -839,6 +843,7 @@ int main(int argc, char **argv)
     // Parse build flags (shared by build, dev, and direct compilation)
     bool keep_cc = false;
     bool cc_only = false;
+    std::string target = "web";
     for (int i = 2; i < argc; ++i)
     {
         std::string arg = argv[i];
@@ -846,16 +851,28 @@ int main(int argc, char **argv)
             keep_cc = true;
         else if (arg == "--cc-only")
             cc_only = true;
+        else if (arg == "--target")
+        {
+            if (i + 1 < argc)
+            {
+                target = argv[++i];
+            }
+            else
+            {
+                ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                return 1;
+            }
+        }
     }
 
     if (first_arg == "build")
     {
-        return build_project(keep_cc, cc_only);
+        return build_project(keep_cc, cc_only, target);
     }
 
     if (first_arg == "dev")
     {
-        return dev_project(keep_cc, cc_only);
+        return dev_project(keep_cc, cc_only, target);
     }
 
     // From here on, we're doing actual compilation - load DefSchema
@@ -863,6 +880,7 @@ int main(int argc, char **argv)
 
     std::string input_file;
     std::string output_dir;
+    target = "web";
 
     for (int i = 1; i < argc; ++i)
     {
@@ -871,6 +889,18 @@ int main(int argc, char **argv)
             cc_only = true;
         else if (arg == "--keep-cc")
             keep_cc = true;
+        else if (arg == "--target")
+        {
+            if (i + 1 < argc)
+            {
+                target = argv[++i];
+            }
+            else
+            {
+                ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                return 1;
+            }
+        }
         else if (arg == "--out" || arg == "-o")
         {
             if (i + 1 < argc)
@@ -895,6 +925,12 @@ int main(int argc, char **argv)
     if (input_file.empty())
     {
         std::cerr << "No input file specified." << std::endl;
+        return 1;
+    }
+
+    if (target != "web" && target != "desktop")
+    {
+        ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or desktop");
         return 1;
     }
 
@@ -1058,17 +1094,248 @@ int main(int argc, char **argv)
         }
 
         // Code generation - automatically detect required headers
-        std::set<std::string> required_headers = get_required_headers(all_components);
-        for (const auto &header : required_headers)
+        const bool is_web_target = (target == "web");
+        std::set<std::string> required_headers = get_required_headers(all_components, is_web_target);
+
+        if (!is_web_target && !required_headers.empty())
         {
-            out << "#include \"webcc/" << header << ".h\"\n";
+            std::string headers;
+            for (const auto &h : required_headers)
+            {
+                if (!headers.empty())
+                    headers += ", ";
+                headers += h;
+            }
+            ErrorHandler::cli_error("Desktop target does not support web platform APIs yet",
+                                    "Unsupported def headers: " + headers);
+            return 1;
         }
+
+        if (is_web_target)
+        {
+            for (const auto &header : required_headers)
+            {
+                out << "#include \"webcc/" << header << ".h\"\n";
+            }
+        }
+        else
+        {
+            // Desktop target: use only WebCC core containers/types (no webcc/webcc.h, no web platform headers).
+            out << "#include <algorithm>\n";
+            out << "#include <chrono>\n";
+            out << "#include <cstdint>\n";
+            out << "#include <cstdlib>\n";
+            out << "#include <iostream>\n";
+            out << "#include <string>\n";
+            out << "#include <thread>\n";
+            out << "#include <unordered_map>\n\n";
+            out << "#include <utility>\n\n";
+        }
+
+        out << "#include \"webcc/core/handle.h\"\n";
+        out << "#include \"webcc/core/string_view.h\"\n";
+        out << "#include \"webcc/core/string.h\"\n";
         out << "#include \"webcc/core/function.h\"\n";
         out << "#include \"webcc/core/allocator.h\"\n";
         out << "#include \"webcc/core/new.h\"\n";
         out << "#include \"webcc/core/array.h\"\n";
         out << "#include \"webcc/core/vector.h\"\n";
-        out << "#include \"webcc/core/random.h\"\n";
+        out << "#include \"webcc/core/random.h\"\n\n";
+
+        // Platform-neutral UI wrappers.
+        // These are intentionally tiny: codegen calls coi::ui::* and each target maps those calls to its runtime.
+        if (is_web_target)
+        {
+            out << "namespace coi::ui {\n";
+            out << "    inline webcc::handle next_deferred_handle() { return webcc::handle(webcc::next_deferred_handle()); }\n";
+            out << "    inline webcc::handle get_body() { return webcc::dom::get_body(); }\n";
+            out << "    inline void flush() { webcc::flush(); }\n";
+            out << "    inline void create_element_deferred(webcc::handle h, webcc::string_view tag) { webcc::dom::create_element_deferred(h, tag); }\n";
+            out << "    inline void create_element_deferred_scoped(webcc::handle h, webcc::string_view tag, webcc::string_view scope) { webcc::dom::create_element_deferred_scoped(h, tag, scope); }\n";
+            out << "    inline void create_comment_deferred(webcc::handle h, webcc::string_view text) { webcc::dom::create_comment_deferred(h, text); }\n";
+            out << "    inline void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) { webcc::dom::set_attribute(webcc::DOMElement(h), name, value); }\n";
+            out << "    inline void set_property(webcc::handle h, webcc::string_view name, webcc::string_view value) { webcc::dom::set_property(webcc::DOMElement(h), name, value); }\n";
+            out << "    inline void set_inner_html(webcc::handle h, webcc::string_view html) { webcc::dom::set_inner_html(webcc::DOMElement(h), html); }\n";
+            out << "    inline void set_inner_text(webcc::handle h, webcc::string_view text) { webcc::dom::set_inner_text(webcc::DOMElement(h), text); }\n";
+            out << "    inline void append_child(webcc::handle parent, webcc::handle child) { webcc::dom::append_child(webcc::DOMElement(parent), webcc::DOMElement(child)); }\n";
+            out << "    inline void insert_before(webcc::handle parent, webcc::handle child, webcc::handle ref) { webcc::dom::insert_before(webcc::DOMElement(parent), webcc::DOMElement(child), webcc::DOMElement(ref)); }\n";
+            out << "    inline void remove_element(webcc::handle h) { webcc::dom::remove_element(webcc::DOMElement(h)); }\n";
+            out << "    inline void move_before(webcc::handle parent, webcc::handle node, webcc::handle ref) { webcc::dom::move_before(webcc::DOMElement(parent), webcc::DOMElement(node), webcc::DOMElement(ref)); }\n";
+            out << "    inline void add_click_listener(webcc::handle h) { webcc::dom::add_click_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_input_listener(webcc::handle h) { webcc::dom::add_input_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_change_listener(webcc::handle h) { webcc::dom::add_change_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_keydown_listener(webcc::handle h) { webcc::dom::add_keydown_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void scroll_to_top() { webcc::dom::scroll_to_top(); }\n";
+            out << "} // namespace coi::ui\n\n";
+        }
+        else
+        {
+            out << "namespace coi::ui {\n";
+            out << "    struct Attr { webcc::string key; webcc::string value; };\n";
+            out << "    struct Node {\n";
+            out << "        webcc::string tag;\n";
+            out << "        webcc::string text;\n";
+            out << "        webcc::handle parent;\n";
+            out << "        std::vector<int32_t> children;\n";
+            out << "        std::vector<Attr> attrs;\n";
+            out << "    };\n";
+            out << "    static std::unordered_map<int32_t, Node> g_nodes;\n";
+            out << "    static int32_t g_next_handle = 0x100000;\n";
+            out << "    static bool g_dumped = false;\n";
+            out << "\n";
+            out << "    static Node& ensure_node(webcc::handle h) {\n";
+            out << "        int32_t id = (int32_t)h;\n";
+            out << "        auto it = g_nodes.find(id);\n";
+            out << "        if (it == g_nodes.end()) {\n";
+            out << "            Node n; n.parent = webcc::handle();\n";
+            out << "            it = g_nodes.emplace(id, std::move(n)).first;\n";
+            out << "        }\n";
+            out << "        return it->second;\n";
+            out << "    }\n";
+            out << "\n";
+            out << "    inline webcc::handle next_deferred_handle() { return webcc::handle(g_next_handle++); }\n";
+            out << "    inline webcc::handle get_body() {\n";
+            out << "        auto& b = ensure_node(webcc::handle(0));\n";
+            out << "        if (b.tag.empty()) b.tag = \"body\";\n";
+            out << "        return webcc::handle(0);\n";
+            out << "    }\n";
+            out << "    inline void flush() {\n";
+            out << "        const char* env = std::getenv(\"COI_DESKTOP_DUMP\");\n";
+            out << "        if (!env || !*env) return;\n";
+            out << "        if (g_dumped && std::string(env) != std::string(\"always\")) return;\n";
+            out << "        g_dumped = true;\n";
+            out << "        // Dump a simple tree snapshot to stdout.\n";
+            out << "        auto dump = [&](auto&& self, int32_t id, int depth) -> void {\n";
+            out << "            auto it = g_nodes.find(id);\n";
+            out << "            if (it == g_nodes.end()) return;\n";
+            out << "            const Node& n = it->second;\n";
+            out << "            for (int i = 0; i < depth; i++) std::cout << \"  \";\n";
+            out << "            std::cout << \"<\" << n.tag.c_str();\n";
+            out << "            for (const auto& a : n.attrs) {\n";
+            out << "                std::cout << \" \" << a.key.c_str() << \"=\\\"\" << a.value.c_str() << \"\\\"\";\n";
+            out << "            }\n";
+            out << "            std::cout << \">\";\n";
+            out << "            if (!n.text.empty()) std::cout << n.text.c_str();\n";
+            out << "            std::cout << \"</\" << n.tag.c_str() << \">\\n\";\n";
+            out << "            for (int32_t c : n.children) self(self, c, depth + 1);\n";
+            out << "        };\n";
+            out << "        dump(dump, 0, 0);\n";
+            out << "    }\n";
+            out << "    inline void create_element_deferred(webcc::handle h, webcc::string_view tag) { auto& n = ensure_node(h); n.tag = webcc::string(tag.data(), tag.length()); }\n";
+            out << "    inline void create_comment_deferred(webcc::handle h, webcc::string_view text) { auto& n = ensure_node(h); n.tag = \"comment\"; n.text = webcc::string(text.data(), text.length()); }\n";
+            out << "    inline void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) {\n";
+            out << "        auto& n = ensure_node(h);\n";
+            out << "        webcc::string k(name.data(), name.length());\n";
+            out << "        webcc::string v(value.data(), value.length());\n";
+            out << "        for (auto& a : n.attrs) { if (a.key == k) { a.value = v; return; } }\n";
+            out << "        n.attrs.push_back(Attr{std::move(k), std::move(v)});\n";
+            out << "    }\n";
+            out << "    inline void create_element_deferred_scoped(webcc::handle h, webcc::string_view tag, webcc::string_view scope) { create_element_deferred(h, tag); set_attribute(h, \"coi-scope\", scope); }\n";
+            out << "    inline void set_property(webcc::handle h, webcc::string_view name, webcc::string_view value) { set_attribute(h, name, value); }\n";
+            out << "    inline void set_inner_html(webcc::handle h, webcc::string_view html) {\n";
+            out << "        auto& n = ensure_node(h);\n";
+            out << "        n.children.clear();\n";
+            out << "        n.text = webcc::string(html.data(), html.length());\n";
+            out << "    }\n";
+            out << "    inline void set_inner_text(webcc::handle h, webcc::string_view text) {\n";
+            out << "        auto& n = ensure_node(h);\n";
+            out << "        n.children.clear();\n";
+            out << "        n.text = webcc::string(text.data(), text.length());\n";
+            out << "    }\n";
+            out << "    inline void append_child(webcc::handle parent, webcc::handle child) {\n";
+            out << "        auto& p = ensure_node(parent);\n";
+            out << "        auto& c = ensure_node(child);\n";
+            out << "        c.parent = parent;\n";
+            out << "        p.children.push_back((int32_t)child);\n";
+            out << "    }\n";
+            out << "    inline void insert_before(webcc::handle parent, webcc::handle child, webcc::handle ref) {\n";
+            out << "        auto& p = ensure_node(parent);\n";
+            out << "        auto& c = ensure_node(child);\n";
+            out << "        c.parent = parent;\n";
+            out << "        int32_t ref_id = (int32_t)ref;\n";
+            out << "        if (ref_id == 0) { p.children.push_back((int32_t)child); return; }\n";
+            out << "        auto it = std::find(p.children.begin(), p.children.end(), ref_id);\n";
+            out << "        if (it == p.children.end()) { p.children.push_back((int32_t)child); return; }\n";
+            out << "        p.children.insert(it, (int32_t)child);\n";
+            out << "    }\n";
+            out << "    inline void remove_element(webcc::handle h) {\n";
+            out << "        auto& n = ensure_node(h);\n";
+            out << "        if (!n.parent.is_valid()) return;\n";
+            out << "        auto& p = ensure_node(n.parent);\n";
+            out << "        int32_t id = (int32_t)h;\n";
+            out << "        p.children.erase(std::remove(p.children.begin(), p.children.end(), id), p.children.end());\n";
+            out << "        n.parent = webcc::handle();\n";
+            out << "    }\n";
+            out << "    inline void move_before(webcc::handle parent, webcc::handle node, webcc::handle ref) {\n";
+            out << "        auto& p = ensure_node(parent);\n";
+            out << "        int32_t node_id = (int32_t)node;\n";
+            out << "        int32_t ref_id = (int32_t)ref;\n";
+            out << "        p.children.erase(std::remove(p.children.begin(), p.children.end(), node_id), p.children.end());\n";
+            out << "        if (ref_id == 0) { p.children.push_back(node_id); return; }\n";
+            out << "        auto it = std::find(p.children.begin(), p.children.end(), ref_id);\n";
+            out << "        if (it == p.children.end()) { p.children.push_back(node_id); return; }\n";
+            out << "        p.children.insert(it, node_id);\n";
+            out << "    }\n";
+            out << "    inline void add_click_listener(webcc::handle) {}\n";
+            out << "    inline void add_input_listener(webcc::handle) {}\n";
+            out << "    inline void add_change_listener(webcc::handle) {}\n";
+            out << "    inline void add_keydown_listener(webcc::handle) {}\n";
+            out << "    inline void scroll_to_top() {}\n";
+            out << "} // namespace coi::ui\n\n";
+        }
+
+        // Generic event dispatcher template
+        out << "template<typename Callback, int MaxListeners = 64>\n";
+        out << "struct Dispatcher {\n";
+        out << "    int32_t handles[MaxListeners];\n";
+        out << "    Callback callbacks[MaxListeners];\n";
+        out << "    int count = 0;\n";
+        out << "    void set(webcc::handle h, Callback cb) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i] = cb; return; }\n";
+        out << "        }\n";
+        out << "        if (count < MaxListeners) {\n";
+        out << "            handles[count] = hid;\n";
+        out << "            callbacks[count] = cb;\n";
+        out << "            count++;\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    void remove(webcc::handle h) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) {\n";
+        out << "                handles[i] = handles[count-1];\n";
+        out << "                callbacks[i] = callbacks[count-1];\n";
+        out << "                count--;\n";
+        out << "                return;\n";
+        out << "            }\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    template<typename... Args>\n";
+        out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i](args...); return true; }\n";
+        out << "        }\n";
+        out << "        return false;\n";
+        out << "    }\n";
+        out << "};\n\n";
+        out << "Dispatcher<webcc::function<void()>, 128> g_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_input_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_change_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(int)>> g_keydown_dispatcher;\n";
+        bool uses_websocket = required_headers.count("websocket") > 0;
+        if (uses_websocket) {
+            out << "// WebSocket event dispatchers\n";
+            out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_ws_message_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_open_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_close_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_error_dispatcher;\n";
+        }
+        out << "webcc::function<void(const webcc::string&)> g_popstate_callback;\n";
+        out << "bool g_key_state[256] = {};\n";
+        out << "int g_view_depth = 0;\n\n";
 
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
@@ -1155,6 +1422,19 @@ int main(int argc, char **argv)
 
         // Create compiler session for cross-component state
         CompilerSession session;
+
+        if (!is_web_target)
+        {
+            for (auto *comp : sorted_components)
+            {
+                if (comp->router)
+                {
+                    ErrorHandler::cli_error("Desktop target does not support router yet",
+                                            "Router uses browser history/popstate APIs.");
+                    return 1;
+                }
+            }
+        }
 
         // Populate component info for parent-child reactivity wiring
         for (auto *comp : sorted_components)
@@ -1243,49 +1523,71 @@ int main(int argc, char **argv)
             out << "void g_app_navigate(const webcc::string& route) {}\n";
             out << "webcc::string g_app_get_route() { return \"\"; }\n";
         }
-
-        out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
-        out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
-        out << "        const auto& e = events[i];\n";
-        out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
-        emit_feature_event_handlers(out, features);
-        out << "        }\n";
-        out << "    }\n";
-        out << "}\n\n";
-        out << "void update_wrapper(double time) {\n";
-        out << "    static double last_time = 0;\n";
-        out << "    double dt = (time - last_time) / 1000.0;\n";
-        out << "    last_time = time;\n";
-        out << "    if (dt > 0.1) dt = 0.1; // Cap dt to avoid huge jumps\n";
-        out << "    static webcc::Event events[64];\n";
-        ;
-        out << "    uint32_t count = 0;\n";
-        out << "    webcc::Event e;\n";
-        out << "    while (webcc::poll_event(e) && count < 64) {\n";
-        out << "        events[count++] = e;\n";
-        out << "    }\n";
-        out << "    dispatch_events(events, count);\n";
-        // Only call tick if the root component has a tick method
-        if (session.components_with_tick.count(final_app_config.root_component))
+        if (is_web_target)
         {
-            out << "    if (app) app->tick(dt);\n";
+            out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
+            out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
+            out << "        const auto& e = events[i];\n";
+            out << "        if (false) {\n"; // Dummy to allow all handlers to use \"} else if\"
+            emit_feature_event_handlers(out, features);
+            out << "        }\n";
+            out << "    }\n";
+            out << "}\n\n";
+            out << "void update_wrapper(double time) {\n";
+            out << "    static double last_time = 0;\n";
+            out << "    double dt = (time - last_time) / 1000.0;\n";
+            out << "    last_time = time;\n";
+            out << "    if (dt > 0.1) dt = 0.1; // Cap dt to avoid huge jumps\n";
+            out << "    static webcc::Event events[64];\n";
+            out << "    uint32_t count = 0;\n";
+            out << "    webcc::Event e;\n";
+            out << "    while (webcc::poll_event(e) && count < 64) {\n";
+            out << "        events[count++] = e;\n";
+            out << "    }\n";
+            out << "    dispatch_events(events, count);\n";
+            if (session.components_with_tick.count(final_app_config.root_component))
+            {
+                out << "    if (app) app->tick(dt);\n";
+            }
+            out << "    coi::ui::flush();\n";
+            out << "}\n\n";
+
+            out << "int main() {\n";
+            out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
+            out << "    // The app needs to persist for the event loop (update_wrapper).\n";
+            out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
+            out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
+            out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
+            emit_feature_init(out, features, final_app_config.root_component);
+            out << "    app->view();\n";
+            out << "    webcc::system::set_main_loop(update_wrapper);\n";
+            out << "    coi::ui::flush();\n";
+            out << "    return 0;\n";
+            out << "}\n";
         }
-        out << "    webcc::flush();\n";
-        out << "}\n\n";
-
-        out << "int main() {\n";
-        out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
-        out << "    // The app needs to persist for the event loop (update_wrapper).\n";
-        out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
-        out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
-        out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
-        emit_feature_init(out, features, final_app_config.root_component);
-
-        out << "    app->view();\n";
-        out << "    webcc::system::set_main_loop(update_wrapper);\n";
-        out << "    webcc::flush();\n";
-        out << "    return 0;\n";
-        out << "}\n";
+        else
+        {
+            out << "int main() {\n";
+            out << "    app = new " << final_app_config.root_component << "();\n";
+            out << "    app->view();\n";
+            out << "    coi::ui::flush();\n";
+            out << "    using clock = std::chrono::steady_clock;\n";
+            out << "    auto last = clock::now();\n";
+            out << "    while (true) {\n";
+            out << "        auto now = clock::now();\n";
+            out << "        double dt = std::chrono::duration<double>(now - last).count();\n";
+            out << "        last = now;\n";
+            out << "        if (dt > 0.1) dt = 0.1;\n";
+            if (session.components_with_tick.count(final_app_config.root_component))
+            {
+                out << "        if (app) app->tick(dt);\n";
+            }
+            out << "        coi::ui::flush();\n";
+            out << "        std::this_thread::sleep_for(std::chrono::milliseconds(16));\n";
+            out << "    }\n";
+            out << "    return 0;\n";
+            out << "}\n";
+        }
 
         out.close();
         if (keep_cc)
@@ -1293,14 +1595,13 @@ int main(int argc, char **argv)
             std::cerr << "Generated " << output_cc << std::endl;
         }
 
-        if (!cc_only)
+        if (!cc_only && is_web_target)
         {
             // Generate CSS file with all styles
+            fs::path css_path = final_output_dir / "app.css";
+            std::ofstream css_out(css_path);
+            if (css_out)
             {
-                fs::path css_path = final_output_dir / "app.css";
-                std::ofstream css_out(css_path);
-                if (css_out)
-                {
                     // Bundle external stylesheets from styles/ folder at project root
                     // Project root is the parent of src/ 
                     fs::path input_dir = fs::path(input_file).parent_path();
@@ -1523,7 +1824,7 @@ int main(int argc, char **argv)
             }
         } // end if (!cc_only) for CSS
 
-        if (!cc_only)
+        if (!cc_only && is_web_target)
         {
             // Generate HTML template in cache directory
             fs::path template_path = cache_dir / "index.template.html";
@@ -1590,10 +1891,51 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
-        }
-    }
-    catch (const std::exception &e)
-    {
+	        }
+
+	        if (!cc_only && !is_web_target)
+	        {
+	            fs::path exe_dir = get_executable_dir();
+	            if (exe_dir.empty())
+	            {
+	                ErrorHandler::cli_error("Could not determine executable directory");
+	                return 1;
+	            }
+
+	            fs::path include_dir = exe_dir / "deps" / "webcc" / "include";
+	            if (!fs::exists(include_dir))
+	            {
+	                ErrorHandler::cli_error("Could not find WebCC core headers for desktop build",
+	                                        "Expected: " + include_dir.string());
+	                return 1;
+	            }
+
+	            fs::path abs_output_cc = fs::absolute(output_cc);
+	            fs::path abs_output_dir = fs::absolute(final_output_dir);
+	            fs::path out_bin = abs_output_dir / "app";
+
+	            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
+	            cmd += " -I" + include_dir.string();
+	            cmd += " " + abs_output_cc.string();
+	            cmd += " -o " + out_bin.string();
+
+	            std::cerr << "Running: " << cmd << std::endl;
+	            int ret = system(cmd.c_str());
+	            if (ret != 0)
+	            {
+	                ErrorHandler::cli_error("Desktop compilation failed",
+	                                        "Try installing a C++20 compiler toolchain (clang++ or g++).");
+	                return 1;
+	            }
+
+	            if (!keep_cc)
+	            {
+	                fs::remove(output_path);
+	            }
+	        }
+	    }
+	    catch (const std::exception &e)
+	    {
         std::cerr << colors::RED << "Error:" << colors::RESET << " " << e.what() << std::endl;
         return 1;
     }

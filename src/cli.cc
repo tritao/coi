@@ -256,7 +256,7 @@ static fs::path find_entry_point()
     return fs::path();
 }
 
-int build_project(bool keep_cc, bool cc_only, bool silent_banner)
+int build_project(bool keep_cc, bool cc_only, const std::string& target, bool silent_banner)
 {
     if (!silent_banner)
     {
@@ -309,6 +309,8 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
         extra_flags += " --keep-cc";
     if (cc_only)
         extra_flags += " --cc-only";
+    if (!target.empty())
+        extra_flags += " --target " + target;
     std::string cmd = "bash -c 'set -o pipefail; " + coi_bin.string() + " " + entry.string() + " --out " + dist_dir.string() + extra_flags + " 2>&1 | grep -v \"Success! Run\"'";
 
     std::cout << BRAND << "▶" << RESET << " Building..." << std::endl;
@@ -324,18 +326,34 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
     return 0;
 }
 
-int dev_project(bool keep_cc, bool cc_only)
+int dev_project(bool keep_cc, bool cc_only, const std::string& target)
 {
     print_banner("dev");
 
     // First build (silent banner since dev already showed one)
-    int ret = build_project(keep_cc, cc_only, true);
+    int ret = build_project(keep_cc, cc_only, target, true);
     if (ret != 0)
     {
         return ret;
     }
 
     fs::path dist_dir = fs::current_path() / "dist";
+
+    if (target == "desktop")
+    {
+        fs::path bin_path = dist_dir / "app";
+        if (!fs::exists(bin_path))
+        {
+            ErrorHandler::cli_error("Desktop build did not produce dist/app",
+                                    "Try: coi build --target desktop");
+            return 1;
+        }
+        std::cout << "  " << GREEN << "➜" << RESET << "  Running: " << CYAN << BOLD << bin_path.string() << RESET << std::endl;
+        std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
+        std::cout << std::endl;
+        std::string cmd = bin_path.string();
+        return system(cmd.c_str());
+    }
 
     std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
     std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
@@ -388,6 +406,7 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--out, -o <dir>" << RESET << "    Output directory" << std::endl;
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
+    std::cout << "    " << DIM << "--target <web|desktop>" << RESET << "  Target platform (default: web)" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;

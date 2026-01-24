@@ -133,6 +133,7 @@ coi App.coi --out ./dist
 | `--out, -o <dir>` | Output directory |
 | `--cc-only` | Generate C++ only, skip WASM compilation |
 | `--keep-cc` | Keep generated C++ files for debugging |
+| `--target <web|desktop>` | Target platform (default: `web`) |
 
 To keep the intermediate C++ file:
 

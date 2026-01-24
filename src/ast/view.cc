@@ -41,11 +41,11 @@ static std::string build_forward_args(size_t count)
 }
 
 // Helper to transform append_child calls to insert_before for anchor-based if regions
-// Transforms: webcc::dom::append_child(_if_X_parent, el[N]);
-// To:         webcc::dom::insert_before(_if_X_parent, el[N], _if_X_anchor);
+// Transforms: coi::ui::append_child(_if_X_parent, el[N]);
+// To:         coi::ui::insert_before(_if_X_parent, el[N], _if_X_anchor);
 static std::string transform_to_insert_before(const std::string& code, const std::string& if_parent, const std::string& if_anchor) {
     std::string result;
-    std::string search_pattern = "webcc::dom::append_child(" + if_parent + ", ";
+    std::string search_pattern = "coi::ui::append_child(" + if_parent + ", ";
     size_t pos = 0;
     size_t last_pos = 0;
     
@@ -66,7 +66,7 @@ static std::string transform_to_insert_before(const std::string& code, const std
         std::string elem = code.substr(elem_start, end_pos - elem_start);
         
         // Generate insert_before call
-        result += "webcc::dom::insert_before(" + if_parent + ", " + elem + ", " + if_anchor + ");";
+        result += "coi::ui::insert_before(" + if_parent + ", " + elem + ", " + if_anchor + ");";
         
         last_pos = end_pos + 2; // Skip past ");"
     }
@@ -356,9 +356,9 @@ static void generate_view_child(ASTNode *child, std::stringstream &ss, const std
     {
         // Route placeholder - create anchor comment for inserting routed components
         ss << "        _route_parent = " << parent << ";\n";
-        ss << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
-        ss << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
-        ss << "        webcc::dom::append_child(" << parent << ", _route_anchor);\n";
+        ss << "        _route_anchor = coi::ui::next_deferred_handle();\n";
+        ss << "        coi::ui::create_comment_deferred(_route_anchor, \"coi-route\");\n";
+        ss << "        coi::ui::append_child(" << parent << ", _route_anchor);\n";
     }
 }
 
@@ -384,25 +384,24 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
     {
         // In loops, use local variable but still deferred creation
         var = "_el_" + std::to_string(my_id);
-        ss << "        webcc::handle " << var << " = webcc::handle(webcc::next_deferred_handle());\n";
+        ss << "        webcc::handle " << var << " = coi::ui::next_deferred_handle();\n";
         if (has_scoped_css) {
-            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
+            ss << "        coi::ui::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
         } else {
-            ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+            ss << "        coi::ui::create_element_deferred(" << var << ", \"" << tag << "\");\n";
         }
     }
     else
     {
         // Outside loops, store in el[] array with deferred creation
         var = "el[" + std::to_string(my_id) + "]";
-        ss << "        " << var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        ss << "        " << var << " = coi::ui::next_deferred_handle();\n";
         if (has_scoped_css) {
-            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
+            ss << "        coi::ui::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
         } else {
-            ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+            ss << "        coi::ui::create_element_deferred(" << var << ", \"" << tag << "\");\n";
         }
     }
-
     if (!ref_binding.empty())
     {
         ss << "        " << ref_binding << " = " << var << ";\n";
@@ -413,32 +412,32 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
     {
         if (attr.name == "onclick")
         {
-            ss << "        webcc::dom::add_click_listener(" << var << ");\n";
+            ss << "        coi::ui::add_click_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             event_handlers.push_back({my_id, "click", attr.value->to_webcc(), is_call});
         }
         else if (attr.name == "oninput")
         {
-            ss << "        webcc::dom::add_input_listener(" << var << ");\n";
+            ss << "        coi::ui::add_input_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             event_handlers.push_back({my_id, "input", attr.value->to_webcc(), is_call});
         }
         else if (attr.name == "onchange")
         {
-            ss << "        webcc::dom::add_change_listener(" << var << ");\n";
+            ss << "        coi::ui::add_change_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             event_handlers.push_back({my_id, "change", attr.value->to_webcc(), is_call});
         }
         else if (attr.name == "onkeydown")
         {
-            ss << "        webcc::dom::add_keydown_listener(" << var << ");\n";
+            ss << "        coi::ui::add_keydown_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             event_handlers.push_back({my_id, "keydown", attr.value->to_webcc(), is_call});
         }
         else
         {
             std::string val = attr.value->to_webcc();
-            ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
+            ss << "        coi::ui::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
 
             if (!attr.value->is_static() && !in_loop)
             {
@@ -458,7 +457,7 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
     // Append to parent
     if (!parent.empty())
     {
-        ss << "        webcc::dom::append_child(" << parent << ", " << var << ");\n";
+        ss << "        coi::ui::append_child(" << parent << ", " << var << ");\n";
     }
 
     // Children
@@ -509,7 +508,7 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
         {
             generated_inline = true;
             std::vector<std::string> parts = {children[0]->to_webcc()};
-            ss << "        " << generate_formatter_block(parts, "webcc::dom::set_inner_text(" + var + ", ") << "\n";
+            ss << "        " << generate_formatter_block(parts, "coi::ui::set_inner_text(" + var + ", ") << "\n";
         }
         else if (children.size() > 1)
         {
@@ -534,13 +533,13 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
                 {
                     parts.push_back(child->to_webcc());
                 }
-                ss << "        " << generate_formatter_block(parts, "webcc::dom::set_inner_text(" + var + ", ") << "\n";
+                ss << "        " << generate_formatter_block(parts, "coi::ui::set_inner_text(" + var + ", ") << "\n";
             }
         }
 
         if (!code.empty())
         {
-            ss << "        webcc::dom::set_inner_text(" << var << ", " << code << ");\n";
+            ss << "        coi::ui::set_inner_text(" << var << ", " << code << ");\n";
         }
 
         if (!all_static && !in_loop)
@@ -788,8 +787,8 @@ void ViewIfStatement::generate_code(std::stringstream &ss, const std::string &pa
     // Create anchor comment and append to parent
     ss << "        _if_" << my_if_id << "_parent = " << parent << ";\n";
     // Use deferred creation for comment anchors
-    ss << "        _if_" << my_if_id << "_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
-    ss << "        webcc::dom::create_comment_deferred(_if_" << my_if_id << "_anchor, \"coi-⚓\");\n";
+    ss << "        _if_" << my_if_id << "_anchor = coi::ui::next_deferred_handle();\n";
+    ss << "        coi::ui::create_comment_deferred(_if_" << my_if_id << "_anchor, \"coi-⚓\");\n";
     ss << "        if (" << region.condition_code << ") {\n";
     ss << "        _if_" << my_if_id << "_state = true;\n";
     // Use original append_child for initial render (before anchor is in DOM)
@@ -799,7 +798,7 @@ void ViewIfStatement::generate_code(std::stringstream &ss, const std::string &pa
     ss << else_ss.str();
     ss << "        }\n";
     // Append anchor after the conditional content
-    ss << "        webcc::dom::append_child(" << parent << ", _if_" << my_if_id << "_anchor);\n";
+    ss << "        coi::ui::append_child(" << parent << ", _if_" << my_if_id << "_anchor);\n";
 
     if (loop_counter && loop_regions)
     {

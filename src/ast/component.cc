@@ -32,12 +32,12 @@ static std::string make_callback_name(const std::string &var_name)
 }
 
 // Transform append_child calls to insert_before for anchor-based regions
-// Transforms: webcc::dom::append_child(parent_var, el[N]);
-// To:         webcc::dom::insert_before(parent_var, el[N], anchor_var);
+// Transforms: coi::ui::append_child(parent_var, el[N]);
+// To:         coi::ui::insert_before(parent_var, el[N], anchor_var);
 static std::string transform_to_insert_before(const std::string &code, const std::string &parent_var, const std::string &anchor_var)
 {
     std::string result;
-    std::string search_pattern = "webcc::dom::append_child(" + parent_var + ", ";
+    std::string search_pattern = "coi::ui::append_child(" + parent_var + ", ";
     size_t pos = 0;
     size_t last_pos = 0;
 
@@ -55,7 +55,7 @@ static std::string transform_to_insert_before(const std::string &code, const std
         size_t elem_start = pos + search_pattern.length();
         std::string elem = code.substr(elem_start, end_pos - elem_start);
 
-        result += "webcc::dom::insert_before(" + parent_var + ", " + elem + ", " + anchor_var + ");";
+        result += "coi::ui::insert_before(" + parent_var + ", " + elem + ", " + anchor_var + ");";
         last_pos = end_pos + 2;
     }
 
@@ -484,9 +484,9 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             // Route placeholder - create anchor comment for inserting routed components
             ss_render << "        _route_parent = parent;\n";
-            ss_render << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
-            ss_render << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
-            ss_render << "        webcc::dom::append_child(parent, _route_anchor);\n";
+            ss_render << "        _route_anchor = coi::ui::next_deferred_handle();\n";
+            ss_render << "        coi::ui::create_comment_deferred(_route_anchor, \"coi-route\");\n";
+            ss_render << "        coi::ui::append_child(parent, _route_anchor);\n";
         }
     }
 
@@ -717,12 +717,12 @@ std::string Component::to_webcc(CompilerSession &session)
             // - checked: for checkbox/radio current checked state
             // - selected: for option current selected state
             if (binding.name == "value" || binding.name == "checked" || binding.name == "selected") {
-                dom_call = "webcc::dom::set_property(" + el_var + ", \"" + binding.name + "\", ";
+                dom_call = "coi::ui::set_property(" + el_var + ", \"" + binding.name + "\", ";
             } else {
-                dom_call = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ";
+                dom_call = "coi::ui::set_attribute(" + el_var + ", \"" + binding.name + "\", ";
             }
         } else {
-            dom_call = "webcc::dom::set_inner_text(" + el_var + ", ";
+            dom_call = "coi::ui::set_inner_text(" + el_var + ", ";
         }
 
         bool optimized = false;
@@ -985,7 +985,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 // Remove all existing HTML elements
                 ss << "        for (auto& _el : " << elements_vec << ") {\n";
-                ss << "            webcc::dom::remove_element(_el);\n";
+                ss << "            coi::ui::remove_element(_el);\n";
                 ss << "        }\n";
                 ss << "        " << elements_vec << ".clear();\n";
                 ss << "        \n";
@@ -1014,7 +1014,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 }
 
                 ss << "        }\n";
-                ss << "        if (--g_view_depth == 0) webcc::flush();\n";
+                ss << "        if (--g_view_depth == 0) coi::ui::flush();\n";
                 ss << "        " << count_var << " = _new_count;\n";
             }
             else
@@ -1050,7 +1050,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << indented.str();
 
                 ss << "        }\n";
-                ss << "        if (--g_view_depth == 0) webcc::flush();\n";
+                ss << "        if (--g_view_depth == 0) coi::ui::flush();\n";
                 ss << "        " << count_var << " = _new_count;\n";
             }
         }
@@ -1125,7 +1125,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "            }\n";
                 ss << "        } else {\n";
                 ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
-                ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
+                ss << "                coi::ui::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                 ss << "                " << vec_name << ".pop_back();\n";
                 ss << "            }\n";
                 ss << "        }\n";
@@ -1173,7 +1173,7 @@ std::string Component::to_webcc(CompilerSession &session)
         }
         for (int el_id : region.else_element_ids)
         {
-            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
+            ss << "            coi::ui::remove_element(el[" << el_id << "]);\n";
         }
         for (const auto &[comp_name, inst_id] : region.else_components)
         {
@@ -1203,7 +1203,7 @@ std::string Component::to_webcc(CompilerSession &session)
                     {
                         std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
                         ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
+                        ss << "                coi::ui::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                         ss << "                " << vec_name << ".pop_back();\n";
                         ss << "            }\n";
                         ss << "            _loop_" << loop_id << "_count = 0;\n";
@@ -1228,7 +1228,7 @@ std::string Component::to_webcc(CompilerSession &session)
                             ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
                         if (keydown_els.count(el_id))
                             ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) coi::ui::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
@@ -1240,7 +1240,7 @@ std::string Component::to_webcc(CompilerSession &session)
                             ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
                         if (keydown_els.count(el_id))
                             ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) coi::ui::remove_element(el[" << el_id << "]);\n";
                     }
                 }
             }
@@ -1261,7 +1261,7 @@ std::string Component::to_webcc(CompilerSession &session)
         }
         for (int el_id : region.then_element_ids)
         {
-            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
+            ss << "            coi::ui::remove_element(el[" << el_id << "]);\n";
         }
         for (const auto &[comp_name, inst_id] : region.then_components)
         {
@@ -1291,7 +1291,7 @@ std::string Component::to_webcc(CompilerSession &session)
                     {
                         std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
                         ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
+                        ss << "                coi::ui::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                         ss << "                " << vec_name << ".pop_back();\n";
                         ss << "            }\n";
                         ss << "            _loop_" << loop_id << "_count = 0;\n";
@@ -1316,7 +1316,7 @@ std::string Component::to_webcc(CompilerSession &session)
                             ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
                         if (keydown_els.count(el_id))
                             ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) coi::ui::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
@@ -1328,7 +1328,7 @@ std::string Component::to_webcc(CompilerSession &session)
                             ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
                         if (keydown_els.count(el_id))
                             ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) coi::ui::remove_element(el[" << el_id << "]);\n";
                     }
                 }
             }
@@ -1476,7 +1476,7 @@ std::string Component::to_webcc(CompilerSession &session)
     }
 
     // View method
-    ss << "    void view(webcc::handle parent = webcc::dom::get_body()) {\n";
+    ss << "    void view(webcc::handle parent = coi::ui::get_body()) {\n";
     ss << "        g_view_depth++;\n";
 
     bool has_init = false;
@@ -1495,7 +1495,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << ss_render.str();
     }
     // End view - flushes only at outermost level, then register event handlers
-    ss << "        if (--g_view_depth == 0) webcc::flush();\n";
+    ss << "        if (--g_view_depth == 0) coi::ui::flush();\n";
     // Register event handlers
     if (masks.click)
     {
@@ -1604,7 +1604,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        if (_current_route == route) return;\n";
         ss << "        _current_route = route;\n";
         ss << "        webcc::system::push_state(route);\n";
-        ss << "        webcc::dom::scroll_to_top();\n";
+        ss << "        coi::ui::scroll_to_top();\n";
         ss << "        _sync_route();\n";
         ss << "    }\n";
 
@@ -1670,8 +1670,8 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "};\n";
             ss << "            _route_" << i << "->view(_route_parent);\n";
             // Move the routed component's root element before the anchor
-            ss << "            webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
-            ss << "            webcc::flush();\n";
+            ss << "            coi::ui::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
+            ss << "            coi::ui::flush();\n";
             ss << "        }\n";
             first = false;
         }
@@ -1755,7 +1755,7 @@ std::string Component::to_webcc(CompilerSession &session)
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
             {
-                ss << "            webcc::dom::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
+                ss << "            coi::ui::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
             }
             ss << "        } else {\n";
             // Remove handlers for else-branch elements
@@ -1773,7 +1773,7 @@ std::string Component::to_webcc(CompilerSession &session)
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
             {
-                ss << "            webcc::dom::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
+                ss << "            coi::ui::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
             }
             ss << "        }\n";
         }
@@ -1827,7 +1827,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(el[0]);\n";
+            ss << "        coi::ui::remove_element(el[0]);\n";
         }
     }
     else
@@ -1843,7 +1843,7 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(el[0]);\n";
+            ss << "        coi::ui::remove_element(el[0]);\n";
         }
     }
     // Cleanup route components
@@ -1885,7 +1885,7 @@ std::string Component::to_webcc(CompilerSession &session)
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
             {
-                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
+                ss << "            if (!skip_dom_removal) coi::ui::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
             }
             ss << "        } else {\n";
             // Remove handlers for else-branch elements
@@ -1897,11 +1897,11 @@ std::string Component::to_webcc(CompilerSession &session)
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
             {
-                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
+                ss << "            if (!skip_dom_removal) coi::ui::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
             }
             ss << "        }\n";
             // Also remove the anchor
-            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(_if_" << root_if_id << "_anchor);\n";
+            ss << "        if (!skip_dom_removal) coi::ui::remove_element(_if_" << root_if_id << "_anchor);\n";
         }
     }
     else if (!conditional_els.empty())
@@ -1961,7 +1961,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(el[0]);\n";
+            ss << "        if (!skip_dom_removal) coi::ui::remove_element(el[0]);\n";
         }
     }
     else
@@ -1987,7 +1987,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(el[0]);\n";
+            ss << "        if (!skip_dom_removal) coi::ui::remove_element(el[0]);\n";
         }
     }
     ss << "    }\n";
