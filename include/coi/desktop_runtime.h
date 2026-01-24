@@ -68,6 +68,7 @@ inline webcc::handle get_body() {
 inline void flush() {
     const char* env = std::getenv("COI_DESKTOP_DUMP");
     if (!env || !*env) return;
+    if (env[0] == '0' && env[1] == '\0') return;
     if (g_dumped && std::string(env) != std::string("always")) return;
     g_dumped = true;
     std::cout << "--- COI_DESKTOP_DUMP ---\n";
@@ -1001,6 +1002,7 @@ struct SokolRunner {
 
 inline bool g_layout_dumped = false;
 inline bool g_click_done = false;
+inline bool g_render_dumped = false;
 
 inline bool parse_xy(const char* s, float& x, float& y) {
     if (!s || !*s) return false;
@@ -1071,6 +1073,37 @@ inline void dump_layout() {
 #endif
 }
 
+inline void dump_render() {
+#if defined(COI_DESKTOP_CLAY)
+    float w = 0.0f, h = 0.0f;
+    parse_viewport(w, h);
+    Clay_RenderCommandArray render_commands = ClayEngine::layout(w, h);
+    if (!ClayEngine::ctx) return;
+
+    std::cout << "--- COI_DESKTOP_RENDER_DUMP ---\n";
+    for (int32_t i = 0; i < render_commands.length; i++) {
+        Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
+        if (!cmd) continue;
+        if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) continue;
+        const auto& bb = cmd->boundingBox;
+        const auto& c = cmd->renderData.rectangle.backgroundColor;
+        if (c.a <= 0.0f) continue;
+
+        int32_t hid = (int32_t)(cmd->id ^ 0xC01D0000u);
+        auto itn = coi::ui::g_nodes.find(hid);
+        if (itn == coi::ui::g_nodes.end()) continue;
+        const auto& n = itn->second;
+        const webcc::string* cls = attr(n, "class");
+
+        auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+        std::cout << "RECT id=" << hid << " tag=" << n.tag.c_str();
+        if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+        std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+    }
+    std::cout << std::flush;
+#endif
+}
+
 inline void maybe_simulate_click() {
     const char* c = std::getenv("COI_DESKTOP_CLICK");
     if (!c || !*c) return;
@@ -1108,8 +1141,18 @@ inline void maybe_simulate_click() {
 inline void flush() {
     maybe_simulate_click();
     coi::ui::flush();
+
+    const char* render_env = std::getenv("COI_DESKTOP_RENDER_DUMP");
+    if (render_env && *render_env && !(render_env[0] == '0' && render_env[1] == '\0')) {
+        if (!g_render_dumped || std::string(render_env) == std::string("always")) {
+            dump_render();
+            g_render_dumped = true;
+        }
+    }
+
     const char* env = std::getenv("COI_DESKTOP_LAYOUT_DUMP");
     if (!env || !*env) return;
+    if (env[0] == '0' && env[1] == '\0') return;
     if (g_layout_dumped && std::string(env) != std::string("always")) return;
     g_layout_dumped = true;
     dump_layout();

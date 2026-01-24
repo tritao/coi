@@ -134,6 +134,14 @@ while IFS= read -r -d '' test_file; do
     [ -z "$layout_dump" ] && layout_dump="1"
   fi
 
+  render_dump_set="0"
+  render_dump=""
+  if [ -f "${test_file%.coi}.render_dump" ]; then
+    render_dump_set="1"
+    render_dump="$(cat "${test_file%.coi}.render_dump" | tr -d ' \t\r\n')"
+    [ -z "$render_dump" ] && render_dump="1"
+  fi
+
   viewport=""
   if [ -f "${test_file%.coi}.viewport" ]; then
     viewport="$(cat "${test_file%.coi}.viewport" | tr -d ' \t\r\n')"
@@ -147,6 +155,9 @@ while IFS= read -r -d '' test_file; do
   run_env=(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames")
   if [ "$layout_dump_set" -eq 1 ]; then
     run_env+=(COI_DESKTOP_LAYOUT_DUMP="$layout_dump")
+  fi
+  if [ "$render_dump_set" -eq 1 ]; then
+    run_env+=(COI_DESKTOP_RENDER_DUMP="$render_dump")
   fi
   if [ -n "$viewport" ]; then
     run_env+=(COI_DESKTOP_VIEWPORT="$viewport")
