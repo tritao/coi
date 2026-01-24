@@ -549,6 +549,14 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--headless" << RESET << "        (run) Desktop headless mode" << std::endl;
     std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit desktop frames" << std::endl;
     std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Desktop tree dump mode" << std::endl;
+    std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (desktop window mode)" << std::endl;
+    std::cout << "    " << DIM << "--capture-every <n>" << RESET << " (run) Capture every N frames (default: 60)" << std::endl;
+    std::cout << "    " << DIM << "--capture-max <n>" << RESET << "   (run) Stop after N captures" << std::endl;
+    std::cout << "    " << DIM << "--capture-size <WxH>" << RESET << " (run) Offscreen capture size" << std::endl;
+    std::cout << "    " << DIM << "--capture-baseline <dir>" << RESET << " (run) Compare .dhash files and report distance" << std::endl;
+    std::cout << "    " << DIM << "--capture-tolerance <n>" << RESET << " (run) Max dHash distance before mismatch" << std::endl;
+    std::cout << "    " << DIM << "--capture-overlay" << RESET << "   (run) Draw a small 'CAPTURE' overlay" << std::endl;
+    std::cout << "    " << DIM << "--capture-fail" << RESET << "      (run) Quit with failure on mismatch" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;

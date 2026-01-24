@@ -466,6 +466,14 @@ int main(int argc, char **argv)
         bool window_set = false;
         int frames = -1;
         std::string dump;
+        std::string capture_dir;
+        std::string capture_size;
+        int capture_every = -1;
+        int capture_max = -1;
+        std::string capture_baseline;
+        int capture_tolerance = -1;
+        bool capture_overlay = false;
+        bool capture_fail = false;
 
         // Parse run flags (includes build flags too).
         for (int i = 2; i < argc; ++i) {
@@ -501,6 +509,52 @@ int main(int argc, char **argv)
                     ErrorHandler::cli_error("--dump requires an argument (0|1|always)");
                     return 1;
                 }
+            } else if (arg == "--capture" || arg == "--capture-dir") {
+                if (i + 1 < argc) {
+                    capture_dir = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture requires a directory");
+                    return 1;
+                }
+            } else if (arg == "--capture-size") {
+                if (i + 1 < argc) {
+                    capture_size = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture-size requires WxH");
+                    return 1;
+                }
+            } else if (arg == "--capture-every") {
+                if (i + 1 < argc) {
+                    capture_every = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-every requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-max") {
+                if (i + 1 < argc) {
+                    capture_max = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-max requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-baseline") {
+                if (i + 1 < argc) {
+                    capture_baseline = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture-baseline requires a directory");
+                    return 1;
+                }
+            } else if (arg == "--capture-tolerance") {
+                if (i + 1 < argc) {
+                    capture_tolerance = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-tolerance requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-overlay") {
+                capture_overlay = true;
+            } else if (arg == "--capture-fail") {
+                capture_fail = true;
             } else if (run_input.empty() && !arg.empty() && arg[0] != '-') {
                 run_input = arg;
             } else {
@@ -515,6 +569,36 @@ int main(int argc, char **argv)
         }
         if (target == "desktop" && !window_set) {
             window = true; // run defaults to windowed for desktop
+        }
+
+        if (!capture_dir.empty() || !capture_size.empty() || capture_every >= 0 || capture_max >= 0 || !capture_baseline.empty() ||
+            capture_tolerance >= 0 || capture_overlay || capture_fail) {
+            if (target != "desktop") {
+                ErrorHandler::cli_error("--capture* options require --target desktop");
+                return 1;
+            }
+#if defined(_WIN32)
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                _putenv_s(k.c_str(), v.c_str());
+            };
+            if (!capture_dir.empty()) putenv_kv("COI_DESKTOP_CAPTURE_DIR", capture_dir);
+            if (!capture_size.empty()) putenv_kv("COI_DESKTOP_CAPTURE_SIZE", capture_size);
+            if (capture_every >= 0) putenv_kv("COI_DESKTOP_CAPTURE_EVERY", std::to_string(capture_every));
+            if (capture_max >= 0) putenv_kv("COI_DESKTOP_CAPTURE_MAX", std::to_string(capture_max));
+            if (!capture_baseline.empty()) putenv_kv("COI_DESKTOP_CAPTURE_BASELINE", capture_baseline);
+            if (capture_tolerance >= 0) putenv_kv("COI_DESKTOP_CAPTURE_TOLERANCE", std::to_string(capture_tolerance));
+            if (capture_overlay) putenv_kv("COI_DESKTOP_CAPTURE_OVERLAY", "1");
+            if (capture_fail) putenv_kv("COI_DESKTOP_CAPTURE_FAIL_ON_MISMATCH", "1");
+#else
+            if (!capture_dir.empty()) setenv("COI_DESKTOP_CAPTURE_DIR", capture_dir.c_str(), 1);
+            if (!capture_size.empty()) setenv("COI_DESKTOP_CAPTURE_SIZE", capture_size.c_str(), 1);
+            if (capture_every >= 0) setenv("COI_DESKTOP_CAPTURE_EVERY", std::to_string(capture_every).c_str(), 1);
+            if (capture_max >= 0) setenv("COI_DESKTOP_CAPTURE_MAX", std::to_string(capture_max).c_str(), 1);
+            if (!capture_baseline.empty()) setenv("COI_DESKTOP_CAPTURE_BASELINE", capture_baseline.c_str(), 1);
+            if (capture_tolerance >= 0) setenv("COI_DESKTOP_CAPTURE_TOLERANCE", std::to_string(capture_tolerance).c_str(), 1);
+            if (capture_overlay) setenv("COI_DESKTOP_CAPTURE_OVERLAY", "1", 1);
+            if (capture_fail) setenv("COI_DESKTOP_CAPTURE_FAIL_ON_MISMATCH", "1", 1);
+#endif
         }
 
         return run_project(keep_cc, cc_only, target, run_input, window, frames, dump);
