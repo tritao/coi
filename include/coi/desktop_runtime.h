@@ -820,7 +820,10 @@ struct SokolRunner {
 #endif
 
 #if defined(COI_DESKTOP_FONTSTASH)
-        fons_ctx = sfons_create(&(sfons_desc_t){.width = 512, .height = 512});
+        sfons_desc_t fs_desc{};
+        fs_desc.width = 512;
+        fs_desc.height = 512;
+        fons_ctx = sfons_create(&fs_desc);
         if (fons_ctx) {
             const char* font_path = std::getenv("COI_DESKTOP_FONT");
             if (!font_path || !*font_path) {
