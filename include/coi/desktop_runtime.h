@@ -278,6 +278,9 @@ struct DesktopClassStyle {
     bool clip_x = false;
     bool clip_y = false;
 
+    bool has_border = false;
+    Clay_BorderWidth border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
+
     bool has_align_x = false;
     Clay_LayoutAlignmentX align_x = CLAY_ALIGN_X_LEFT;
 
@@ -352,6 +355,16 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
             st.clip_y = true;
             return;
         }
+        if (t == "border") {
+            st.has_border = true;
+            st.border_width = Clay_BorderWidth{1, 1, 1, 1, st.border_width.betweenChildren};
+            return;
+        }
+        if (t == "border-none") {
+            st.has_border = false;
+            st.border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
+            return;
+        }
         if (t == "grow") {
             st.w_grow = true;
             return;
@@ -424,6 +437,16 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
         if (parse_u16_suffix("g-", st.gap, st.has_gap)) return;
         if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
         if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
+
+        uint16_t bw = 0;
+        if (parse_u16_suffix("border-", bw, st.has_border)) {
+            st.border_width.left = bw;
+            st.border_width.right = bw;
+            st.border_width.top = bw;
+            st.border_width.bottom = bw;
+            return;
+        }
+        if (parse_u16_suffix("border-between-", st.border_width.betweenChildren, st.has_border)) return;
     }));
 
     if (is_root) {
@@ -539,6 +562,16 @@ struct ClayEngine {
                 .childOffset = Clay_Vector2{0, 0},
             };
         }
+        if (st.has_border && (st.border_width.left || st.border_width.right || st.border_width.top || st.border_width.bottom ||
+                              st.border_width.betweenChildren)) {
+            uint32_t h = hash_u32((attr(n, "class") ? attr(n, "class")->c_str() : n.tag.c_str()));
+            float cr, cg, cb;
+            color_from_hash(h, cr, cg, cb);
+            decl.border = Clay_BorderElementConfig{
+                .color = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 180.0f},
+                .width = st.border_width,
+            };
+        }
         if (is_root || st.bg_none) {
             decl.backgroundColor = Clay_Color{0, 0, 0, 0};
         } else {
@@ -558,6 +591,7 @@ struct ClayEngine {
         if (n.tag == "comment") return;
 
         Clay_ElementDeclaration decl = declaration_for_node(n, is_root);
+        decl.userData = (void*)(intptr_t)id;
         Clay_ElementId eid = element_id(id);
         CLAY(eid, decl) {
             if (!n.text.empty()) {
@@ -886,15 +920,36 @@ struct SokolRunner {
                     begin_quads();
                     continue;
                 }
-                if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) continue;
                 const auto& bb = cmd->boundingBox;
-                const auto& c = cmd->renderData.rectangle.backgroundColor;
-                sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
-                float x0 = bb.x, y0 = bb.y, x1 = bb.x + bb.width, y1 = bb.y + bb.height;
-                sgl_v2f(x0, y0);
-                sgl_v2f(x1, y0);
-                sgl_v2f(x1, y1);
-                sgl_v2f(x0, y1);
+                auto quad = [&](float x, float y, float w, float h) {
+                    float x0 = x, y0 = y, x1 = x + w, y1 = y + h;
+                    sgl_v2f(x0, y0);
+                    sgl_v2f(x1, y0);
+                    sgl_v2f(x1, y1);
+                    sgl_v2f(x0, y1);
+                };
+
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
+                    const auto& c = cmd->renderData.rectangle.backgroundColor;
+                    sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+                    quad(bb.x, bb.y, bb.width, bb.height);
+                } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_BORDER) {
+                    const auto& b = cmd->renderData.border;
+                    const auto& c = b.color;
+                    if (c.a <= 0) continue;
+                    float w = std::max(0.0f, bb.width);
+                    float h = std::max(0.0f, bb.height);
+                    float l = std::min<float>((float)b.width.left, w);
+                    float r = std::min<float>((float)b.width.right, w);
+                    float t = std::min<float>((float)b.width.top, h);
+                    float bo = std::min<float>((float)b.width.bottom, h);
+                    if ((l + r + t + bo) <= 0.0f) continue;
+                    sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+                    if (t > 0.0f) quad(bb.x, bb.y, w, t);
+                    if (bo > 0.0f) quad(bb.x, bb.y + h - bo, w, bo);
+                    if (l > 0.0f) quad(bb.x, bb.y, l, h);
+                    if (r > 0.0f) quad(bb.x + w - r, bb.y, r, h);
+                }
             }
             flush_quads();
         } else {
@@ -1245,6 +1300,29 @@ inline void dump_render() {
             std::cout << "SCISSOR_START x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
         } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
             std::cout << "SCISSOR_END\n";
+        } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_BORDER) {
+            const auto& b = cmd->renderData.border;
+            const auto& c = b.color;
+            if (c.a <= 0.0f) continue;
+            const auto& w = b.width;
+            if (!(w.left || w.right || w.top || w.bottom || w.betweenChildren)) continue;
+
+            const int32_t owner = cmd->userData ? (int32_t)(intptr_t)cmd->userData : 0;
+            const auto itn = (owner != 0) ? coi::ui::g_nodes.find(owner) : coi::ui::g_nodes.end();
+
+            std::cout << "BORDER";
+            if (itn != coi::ui::g_nodes.end()) {
+                const auto& n = itn->second;
+                const webcc::string* cls = attr(n, "class");
+                std::cout << " owner=" << owner << " tag=" << n.tag.c_str();
+                if (cls && !cls->empty()) std::cout << " class=\"" << cls->c_str() << "\"";
+            } else if (owner != 0) {
+                std::cout << " owner=" << owner;
+            }
+            std::cout << " x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height);
+            std::cout << " l=" << (int)w.left << " r=" << (int)w.right << " t=" << (int)w.top << " b=" << (int)w.bottom
+                      << " between=" << (int)w.betweenChildren;
+            std::cout << " color=" << (int)c.r << "," << (int)c.g << "," << (int)c.b << "," << (int)c.a << "\n";
         } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
             const auto& c = cmd->renderData.rectangle.backgroundColor;
             if (c.a <= 0.0f) continue;
