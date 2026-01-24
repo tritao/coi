@@ -556,7 +556,7 @@ struct ClayEngine {
         Clay_SetCurrentContext(ctx);
         Clay_SetMeasureTextFunction(measure_text, nullptr);
         text_cfg = CLAY_TEXT_CONFIG({
-            .textColor = {20, 20, 22, 255},
+            .textColor = {235, 235, 240, 255},
             .fontSize = 8,
             .letterSpacing = 0,
             .lineHeight = 8,

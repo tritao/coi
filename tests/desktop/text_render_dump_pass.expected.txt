@@ -1,3 +1,3 @@
 --- COI_DESKTOP_RENDER_DUMP ---
 RECT id=1048577 tag=div class="t w-100 h-30 pad-0" x=0 y=0 w=100 h=30
-TEXT owner=1048577 tag=div class="t w-100 h-30 pad-0" x=0 y=0 w=40 h=8 color=20,20,22,255 font=0 size=8 ls=0 lh=8 text="Hello"
+TEXT owner=1048577 tag=div class="t w-100 h-30 pad-0" x=0 y=0 w=40 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Hello"
