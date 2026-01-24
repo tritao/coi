@@ -9,6 +9,9 @@
 #include <limits.h>
 #include <cstdlib>
 #include <vector>
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#endif
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -33,6 +36,33 @@ static void print_banner(const char *cmd)
         std::cout << " " << DIM << cmd << RESET;
     }
     std::cout << std::endl;
+}
+
+static int normalize_system_status(int status)
+{
+#if defined(_WIN32)
+    // On Windows, system() returns the command's exit code.
+    return status;
+#else
+    if (status == -1)
+    {
+        return 1;
+    }
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
+    if (WIFSIGNALED(status))
+    {
+        return 128 + WTERMSIG(status);
+    }
+    return 1;
+#endif
+}
+
+static int run_system(const std::string& cmd)
+{
+    return normalize_system_status(system(cmd.c_str()));
 }
 
 // Get the directory where the coi executable is located
@@ -316,7 +346,7 @@ int build_project(bool keep_cc, bool cc_only, const std::string& target, bool si
     std::string cmd = "bash -c 'set -o pipefail; " + coi_bin.string() + " " + entry.string() + " --out " + dist_dir.string() + extra_flags + " 2>&1 | grep -v \"Success! Run\"'";
 
     std::cout << BRAND << "▶" << RESET << " Building..." << std::endl;
-    int ret = system(cmd.c_str());
+    int ret = run_system(cmd);
 
     if (ret != 0)
     {
@@ -354,7 +384,7 @@ int dev_project(bool keep_cc, bool cc_only, const std::string& target)
         std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
         std::cout << std::endl;
         std::string cmd = bin_path.string();
-        return system(cmd.c_str());
+        return run_system(cmd);
     }
 
     std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
@@ -388,7 +418,7 @@ if __name__ == '__main__':
 )";
 
     std::string cmd = "cd " + dist_dir.string() + " && python3 -c \"" + python_script + "\" 2>&1 | grep -v 'Serving HTTP'";
-    return system(cmd.c_str());
+    return run_system(cmd);
 }
 
 static int run_web_server(const fs::path& dist_dir)
@@ -420,7 +450,7 @@ if __name__ == '__main__':
 )";
 
     std::string cmd = "cd " + dist_dir.string() + " && python3 -c \"" + python_script + "\" 2>&1 | grep -v 'Serving HTTP'";
-    return system(cmd.c_str());
+    return run_system(cmd);
 }
 
 static int run_desktop_binary(const fs::path& bin_path, bool window, int frames, const std::string& dump)
@@ -451,7 +481,7 @@ static int run_desktop_binary(const fs::path& bin_path, bool window, int frames,
     std::cout << std::endl;
 
     std::string cmd = env + bin_path.string();
-    return system(cmd.c_str());
+    return run_system(cmd);
 }
 
 static fs::path mktemp_dir_under(const fs::path& parent, const std::string& prefix)
@@ -506,7 +536,7 @@ int run_project(bool keep_cc, bool cc_only, const std::string& target,
 
         std::cout << BRAND << "▶" << RESET << " Building..." << std::endl;
         std::string cmd = coi_bin.string() + " " + input_file + " --out " + dist_dir.string() + extra_flags;
-        int ret = system(cmd.c_str());
+        int ret = run_system(cmd);
         if (ret != 0)
         {
             ErrorHandler::build_failed();
