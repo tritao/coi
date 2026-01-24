@@ -1,0 +1,7 @@
+# Snapshot after each step is automatic.
+snapshot
+click 10 10
+click 10 10
+pointer 10 50
+scroll 0 30
+

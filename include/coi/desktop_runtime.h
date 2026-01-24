@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -1437,10 +1438,17 @@ inline bool parse_viewport(float& w, float& h) {
     return true;
 }
 
+inline void dump_layout(float w, float h);
 inline void dump_layout() {
 #if defined(COI_DESKTOP_CLAY)
     float w = 0.0f, h = 0.0f;
     parse_viewport(w, h);
+    dump_layout(w, h);
+#endif
+}
+
+inline void dump_layout(float w, float h) {
+#if defined(COI_DESKTOP_CLAY)
     (void)ClayEngine::layout(w, h);
     if (!ClayEngine::ctx) return;
 
@@ -1474,10 +1482,17 @@ inline void dump_layout() {
 #endif
 }
 
+inline void dump_render(float w, float h);
 inline void dump_render() {
 #if defined(COI_DESKTOP_CLAY)
     float w = 0.0f, h = 0.0f;
     parse_viewport(w, h);
+    dump_render(w, h);
+#endif
+}
+
+inline void dump_render(float w, float h) {
+#if defined(COI_DESKTOP_CLAY)
     Clay_RenderCommandArray render_commands = ClayEngine::layout(w, h);
     if (!ClayEngine::ctx) return;
 
@@ -1592,6 +1607,68 @@ inline void dump_render() {
 #endif
 }
 
+inline void dump_tree_force() {
+    std::cout << "--- COI_DESKTOP_DUMP ---\n";
+    auto dump = [&](auto&& self, int32_t id, int depth) -> void {
+        auto it = coi::ui::g_nodes.find(id);
+        if (it == coi::ui::g_nodes.end()) return;
+        const coi::ui::Node& n = it->second;
+        for (int i = 0; i < depth; i++) std::cout << "  ";
+        std::cout << "<" << n.tag.c_str();
+        for (const auto& a : n.attrs) {
+            std::cout << " " << a.key.c_str() << "=\"" << a.value.c_str() << "\"";
+        }
+        std::cout << ">";
+        if (!n.text.empty()) std::cout << n.text.c_str();
+        std::cout << "</" << n.tag.c_str() << ">\n";
+        for (int32_t c : n.children) self(self, c, depth + 1);
+    };
+    dump(dump, 0, 0);
+    std::cout << std::flush;
+}
+
+inline void simulate_click_at(float x, float y, float w, float h) {
+    if (!g_click_dispatcher) return;
+#if defined(COI_DESKTOP_CLAY)
+    (void)ClayEngine::layout(w, h);
+    if (!ClayEngine::ctx) return;
+    Clay_SetCurrentContext(ClayEngine::ctx);
+    Clay_SetPointerState(Clay_Vector2{x, y}, false);
+    Clay_ElementIdArray ids = Clay_GetPointerOverIds();
+    for (int32_t i = ids.length - 1; i >= 0; --i) {
+        Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
+        if (!eid) continue;
+        int32_t hid = (int32_t)(eid->id ^ 0xC01D0000u);
+        if (coi::ui::g_nodes.find(hid) == coi::ui::g_nodes.end()) continue;
+        dispatch_click_bubble(webcc::handle(hid));
+        return;
+    }
+#else
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+#endif
+}
+
+inline void simulate_scroll_at(float pointer_x, float pointer_y, float dx, float dy, float w, float h) {
+#if defined(COI_DESKTOP_CLAY)
+    // Prime scroll container mappings and pointer-over state.
+    ClayEngine::set_input(pointer_x, pointer_y, false, 0.0f, 0.0f, 1.0f / 60.0f);
+    (void)ClayEngine::layout(w, h);
+    // Apply scroll. Deltas follow browser-like semantics.
+    ClayEngine::set_input(pointer_x, pointer_y, false, -dx, -dy, 1.0f / 60.0f);
+    (void)ClayEngine::layout(w, h);
+#else
+    (void)pointer_x;
+    (void)pointer_y;
+    (void)dx;
+    (void)dy;
+    (void)w;
+    (void)h;
+#endif
+}
+
 inline void maybe_simulate_click() {
     const char* c = std::getenv("COI_DESKTOP_CLICK");
     if (!c || !*c) return;
@@ -1604,21 +1681,7 @@ inline void maybe_simulate_click() {
 #if defined(COI_DESKTOP_CLAY)
     float w = 0.0f, h = 0.0f;
     parse_viewport(w, h);
-    (void)ClayEngine::layout(w, h);
-    if (!ClayEngine::ctx) return;
-    Clay_SetCurrentContext(ClayEngine::ctx);
-    Clay_SetPointerState(Clay_Vector2{x, y}, false);
-    Clay_ElementIdArray ids = Clay_GetPointerOverIds();
-    // ids are ordered from root->leaf, so traverse backwards to find a COI handle node.
-    for (int32_t i = ids.length - 1; i >= 0; --i) {
-        Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
-        if (!eid) continue;
-        int32_t hid = (int32_t)(eid->id ^ 0xC01D0000u);
-        if (coi::ui::g_nodes.find(hid) == coi::ui::g_nodes.end()) continue;
-        dispatch_click_bubble(webcc::handle(hid));
-        g_click_done = true;
-        return;
-    }
+    simulate_click_at(x, y, w, h);
 #else
     (void)x;
     (void)y;
@@ -1641,13 +1704,7 @@ inline void maybe_simulate_scroll() {
 #if defined(COI_DESKTOP_CLAY)
     float w = 0.0f, h = 0.0f;
     parse_viewport(w, h);
-    // Prime scroll container mappings and pointer-over state.
-    ClayEngine::set_input(px, py, false, 0.0f, 0.0f, 1.0f / 60.0f);
-    (void)ClayEngine::layout(w, h);
-    // Apply scroll. Env deltas follow "positive means scroll down/right" (browser-like);
-    // Clay expects negative scrollDelta.y to move content down.
-    ClayEngine::set_input(px, py, false, -dx, -dy, 1.0f / 60.0f);
-    (void)ClayEngine::layout(w, h);
+    simulate_scroll_at(px, py, dx, dy, w, h);
 #else
     (void)dx;
     (void)dy;
@@ -1657,7 +1714,196 @@ inline void maybe_simulate_scroll() {
     g_scroll_done = true;
 }
 
+inline bool parse_wh(const std::string& s, float& w, float& h) {
+    int iw = 0;
+    int ih = 0;
+    if (std::sscanf(s.c_str(), "%dx%d", &iw, &ih) == 2 || std::sscanf(s.c_str(), "%d,%d", &iw, &ih) == 2 ||
+        std::sscanf(s.c_str(), "%d %d", &iw, &ih) == 2) {
+        if (iw <= 0) iw = 1;
+        if (ih <= 0) ih = 1;
+        w = (float)iw;
+        h = (float)ih;
+        return true;
+    }
+    return false;
+}
+
+inline std::string trim_copy(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')) i++;
+    size_t j = s.size();
+    while (j > i && (s[j - 1] == ' ' || s[j - 1] == '\t' || s[j - 1] == '\r' || s[j - 1] == '\n')) j--;
+    return s.substr(i, j - i);
+}
+
+inline std::vector<std::string> split_ws(const std::string& s) {
+    std::vector<std::string> out;
+    size_t i = 0;
+    while (i < s.size()) {
+        while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) i++;
+        if (i >= s.size()) break;
+        size_t j = i;
+        while (j < s.size() && (s[j] != ' ' && s[j] != '\t')) j++;
+        out.push_back(s.substr(i, j - i));
+        i = j;
+    }
+    return out;
+}
+
+struct DesktopScriptRunner {
+    bool loaded = false;
+    bool ran = false;
+    std::string path;
+    std::vector<std::string> lines;
+
+    float viewport_w = 0.0f;
+    float viewport_h = 0.0f;
+    float pointer_x = 1.0f;
+    float pointer_y = 1.0f;
+
+    bool dump_tree = true;
+    bool dump_layout = false;
+    bool dump_render = false;
+};
+
+inline DesktopScriptRunner g_script;
+
+inline void load_script_if_any() {
+    if (g_script.loaded) return;
+    const char* p = std::getenv("COI_DESKTOP_SCRIPT");
+    if (!p || !*p) return;
+    g_script.loaded = true;
+    g_script.path = p;
+
+    parse_viewport(g_script.viewport_w, g_script.viewport_h);
+    const char* ptr = std::getenv("COI_DESKTOP_POINTER");
+    if (ptr && *ptr) (void)parse_xy(ptr, g_script.pointer_x, g_script.pointer_y);
+
+    const char* dumps = std::getenv("COI_DESKTOP_SCRIPT_DUMPS");
+    if (dumps && *dumps) {
+        g_script.dump_tree = false;
+        g_script.dump_layout = false;
+        g_script.dump_render = false;
+        std::string s = dumps;
+        for (char& c : s) c = (c == ';') ? ',' : c;
+        auto parts = split_ws(s);
+        // also accept comma-separated in a single token
+        std::vector<std::string> expanded;
+        for (const auto& tok : parts) {
+            size_t start = 0;
+            while (start < tok.size()) {
+                size_t end = tok.find(',', start);
+                if (end == std::string::npos) end = tok.size();
+                if (end > start) expanded.push_back(tok.substr(start, end - start));
+                start = end + 1;
+            }
+        }
+        for (auto t : expanded) {
+            for (char& c : t) c = (char)std::tolower((unsigned char)c);
+            if (t == "all") {
+                g_script.dump_tree = true;
+                g_script.dump_layout = true;
+                g_script.dump_render = true;
+            } else if (t == "dump" || t == "tree") {
+                g_script.dump_tree = true;
+            } else if (t == "layout") {
+                g_script.dump_layout = true;
+            } else if (t == "render" || t == "render_dump") {
+                g_script.dump_render = true;
+            }
+        }
+        // default if parsed nothing
+        if (!g_script.dump_tree && !g_script.dump_layout && !g_script.dump_render) g_script.dump_tree = true;
+    }
+
+    std::ifstream f(g_script.path);
+    if (!f) {
+        std::cerr << "[desktop-script] failed to open: " << g_script.path << "\n";
+        g_script.ran = true;
+        return;
+    }
+    std::string line;
+    while (std::getline(f, line)) g_script.lines.push_back(line);
+}
+
+inline void script_snapshot(int step, const std::string& line) {
+    std::cout << "--- COI_DESKTOP_SCRIPT_STEP " << step << ": " << line << " ---\n";
+    if (g_script.dump_tree) dump_tree_force();
+    if (g_script.dump_layout) dump_layout(g_script.viewport_w, g_script.viewport_h);
+    if (g_script.dump_render) dump_render(g_script.viewport_w, g_script.viewport_h);
+    std::cout << std::flush;
+}
+
+inline void run_script_if_any() {
+    load_script_if_any();
+    if (!g_script.loaded || g_script.ran) return;
+    g_script.ran = true;
+
+    int step = 0;
+    for (const auto& raw : g_script.lines) {
+        std::string line = trim_copy(raw);
+        if (line.empty()) continue;
+        if (line[0] == '#') continue;
+
+        auto toks = split_ws(line);
+        if (toks.empty()) continue;
+        std::string cmd = toks[0];
+        for (char& c : cmd) c = (char)std::tolower((unsigned char)c);
+
+        bool ok = true;
+        if (cmd == "viewport") {
+            if (toks.size() < 2) {
+                ok = false;
+            } else {
+                ok = parse_wh(toks[1], g_script.viewport_w, g_script.viewport_h);
+                if (!ok && toks.size() >= 3) {
+                    ok = parse_wh(toks[1] + " " + toks[2], g_script.viewport_w, g_script.viewport_h);
+                }
+            }
+        } else if (cmd == "pointer" || cmd == "move") {
+            if (toks.size() < 3) {
+                ok = false;
+            } else {
+                float x = 0.0f, y = 0.0f;
+                ok = parse_xy((toks[1] + " " + toks[2]).c_str(), x, y);
+                if (ok) {
+                    g_script.pointer_x = x;
+                    g_script.pointer_y = y;
+                }
+            }
+        } else if (cmd == "click") {
+            float x = g_script.pointer_x;
+            float y = g_script.pointer_y;
+            if (toks.size() >= 3) {
+                ok = parse_xy((toks[1] + " " + toks[2]).c_str(), x, y);
+            }
+            if (ok) simulate_click_at(x, y, g_script.viewport_w, g_script.viewport_h);
+        } else if (cmd == "scroll") {
+            if (toks.size() < 3) {
+                ok = false;
+            } else {
+                float dx = 0.0f, dy = 0.0f;
+                ok = parse_xy((toks[1] + " " + toks[2]).c_str(), dx, dy);
+                if (ok) {
+                    simulate_scroll_at(g_script.pointer_x, g_script.pointer_y, dx, dy, g_script.viewport_w, g_script.viewport_h);
+                }
+            }
+        } else if (cmd == "snapshot" || cmd == "dump") {
+            // no-op; snapshot happens below
+        } else {
+            ok = false;
+        }
+
+        step++;
+        if (!ok) {
+            std::cerr << "[desktop-script] parse error in: " << g_script.path << ": " << line << "\n";
+        }
+        script_snapshot(step, line);
+    }
+}
+
 inline void flush() {
+    run_script_if_any();
     maybe_simulate_scroll();
     maybe_simulate_click();
     coi::ui::flush();

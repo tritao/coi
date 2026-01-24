@@ -162,6 +162,16 @@ while IFS= read -r -d '' test_file; do
     scroll="$(cat "${test_file%.coi}.scroll" | tr -d ' \t\r\n')"
   fi
 
+  script_path=""
+  if [ -f "${test_file%.coi}.script" ]; then
+    script_path="${test_file%.coi}.script"
+  fi
+
+  script_dumps=""
+  if [ -f "${test_file%.coi}.script_dumps" ]; then
+    script_dumps="$(cat "${test_file%.coi}.script_dumps" | tr -d ' \t\r\n')"
+  fi
+
   run_env=(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames")
   if [ "$layout_dump_set" -eq 1 ]; then
     run_env+=(COI_DESKTOP_LAYOUT_DUMP="$layout_dump")
@@ -180,6 +190,12 @@ while IFS= read -r -d '' test_file; do
   fi
   if [ -n "$scroll" ]; then
     run_env+=(COI_DESKTOP_SCROLL="$scroll")
+  fi
+  if [ -n "$script_path" ]; then
+    run_env+=(COI_DESKTOP_SCRIPT="$script_path")
+  fi
+  if [ -n "$script_dumps" ]; then
+    run_env+=(COI_DESKTOP_SCRIPT_DUMPS="$script_dumps")
   fi
 
   set +e

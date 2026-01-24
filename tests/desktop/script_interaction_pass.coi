@@ -1,0 +1,23 @@
+component App {
+    mut int count = 0;
+
+    def inc() : void {
+        count += 1;
+    }
+
+    view {
+        <div class="root col pad-0 gap-4 fill">
+            <div class="btn w-120 h-30 pad-0 border-1" onclick={inc}>Count:{count}</div>
+            <div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip">
+                <div class="item w-180 h-20 pad-0">A</div>
+                <div class="item w-180 h-20 pad-0">B</div>
+                <div class="item w-180 h-20 pad-0">C</div>
+                <div class="item w-180 h-20 pad-0">D</div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
