@@ -35,6 +35,9 @@ jobs:
       - name: Run Tests
         run: ./tests/run.sh
 
+      - name: Run Desktop Tests
+        run: ./tests/run_desktop.sh
+
       - name: Build Example
         run: cd example && ../coi build
 
