@@ -1130,6 +1130,17 @@ int main(int argc, char **argv)
             out << "#include <thread>\n";
             out << "#include <unordered_map>\n\n";
             out << "#include <utility>\n\n";
+            out << "#if defined(COI_DESKTOP_SOKOL)\n";
+            out << "    #define SOKOL_NO_ENTRY\n";
+            out << "    #define SOKOL_GLCORE33\n";
+            out << "    #define SOKOL_IMPL\n";
+            out << "    #define SOKOL_DEBUGTEXT_IMPL\n";
+            out << "    #include \"sokol_app.h\"\n";
+            out << "    #include \"sokol_gfx.h\"\n";
+            out << "    #include \"sokol_glue.h\"\n";
+            out << "    #include \"sokol_time.h\"\n";
+            out << "    #include \"sokol_debugtext.h\"\n";
+            out << "#endif\n\n";
         }
 
         out << "#include \"webcc/core/handle.h\"\n";
@@ -1567,6 +1578,99 @@ int main(int argc, char **argv)
             out << "    return 0;\n";
             out << "}\n";
         } else {
+            out << "#if defined(COI_DESKTOP_SOKOL)\n";
+            out << "namespace coi::desktop {\n";
+            out << "    struct SokolState {\n";
+            out << "        int frames_limit = -1;\n";
+            out << "        int frames = 0;\n";
+            out << "        bool has_tick = false;\n";
+            out << "    };\n";
+            out << "    static SokolState g_state;\n";
+            out << "\n";
+            out << "    static void _sdtx_dump_node(int32_t id, int depth) {\n";
+            out << "        auto it = coi::ui::g_nodes.find(id);\n";
+            out << "        if (it == coi::ui::g_nodes.end()) return;\n";
+            out << "        const auto& n = it->second;\n";
+            out << "        std::string s;\n";
+            out << "        s.append((size_t)depth * 2, ' ');\n";
+            out << "        s.push_back('<');\n";
+            out << "        s += n.tag.c_str();\n";
+            out << "        for (const auto& a : n.attrs) {\n";
+            out << "            s.push_back(' ');\n";
+            out << "            s += a.key.c_str();\n";
+            out << "            s += \"=\\\"\";\n";
+            out << "            s += a.value.c_str();\n";
+            out << "            s += \"\\\"\";\n";
+            out << "        }\n";
+            out << "        s.push_back('>');\n";
+            out << "        if (!n.text.empty()) s += n.text.c_str();\n";
+            out << "        s += \"</\";\n";
+            out << "        s += n.tag.c_str();\n";
+            out << "        s.push_back('>');\n";
+            out << "        sdtx_printf(\"%s\\n\", s.c_str());\n";
+            out << "        for (int32_t c : n.children) _sdtx_dump_node(c, depth + 1);\n";
+            out << "    }\n";
+            out << "\n";
+            out << "    static void _sokol_init(void) {\n";
+            out << "        stm_setup();\n";
+            out << "        sg_desc desc{};\n";
+            out << "        desc.context = sapp_sgcontext();\n";
+            out << "        sg_setup(&desc);\n";
+            out << "        sdtx_desc_t ddesc{};\n";
+            out << "        sdtx_setup(&ddesc);\n";
+            out << "    }\n";
+            out << "\n";
+            out << "    static void _sokol_frame(void) {\n";
+            out << "        double dt = sapp_frame_duration();\n";
+            out << "        if (dt > 0.1) dt = 0.1;\n";
+            out << "        if (g_state.has_tick && app) app->tick(dt);\n";
+            out << "        coi::ui::flush();\n";
+            out << "\n";
+            out << "        sg_pass_action pass{};\n";
+            out << "        pass.colors[0].load_action = SG_LOADACTION_CLEAR;\n";
+            out << "        pass.colors[0].clear_value = { 0.08f, 0.08f, 0.10f, 1.0f };\n";
+            out << "        sg_begin_default_pass(&pass, sapp_width(), sapp_height());\n";
+            out << "\n";
+            out << "        sdtx_canvas(80, 45);\n";
+            out << "        sdtx_origin(1, 1);\n";
+            out << "        sdtx_home();\n";
+            out << "        sdtx_puts(\"COI desktop runtime (sokol)\\n\\n\");\n";
+            out << "        sdtx_printf(\"dt: %.3f\\n\", dt);\n";
+            out << "        sdtx_puts(\"UI tree:\\n\");\n";
+            out << "        _sdtx_dump_node(0, 0);\n";
+            out << "        sdtx_draw();\n";
+            out << "\n";
+            out << "        sg_end_pass();\n";
+            out << "        sg_commit();\n";
+            out << "\n";
+            out << "        if (g_state.frames_limit > 0) {\n";
+            out << "            g_state.frames++;\n";
+            out << "            if (g_state.frames >= g_state.frames_limit) sapp_request_quit();\n";
+            out << "        }\n";
+            out << "    }\n";
+            out << "\n";
+            out << "    static void _sokol_cleanup(void) {\n";
+            out << "        sdtx_shutdown();\n";
+            out << "        sg_shutdown();\n";
+            out << "    }\n";
+            out << "\n";
+            out << "    int run_windowed(int frames_limit, bool has_tick) {\n";
+            out << "        g_state.frames_limit = frames_limit;\n";
+            out << "        g_state.frames = 0;\n";
+            out << "        g_state.has_tick = has_tick;\n";
+            out << "        sapp_desc desc{};\n";
+            out << "        desc.width = 960;\n";
+            out << "        desc.height = 540;\n";
+            out << "        desc.window_title = \"COI (Desktop)\";\n";
+            out << "        desc.init_cb = _sokol_init;\n";
+            out << "        desc.frame_cb = _sokol_frame;\n";
+            out << "        desc.cleanup_cb = _sokol_cleanup;\n";
+            out << "        sapp_run(&desc);\n";
+            out << "        return 0;\n";
+            out << "    }\n";
+            out << "} // namespace coi::desktop\n";
+            out << "#endif\n\n";
+
             out << "int main() {\n";
             out << "    app = new " << final_app_config.root_component << "();\n";
             out << "    app->view();\n";
@@ -1574,6 +1678,14 @@ int main(int argc, char **argv)
             out << "    const char* frames_env = std::getenv(\"COI_DESKTOP_FRAMES\");\n";
             out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
             out << "    if (frames == 0) return 0;\n";
+            out << "    const char* window_env = std::getenv(\"COI_DESKTOP_WINDOW\");\n";
+            out << "    if (window_env && *window_env && std::string(window_env) != std::string(\"0\")) {\n";
+            out << "#if defined(COI_DESKTOP_SOKOL)\n";
+            out << "        return coi::desktop::run_windowed(frames, " << (session.components_with_tick.count(final_app_config.root_component) ? "true" : "false") << ");\n";
+            out << "#else\n";
+            out << "        std::cerr << \"COI_DESKTOP_WINDOW requested but this binary was built without Sokol support\\n\";\n";
+            out << "#endif\n";
+            out << "    }\n";
             out << "    using clock = std::chrono::steady_clock;\n";
             out << "    auto last = clock::now();\n";
             out << "    int i = 0;\n";
@@ -1898,40 +2010,53 @@ int main(int argc, char **argv)
             }
 	        }
 
-	        if (!cc_only && !is_web_target)
-	        {
-	            fs::path exe_dir = get_executable_dir();
-	            if (exe_dir.empty())
-	            {
-	                ErrorHandler::cli_error("Could not determine executable directory");
-	                return 1;
-	            }
+		        if (!cc_only && !is_web_target)
+		        {
+		            fs::path exe_dir = get_executable_dir();
+		            if (exe_dir.empty())
+		            {
+		                ErrorHandler::cli_error("Could not determine executable directory");
+		                return 1;
+		            }
 
-	            fs::path include_dir = exe_dir / "deps" / "webcc" / "include";
-	            if (!fs::exists(include_dir))
-	            {
-	                ErrorHandler::cli_error("Could not find WebCC core headers for desktop build",
-	                                        "Expected: " + include_dir.string());
-	                return 1;
-	            }
+		            fs::path include_dir = exe_dir / "deps" / "webcc" / "include";
+		            if (!fs::exists(include_dir))
+		            {
+		                ErrorHandler::cli_error("Could not find WebCC core headers for desktop build",
+		                                        "Expected: " + include_dir.string());
+		                return 1;
+		            }
 
-	            fs::path abs_output_cc = fs::absolute(output_cc);
-	            fs::path abs_output_dir = fs::absolute(final_output_dir);
-	            fs::path out_bin = abs_output_dir / "app";
+		            fs::path sokol_dir = exe_dir / "deps" / "sokol";
+		            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
 
-	            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
-	            cmd += " -I" + include_dir.string();
-	            cmd += " " + abs_output_cc.string();
-	            cmd += " -o " + out_bin.string();
+		            fs::path abs_output_cc = fs::absolute(output_cc);
+		            fs::path abs_output_dir = fs::absolute(final_output_dir);
+		            fs::path out_bin = abs_output_dir / "app";
 
-	            std::cerr << "Running: " << cmd << std::endl;
-	            int ret = system(cmd.c_str());
-	            if (ret != 0)
-	            {
-	                ErrorHandler::cli_error("Desktop compilation failed",
-	                                        "Try installing a C++20 compiler toolchain (clang++ or g++).");
-	                return 1;
-	            }
+		            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
+		            cmd += " -I" + include_dir.string();
+		            if (has_sokol) {
+		                cmd += " -I" + sokol_dir.string();
+		                cmd += " -I" + (sokol_dir / "util").string();
+#if defined(__linux__) || defined(__unix__)
+		                cmd += " -DCOI_DESKTOP_SOKOL";
+		                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
+#endif
+		            }
+		            cmd += " " + abs_output_cc.string();
+		            cmd += " -o " + out_bin.string();
+
+		            std::cerr << "Running: " << cmd << std::endl;
+		            int ret = system(cmd.c_str());
+		            if (ret != 0)
+		            {
+		                ErrorHandler::cli_error("Desktop compilation failed",
+		                                        "Try installing a C++20 compiler toolchain (clang++ or g++).\n"
+		                                        "If you enabled the Sokol window backend, install X11/GL dev libs or run:\n"
+		                                        "  git submodule update --init --recursive");
+		                return 1;
+		            }
 
 	            if (!keep_cc)
 	            {
