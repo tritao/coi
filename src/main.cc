@@ -1697,9 +1697,10 @@ int main(int argc, char **argv)
             out << "        p.swapchain = sglue_swapchain();\n";
             out << "        sg_begin_pass(&p);\n";
             out << "\n";
-            out << "        sdtx_canvas(80, 45);\n";
+            out << "        sdtx_canvas((float)sapp_width() / 2.0f, (float)sapp_height() / 2.0f);\n";
             out << "        sdtx_origin(1, 1);\n";
             out << "        sdtx_home();\n";
+            out << "        sdtx_color3f(1.0f, 1.0f, 1.0f);\n";
             out << "        sdtx_puts(\"COI desktop runtime (sokol)\\n\\n\");\n";
             out << "        sdtx_printf(\"dt: %.3f\\n\", dt);\n";
             out << "        sdtx_puts(\"UI tree:\\n\");\n";
