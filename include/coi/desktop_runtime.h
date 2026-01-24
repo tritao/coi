@@ -824,6 +824,9 @@ struct SokolRunner {
         fs_desc.width = 512;
         fs_desc.height = 512;
         fons_ctx = sfons_create(&fs_desc);
+        if (!fons_ctx) {
+            std::cerr << "[font] sfons_create failed\n";
+        }
         if (fons_ctx) {
             const char* font_path = std::getenv("COI_DESKTOP_FONT");
             if (!font_path || !*font_path) {
@@ -1104,6 +1107,8 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_CLAY) && defined(COI_DESKTOP_FONTSTASH)
         if (clay_ok && fons_ctx && fons_font != FONS_INVALID) {
+            // Ensure font rendering isn't accidentally clipped by a stale scissor rect.
+            sg_apply_scissor_rect(0, 0, sapp_width(), sapp_height(), true /* origin_top_left */);
             fonsClearState(fons_ctx);
             fonsSetFont(fons_ctx, fons_font);
             fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
@@ -1122,6 +1127,13 @@ struct SokolRunner {
                     (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
                 }
             }
+            const char* ttf_test = std::getenv("COI_DESKTOP_TTF_TEST");
+            if (ttf_test && *ttf_test && std::string(ttf_test) != std::string("0")) {
+                fonsSetSize(fons_ctx, 28.0f);
+                fonsSetSpacing(fons_ctx, 0.0f);
+                fonsSetColor(fons_ctx, sfons_rgba(255, 80, 80, 255));
+                (void)fonsDrawText(fons_ctx, 20.0f, 52.0f, "TTF OK", nullptr);
+            }
             sfons_flush(fons_ctx);
             sgl_draw();
         }
@@ -1134,6 +1146,9 @@ struct SokolRunner {
         sdtx_color3f(1.0f, 1.0f, 1.0f);
         sdtx_puts("COI desktop runtime (sokol)\n");
         sdtx_printf("dt: %.3f\n\n", dt);
+#if defined(COI_DESKTOP_FONTSTASH)
+        sdtx_printf("fontstash: %s\n\n", (fons_ctx && fons_font != FONS_INVALID) ? "on" : "off");
+#endif
 
 #if defined(COI_DESKTOP_CLAY)
         if (clay_ok) {
