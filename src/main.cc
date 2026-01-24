@@ -875,6 +875,66 @@ int main(int argc, char **argv)
         return dev_project(keep_cc, cc_only, target);
     }
 
+    if (first_arg == "run") {
+        std::string run_input;
+        bool window = false;
+        bool window_set = false;
+        int frames = -1;
+        std::string dump;
+
+        // Parse run flags (includes build flags too).
+        for (int i = 2; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--keep-cc") {
+                keep_cc = true;
+            } else if (arg == "--cc-only") {
+                cc_only = true;
+            } else if (arg == "--target") {
+                if (i + 1 < argc) {
+                    target = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                    return 1;
+                }
+            } else if (arg == "--window") {
+                window = true;
+                window_set = true;
+            } else if (arg == "--headless") {
+                window = false;
+                window_set = true;
+            } else if (arg == "--frames") {
+                if (i + 1 < argc) {
+                    frames = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--frames requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--dump") {
+                if (i + 1 < argc) {
+                    dump = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--dump requires an argument (0|1|always)");
+                    return 1;
+                }
+            } else if (run_input.empty() && !arg.empty() && arg[0] != '-') {
+                run_input = arg;
+            } else {
+                ErrorHandler::cli_error("Unknown argument: " + arg);
+                return 1;
+            }
+        }
+
+        if (target != "web" && target != "desktop") {
+            ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or desktop");
+            return 1;
+        }
+        if (target == "desktop" && !window_set) {
+            window = true; // run defaults to windowed for desktop
+        }
+
+        return run_project(keep_cc, cc_only, target, run_input, window, frames, dump);
+    }
+
     // From here on, we're doing actual compilation - load DefSchema
     load_def_schema();
 

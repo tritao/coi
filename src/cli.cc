@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <unistd.h>
 #include <limits.h>
+#include <cstdlib>
+#include <vector>
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -389,6 +391,141 @@ if __name__ == '__main__':
     return system(cmd.c_str());
 }
 
+static int run_web_server(const fs::path& dist_dir)
+{
+    // Start SPA-aware server using Python with fallback to index.html for client-side routing
+    std::string python_script = R"(
+import http.server
+import os
+
+class SPAHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # Serve static files if they exist
+        path = self.translate_path(self.path)
+        if os.path.isfile(path):
+            return http.server.SimpleHTTPRequestHandler.do_GET(self)
+        # For SPA routing: return index.html for any path that doesn't exist
+        self.path = '/index.html'
+        return http.server.SimpleHTTPRequestHandler.do_GET(self)
+
+if __name__ == '__main__':
+    import socketserver
+    PORT = 8000
+    
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+    
+    with ReusableTCPServer(('', PORT), SPAHandler) as httpd:
+        httpd.serve_forever()
+)";
+
+    std::string cmd = "cd " + dist_dir.string() + " && python3 -c \"" + python_script + "\" 2>&1 | grep -v 'Serving HTTP'";
+    return system(cmd.c_str());
+}
+
+static int run_desktop_binary(const fs::path& bin_path, bool window, int frames, const std::string& dump)
+{
+    if (!fs::exists(bin_path))
+    {
+        ErrorHandler::cli_error("Desktop build did not produce " + bin_path.string(),
+                                "Try: coi build --target desktop");
+        return 1;
+    }
+
+    std::string env;
+    if (!dump.empty())
+    {
+        env += "COI_DESKTOP_DUMP=" + dump + " ";
+    }
+    if (frames >= 0)
+    {
+        env += "COI_DESKTOP_FRAMES=" + std::to_string(frames) + " ";
+    }
+    if (window)
+    {
+        env += "COI_DESKTOP_WINDOW=1 ";
+    }
+
+    std::cout << "  " << GREEN << "➜" << RESET << "  Running: " << CYAN << BOLD << bin_path.string() << RESET << std::endl;
+    std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
+    std::cout << std::endl;
+
+    std::string cmd = env + bin_path.string();
+    return system(cmd.c_str());
+}
+
+static fs::path mktemp_dir_under(const fs::path& parent, const std::string& prefix)
+{
+    fs::create_directories(parent);
+    std::string templ = (parent / (prefix + "-XXXXXX")).string();
+    std::vector<char> buf(templ.begin(), templ.end());
+    buf.push_back('\0');
+    char* res = mkdtemp(buf.data());
+    if (!res)
+    {
+        return fs::path();
+    }
+    return fs::path(res);
+}
+
+int run_project(bool keep_cc, bool cc_only, const std::string& target,
+                const std::string& input_file, bool window, int frames, const std::string& dump)
+{
+    print_banner("run");
+
+    fs::path dist_dir;
+    if (input_file.empty())
+    {
+        int ret = build_project(keep_cc, cc_only, target, true);
+        if (ret != 0)
+        {
+            return ret;
+        }
+        dist_dir = fs::current_path() / "dist";
+    }
+    else
+    {
+        // Compile the provided file into a temp directory under .coi_cache/run.
+        fs::path run_root = fs::current_path() / ".coi_cache" / "run";
+        fs::path out_dir = mktemp_dir_under(run_root, "coi-run");
+        if (out_dir.empty())
+        {
+            ErrorHandler::cli_error("Could not create temp run directory",
+                                    "Try creating .coi_cache/ with write permissions.");
+            return 1;
+        }
+        dist_dir = out_dir;
+
+        fs::path exe_dir = get_executable_dir();
+        fs::path coi_bin = exe_dir / "coi";
+
+        std::string extra_flags;
+        if (keep_cc) extra_flags += " --keep-cc";
+        if (cc_only) extra_flags += " --cc-only";
+        if (!target.empty()) extra_flags += " --target " + target;
+
+        std::cout << BRAND << "▶" << RESET << " Building..." << std::endl;
+        std::string cmd = coi_bin.string() + " " + input_file + " --out " + dist_dir.string() + extra_flags;
+        int ret = system(cmd.c_str());
+        if (ret != 0)
+        {
+            ErrorHandler::build_failed();
+            return 1;
+        }
+    }
+
+    if (target == "desktop")
+    {
+        fs::path bin_path = dist_dir / "app";
+        return run_desktop_binary(bin_path, window, frames, dump);
+    }
+
+    std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
+    std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
+    std::cout << std::endl;
+    return run_web_server(dist_dir);
+}
+
 void print_help(const char *program_name)
 {
     std::cout << std::endl;
@@ -400,6 +537,7 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " init" << RESET << " [name]              Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
     std::cout << "    " << CYAN << program_name << " dev" << RESET << "                      Build and start dev server" << std::endl;
+    std::cout << "    " << CYAN << program_name << " run" << RESET << "                      Build and run (desktop opens window)" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Options:" << RESET << std::endl;
@@ -407,9 +545,14 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
     std::cout << "    " << DIM << "--target <web|desktop>" << RESET << "  Target platform (default: web)" << std::endl;
+    std::cout << "    " << DIM << "--window" << RESET << "          (run) Open a desktop window" << std::endl;
+    std::cout << "    " << DIM << "--headless" << RESET << "        (run) Desktop headless mode" << std::endl;
+    std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit desktop frames" << std::endl;
+    std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Desktop tree dump mode" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi run --target desktop" << std::endl;
     std::cout << std::endl;
 }

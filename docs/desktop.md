@@ -11,6 +11,12 @@ coi build --target desktop
 ./dist/app
 ```
 
+Or, build + run in one step:
+
+```bash
+coi run --target desktop
+```
+
 To open a real window (Sokol backend) instead of running headless:
 
 ```bash
