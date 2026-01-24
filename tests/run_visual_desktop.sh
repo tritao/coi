@@ -78,6 +78,11 @@ done
 
 scenes=(
   "font_window_demo:$ROOT_DIR/tests/desktop/font_window_demo.coi"
+  "border_render_dump_pass:$ROOT_DIR/tests/desktop/border_render_dump_pass.coi"
+  "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/border_between_render_dump_pass.coi"
+  "clip_render_dump_pass:$ROOT_DIR/tests/desktop/clip_render_dump_pass.coi"
+  "scroll_render_dump_pass:$ROOT_DIR/tests/desktop/scroll_render_dump_pass.coi"
+  "text_render_dump_pass:$ROOT_DIR/tests/desktop/text_render_dump_pass.coi"
 )
 
 need_xvfb=0
