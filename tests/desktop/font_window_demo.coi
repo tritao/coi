@@ -1,0 +1,20 @@
+component App {
+    view {
+        <div class="root col pad-10 gap-6 fill bg-none">
+            <div class="title w-400 h-30 pad-0">COI Desktop (Fontstash)</div>
+            <div class="body w-500 h-90 pad-0">
+                This is real TTF text rendering (not debug glyphs).
+                Try resizing the window or changing COI_DESKTOP_FONT.
+            </div>
+            <div class="row row pad-0 gap-6">
+                <div class="btn w-120 h-30 pad-0 border-1">Button</div>
+                <div class="btn w-120 h-30 pad-0 border-1">Another</div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

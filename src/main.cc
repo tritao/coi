@@ -1353,6 +1353,8 @@ int main(int argc, char **argv)
 
 			            fs::path sokol_dir = exe_dir / "deps" / "sokol";
 			            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
+			            fs::path fontstash_dir = sokol_dir / "tests" / "ext";
+			            const bool has_fontstash = fs::exists(fontstash_dir / "fontstash.h") && fs::exists(fontstash_dir / "stb_truetype.h");
 			            fs::path clay_dir = exe_dir / "deps" / "clay";
 			            const bool has_clay = fs::exists(clay_dir / "clay.h");
 
@@ -1370,6 +1372,10 @@ int main(int argc, char **argv)
 			            if (has_sokol) {
 			                cmd += " -I" + sokol_dir.string();
 			                cmd += " -I" + (sokol_dir / "util").string();
+			                if (has_fontstash) {
+			                    cmd += " -I" + fontstash_dir.string();
+			                    cmd += " -DCOI_DESKTOP_FONTSTASH";
+			                }
 #if defined(__linux__) || defined(__unix__)
 			                cmd += " -DCOI_DESKTOP_SOKOL";
 		                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
