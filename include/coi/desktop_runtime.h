@@ -210,6 +210,10 @@ inline void scroll_to_top() {}
     #endif
     #if defined(COI_DESKTOP_CAPTURE)
         #include "stb_image_write.h"
+        #if defined(__linux__) || defined(__unix__)
+            #include <X11/Xlib.h>
+            #include <X11/Xutil.h>
+        #endif
     #endif
 #endif
 
@@ -859,6 +863,8 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_CAPTURE)
     static inline bool capture_enabled = false;
+    enum class CaptureMode { Offscreen, X11 };
+    static inline CaptureMode capture_mode = CaptureMode::Offscreen;
     static inline int capture_every = 60;
     static inline int capture_max = -1;
     static inline int capture_index = 0;
@@ -874,6 +880,8 @@ struct SokolRunner {
     static inline std::vector<uint8_t> capture_pixels;
     static inline std::vector<uint8_t> capture_pixels_flipped;
     static inline int exit_code = 0;
+    static inline bool capture_debug = false;
+    static inline bool capture_pending_after_commit = false;
 
     static inline bool parse_wh(const char* s, int& w, int& h) {
         if (!s || !*s) return false;
@@ -952,6 +960,26 @@ struct SokolRunner {
         capture_enabled = true;
         capture_dir = std::filesystem::path(dir);
 
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_DEBUG")) {
+            capture_debug = (std::string(e) != "0");
+        }
+
+        // Default to X11 window capture on Linux, since it's more robust across
+        // GL driver setups (including headless/Xvfb). Offscreen capture can be
+        // forced via COI_DESKTOP_CAPTURE_MODE=offscreen.
+#if defined(__linux__) || defined(__unix__)
+        capture_mode = CaptureMode::X11;
+#else
+        capture_mode = CaptureMode::Offscreen;
+#endif
+        if (const char* m = std::getenv("COI_DESKTOP_CAPTURE_MODE")) {
+            if (m && *m) {
+                const std::string mm(m);
+                if (mm == "x11") capture_mode = CaptureMode::X11;
+                if (mm == "offscreen") capture_mode = CaptureMode::Offscreen;
+            }
+        }
+
         capture_w = sapp_width();
         capture_h = sapp_height();
         const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
@@ -986,9 +1014,24 @@ struct SokolRunner {
         capture_pixels.clear();
         capture_pixels_flipped.clear();
         capture_index = 0;
+        capture_pending_after_commit = false;
+
+        if (capture_debug) {
+            std::cerr << "[capture] enabled dir=" << capture_dir.string()
+                      << " size=" << capture_w << "x" << capture_h
+                      << " mode=" << (capture_mode == CaptureMode::Offscreen ? "offscreen" : "x11")
+                      << " every=" << capture_every
+                      << " max=" << capture_max
+                      << " baseline=" << capture_baseline_dir.string()
+                      << " tol=" << capture_tolerance
+                      << " overlay=" << (capture_overlay ? 1 : 0)
+                      << " fail=" << (capture_fail_on_mismatch ? 1 : 0)
+                      << std::endl;
+        }
     }
 
     static void capture_shutdown() {
+        capture_pending_after_commit = false;
         if (capture_view.id != SG_INVALID_ID) {
             sg_destroy_view(capture_view);
             capture_view.id = SG_INVALID_ID;
@@ -1003,6 +1046,7 @@ struct SokolRunner {
 
     static void capture_ensure_target() {
         if (!capture_enabled) return;
+        if (capture_mode != CaptureMode::Offscreen) return;
         if (capture_w <= 0) capture_w = 1;
         if (capture_h <= 0) capture_h = 1;
 
@@ -1012,18 +1056,47 @@ struct SokolRunner {
             capture_shutdown();
         }
 
+        if (capture_debug) {
+            std::cerr << "[capture] ensure_target " << capture_w << "x" << capture_h << std::endl;
+        }
+
         sg_image_desc img_desc{};
+        img_desc.type = SG_IMAGETYPE_2D;
         img_desc.width = capture_w;
         img_desc.height = capture_h;
+        img_desc.num_mipmaps = 1;
+        img_desc.sample_count = 1;
         img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
         img_desc.usage.color_attachment = true;
         img_desc.label = "coi-capture-color";
+        if (capture_debug) {
+            std::cerr << "[capture] sg_make_image..." << std::endl;
+        }
         capture_img = sg_make_image(&img_desc);
+        if (capture_debug) {
+            std::cerr << "[capture] sg_make_image id=" << capture_img.id << std::endl;
+        }
+        if (capture_img.id == SG_INVALID_ID) {
+            std::cerr << "[capture] failed to create capture image; disabling capture\n";
+            capture_enabled = false;
+            return;
+        }
 
         sg_view_desc view_desc{};
         view_desc.color_attachment.image = capture_img;
         view_desc.label = "coi-capture-view";
+        if (capture_debug) {
+            std::cerr << "[capture] sg_make_view..." << std::endl;
+        }
         capture_view = sg_make_view(&view_desc);
+        if (capture_debug) {
+            std::cerr << "[capture] sg_make_view id=" << capture_view.id << std::endl;
+        }
+        if (capture_view.id == SG_INVALID_ID) {
+            std::cerr << "[capture] failed to create capture view; disabling capture\n";
+            capture_enabled = false;
+            return;
+        }
 
         capture_pixels.resize((size_t)capture_w * (size_t)capture_h * 4u);
         capture_pixels_flipped.resize(capture_pixels.size());
@@ -1035,6 +1108,15 @@ struct SokolRunner {
         if (capture_max >= 0 && capture_index >= capture_max) return;
         if (capture_every > 1 && (frames % capture_every) != 0) return;
 
+        if (capture_debug) {
+            std::cerr << "[capture] capture_maybe frame=" << frames << " idx=" << capture_index << std::endl;
+        }
+
+        if (capture_mode == CaptureMode::X11) {
+            capture_pending_after_commit = true;
+            return;
+        }
+
         capture_ensure_target();
         if (capture_view.id == SG_INVALID_ID) return;
 
@@ -1042,6 +1124,9 @@ struct SokolRunner {
         sg_pass cp{};
         cp.action = action;
         cp.attachments.colors[0] = capture_view;
+        if (capture_debug) {
+            std::cerr << "[capture] sg_begin_pass..." << std::endl;
+        }
         sg_begin_pass(&cp);
 
         sgl_defaults();
@@ -1201,41 +1286,124 @@ struct SokolRunner {
             std::memcpy(dst, src, stride);
         }
 
+        capture_write_outputs(capture_pixels_flipped.data(), capture_w, capture_h, (int)stride);
+    }
+
+    static void capture_write_outputs(const uint8_t* rgba_topdown, int w, int h, int stride_bytes) {
+        if (!rgba_topdown || w <= 0 || h <= 0) return;
         char name[64];
         std::snprintf(name, sizeof(name), "frame_%06d.png", capture_index);
         std::filesystem::path png_path = capture_dir / name;
-        const int ok_png = stbi_write_png(png_path.string().c_str(), capture_w, capture_h, 4, capture_pixels_flipped.data(), (int)stride);
+        const int ok_png = stbi_write_png(png_path.string().c_str(), w, h, 4, rgba_topdown, stride_bytes);
         if (!ok_png) {
             std::cerr << "[capture] failed to write png: " << png_path.string() << "\n";
         }
 
-        const uint64_t h = dhash_rgba8(capture_pixels_flipped.data(), capture_w, capture_h);
+        const uint64_t hsh = dhash_rgba8(rgba_topdown, w, h);
         std::snprintf(name, sizeof(name), "frame_%06d.dhash", capture_index);
         std::filesystem::path hash_path = capture_dir / name;
         {
             std::ofstream hf(hash_path);
-            hf << std::hex << h << "\n";
+            hf << std::hex << hsh << "\n";
         }
 
         if (!capture_baseline_dir.empty()) {
             std::filesystem::path base_hash = capture_baseline_dir / hash_path.filename();
             uint64_t base = 0;
             if (read_hex_u64(base_hash, base)) {
-                const int dist = popcount64(h ^ base);
-                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec
+                const int dist = popcount64(hsh ^ base);
+                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << hsh << std::dec
                           << " baseline_dist=" << dist << " tol=" << capture_tolerance << "\n";
                 if (dist > capture_tolerance) {
                     exit_code = 1;
                     if (capture_fail_on_mismatch) sapp_request_quit();
                 }
             } else {
-                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec << " (no baseline)\n";
+                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << hsh << std::dec << " (no baseline)\n";
             }
         } else {
-            std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec << "\n";
+            std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << hsh << std::dec << "\n";
         }
 
         capture_index++;
+    }
+
+    static uint8_t mask_to_u8(uint32_t pixel, uint32_t mask) {
+        if (!mask) return 0;
+        uint32_t m = mask;
+#if defined(__GNUC__) || defined(__clang__)
+        const int shift = __builtin_ctz(m);
+#else
+        int shift = 0;
+        while ((m & 1u) == 0u) { m >>= 1u; shift++; }
+        m = mask;
+#endif
+        m >>= shift;
+        int bits = 0;
+        while (m & 1u) { bits++; m >>= 1u; }
+        uint32_t v = (pixel & mask) >> shift;
+        if (bits <= 0) return 0;
+        if (bits >= 8) {
+            v >>= (bits - 8);
+            return (uint8_t)v;
+        }
+        const uint32_t maxv = (1u << bits) - 1u;
+        v = (v * 255u + (maxv / 2u)) / maxv;
+        return (uint8_t)v;
+    }
+
+    static bool capture_x11_read_rgba(std::vector<uint8_t>& out_rgba, int w, int h) {
+#if defined(__linux__) || defined(__unix__)
+        Display* dpy = (Display*)sapp_x11_get_display();
+        Window win = (Window)(uintptr_t)sapp_x11_get_window();
+        if (!dpy || !win) return false;
+        XImage* img = XGetImage(dpy, win, 0, 0, (unsigned int)w, (unsigned int)h, AllPlanes, ZPixmap);
+        if (!img) return false;
+        out_rgba.resize((size_t)w * (size_t)h * 4u);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                const unsigned long p = XGetPixel(img, x, y);
+                const uint8_t r = mask_to_u8((uint32_t)p, (uint32_t)img->red_mask);
+                const uint8_t g = mask_to_u8((uint32_t)p, (uint32_t)img->green_mask);
+                const uint8_t b = mask_to_u8((uint32_t)p, (uint32_t)img->blue_mask);
+                const size_t idx = ((size_t)y * (size_t)w + (size_t)x) * 4u;
+                out_rgba[idx + 0] = r;
+                out_rgba[idx + 1] = g;
+                out_rgba[idx + 2] = b;
+                out_rgba[idx + 3] = 255;
+            }
+        }
+        XDestroyImage(img);
+        return true;
+#else
+        (void)out_rgba;
+        (void)w;
+        (void)h;
+        return false;
+#endif
+    }
+
+    static void capture_after_commit() {
+        if (!capture_enabled) return;
+        if (capture_mode != CaptureMode::X11) return;
+        if (!capture_pending_after_commit) return;
+        capture_pending_after_commit = false;
+        if (capture_max >= 0 && capture_index >= capture_max) return;
+
+        if (capture_w <= 0) capture_w = sapp_width();
+        if (capture_h <= 0) capture_h = sapp_height();
+
+        if (capture_debug) {
+            std::cerr << "[capture] after_commit x11 read " << capture_w << "x" << capture_h << std::endl;
+        }
+
+        if (!capture_x11_read_rgba(capture_pixels_flipped, capture_w, capture_h)) {
+            std::cerr << "[capture] X11 read failed; disabling capture\n";
+            capture_enabled = false;
+            return;
+        }
+        const int stride = capture_w * 4;
+        capture_write_outputs(capture_pixels_flipped.data(), capture_w, capture_h, stride);
     }
 #endif
 
@@ -1749,6 +1917,9 @@ struct SokolRunner {
         capture_maybe(pass, dt);
 #endif
         sg_commit();
+#if defined(COI_DESKTOP_CAPTURE)
+        capture_after_commit();
+#endif
 
         frames++;
         if (frames_limit > 0 && frames >= frames_limit) {
@@ -1783,8 +1954,22 @@ struct SokolRunner {
         frames = 0;
 
         sapp_desc desc{};
-        desc.width = 960;
-        desc.height = 540;
+        int win_w = 960;
+        int win_h = 540;
+#if defined(COI_DESKTOP_CAPTURE)
+        // If capture is enabled and a size is provided, prefer that as the window size
+        // so that X11-based capture is deterministic.
+        if (const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR"); dir && *dir) {
+            const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
+            int cw = 0, ch = 0;
+            if (parse_wh(size, cw, ch)) {
+                win_w = cw;
+                win_h = ch;
+            }
+        }
+#endif
+        desc.width = win_w;
+        desc.height = win_h;
         desc.window_title = "COI (Desktop)";
         desc.init_cb = init;
         desc.frame_cb = frame_cb;

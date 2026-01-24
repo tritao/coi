@@ -100,6 +100,12 @@ if [[ "$need_xvfb" -eq 1 ]]; then
   fi
 fi
 
+capture_env_prefix=()
+if [[ "$need_xvfb" -eq 1 ]]; then
+  # Xvfb's GL stack often can't create offscreen render targets; use X11-based capture instead.
+  capture_env_prefix=(env COI_DESKTOP_CAPTURE_MODE=x11)
+fi
+
 mkdir -p "$OUT_DIR"
 mkdir -p "$BASELINE_DIR"
 
@@ -122,7 +128,7 @@ for entry in "${scenes[@]}"; do
 
   if [[ "$MODE" == "update" ]]; then
     mkdir -p "$scene_base"
-    "${run_cmd_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+    "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
       --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES"
 
     rm -rf "$scene_base"
@@ -142,7 +148,7 @@ for entry in "${scenes[@]}"; do
   fi
 
   set +e
-  "${run_cmd_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+  "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
     --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES" \
     --capture-baseline "$scene_base" --capture-tolerance "$TOLERANCE" --capture-fail
   rc=$?
