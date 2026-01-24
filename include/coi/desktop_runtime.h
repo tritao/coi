@@ -275,6 +275,9 @@ struct DesktopClassStyle {
 
     bool bg_none = false;
 
+    bool clip_x = false;
+    bool clip_y = false;
+
     bool has_align_x = false;
     Clay_LayoutAlignmentX align_x = CLAY_ALIGN_X_LEFT;
 
@@ -334,6 +337,19 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
         }
         if (t == "bg-none") {
             st.bg_none = true;
+            return;
+        }
+        if (t == "clip") {
+            st.clip_x = true;
+            st.clip_y = true;
+            return;
+        }
+        if (t == "clip-x") {
+            st.clip_x = true;
+            return;
+        }
+        if (t == "clip-y") {
+            st.clip_y = true;
             return;
         }
         if (t == "grow") {
@@ -516,6 +532,13 @@ struct ClayEngine {
             .childAlignment = Clay_ChildAlignment{ax, ay},
             .layoutDirection = dir,
         };
+        if (st.clip_x || st.clip_y) {
+            decl.clip = Clay_ClipElementConfig{
+                .horizontal = st.clip_x,
+                .vertical = st.clip_y,
+                .childOffset = Clay_Vector2{0, 0},
+            };
+        }
         if (is_root || st.bg_none) {
             decl.backgroundColor = Clay_Color{0, 0, 0, 0};
         } else {
@@ -798,12 +821,71 @@ struct SokolRunner {
         sgl_matrix_mode_modelview();
         sgl_load_identity();
 
-        sgl_begin_quads();
 #if defined(COI_DESKTOP_CLAY)
         if (clay_ok) {
+            auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+            struct IRect {
+                int x = 0;
+                int y = 0;
+                int w = 0;
+                int h = 0;
+            };
+            auto intersect = [](const IRect& a, const IRect& b) -> IRect {
+                int x0 = std::max(a.x, b.x);
+                int y0 = std::max(a.y, b.y);
+                int x1 = std::min(a.x + a.w, b.x + b.w);
+                int y1 = std::min(a.y + a.h, b.y + b.h);
+                IRect out;
+                out.x = x0;
+                out.y = y0;
+                out.w = std::max(0, x1 - x0);
+                out.h = std::max(0, y1 - y0);
+                return out;
+            };
+            auto apply_scissor = [&](const IRect& r) {
+                sg_apply_scissor_rect(r.x, r.y, r.w, r.h, true /* origin_top_left */);
+            };
+
+            const IRect full{0, 0, sapp_width(), sapp_height()};
+            std::vector<IRect> scissor_stack;
+            apply_scissor(full);
+
+            bool quads_open = false;
+            auto begin_quads = [&]() {
+                if (!quads_open) {
+                    sgl_begin_quads();
+                    quads_open = true;
+                }
+            };
+            auto flush_quads = [&]() {
+                if (quads_open) {
+                    sgl_end();
+                    sgl_draw();
+                    quads_open = false;
+                }
+            };
+
+            begin_quads();
             for (int32_t i = 0; i < render_commands.length; i++) {
                 Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
                 if (!cmd) continue;
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
+                    flush_quads();
+                    const auto& bb = cmd->boundingBox;
+                    IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+                    if (!scissor_stack.empty()) r = intersect(scissor_stack.back(), r);
+                    scissor_stack.push_back(r);
+                    apply_scissor(r);
+                    begin_quads();
+                    continue;
+                }
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
+                    flush_quads();
+                    if (!scissor_stack.empty()) scissor_stack.pop_back();
+                    apply_scissor(scissor_stack.empty() ? full : scissor_stack.back());
+                    begin_quads();
+                    continue;
+                }
                 if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) continue;
                 const auto& bb = cmd->boundingBox;
                 const auto& c = cmd->renderData.rectangle.backgroundColor;
@@ -814,7 +896,9 @@ struct SokolRunner {
                 sgl_v2f(x1, y1);
                 sgl_v2f(x0, y1);
             }
+            flush_quads();
         } else {
+            sgl_begin_quads();
             for (int32_t id : draw_list) {
                 if (id == 0) continue;
                 auto itn = coi::ui::g_nodes.find(id);
@@ -835,8 +919,11 @@ struct SokolRunner {
                 sgl_v2f(x1, y1);
                 sgl_v2f(x0, y1);
             }
+            sgl_end();
+            sgl_draw();
         }
 #else
+        sgl_begin_quads();
         for (int32_t id : draw_list) {
             if (id == 0) continue;
             auto itn = coi::ui::g_nodes.find(id);
@@ -857,9 +944,9 @@ struct SokolRunner {
             sgl_v2f(x1, y1);
             sgl_v2f(x0, y1);
         }
-#endif
         sgl_end();
         sgl_draw();
+#endif
 
         const float cell = 8.0f;
         sdtx_canvas((float)sapp_width(), (float)sapp_height());
@@ -872,12 +959,55 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_CLAY)
         if (clay_ok) {
+            auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+            struct IRect {
+                int x = 0;
+                int y = 0;
+                int w = 0;
+                int h = 0;
+            };
+            auto intersect = [](const IRect& a, const IRect& b) -> bool {
+                int x0 = std::max(a.x, b.x);
+                int y0 = std::max(a.y, b.y);
+                int x1 = std::min(a.x + a.w, b.x + b.w);
+                int y1 = std::min(a.y + a.h, b.y + b.h);
+                return (x1 > x0) && (y1 > y0);
+            };
+            const IRect full{0, 0, sapp_width(), sapp_height()};
+            std::vector<IRect> scissor_stack;
+            IRect active = full;
+
             // Render clay text commands using sokol_debugtext (monospace-ish).
             for (int32_t i = 0; i < render_commands.length; i++) {
                 Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
                 if (!cmd) continue;
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
+                    const auto& bb = cmd->boundingBox;
+                    IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+                    if (!scissor_stack.empty()) {
+                        const IRect& prev = scissor_stack.back();
+                        int x0 = std::max(prev.x, r.x);
+                        int y0 = std::max(prev.y, r.y);
+                        int x1 = std::min(prev.x + prev.w, r.x + r.w);
+                        int y1 = std::min(prev.y + prev.h, r.y + r.h);
+                        r.x = x0;
+                        r.y = y0;
+                        r.w = std::max(0, x1 - x0);
+                        r.h = std::max(0, y1 - y0);
+                    }
+                    scissor_stack.push_back(r);
+                    active = r;
+                    continue;
+                }
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
+                    if (!scissor_stack.empty()) scissor_stack.pop_back();
+                    active = scissor_stack.empty() ? full : scissor_stack.back();
+                    continue;
+                }
                 if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
                 const auto& bb = cmd->boundingBox;
+                IRect tbb{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+                if (!intersect(active, tbb)) continue;
                 const auto& t = cmd->renderData.text;
                 const auto& col = t.textColor;
                 sdtx_origin(bb.x / cell, bb.y / cell);
@@ -1111,7 +1241,11 @@ inline void dump_render() {
         if (!cmd) continue;
         const auto& bb = cmd->boundingBox;
 
-        if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
+        if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
+            std::cout << "SCISSOR_START x=" << iround(bb.x) << " y=" << iround(bb.y) << " w=" << iround(bb.width) << " h=" << iround(bb.height) << "\n";
+        } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
+            std::cout << "SCISSOR_END\n";
+        } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
             const auto& c = cmd->renderData.rectangle.backgroundColor;
             if (c.a <= 0.0f) continue;
 

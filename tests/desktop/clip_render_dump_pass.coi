@@ -1,0 +1,14 @@
+component App {
+    view {
+        <div class="root pad-0 gap-0 fill bg-none">
+            <div class="clipper w-60 h-20 pad-0 clip">
+                <div class="inner w-100 h-20 pad-0"></div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
