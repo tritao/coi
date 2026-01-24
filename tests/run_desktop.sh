@@ -126,8 +126,29 @@ while IFS= read -r -d '' test_file; do
     [ -z "$dump_mode" ] && dump_mode="1"
   fi
 
+  layout_dump_set="0"
+  layout_dump=""
+  if [ -f "${test_file%.coi}.layout_dump" ]; then
+    layout_dump_set="1"
+    layout_dump="$(cat "${test_file%.coi}.layout_dump" | tr -d ' \t\r\n')"
+    [ -z "$layout_dump" ] && layout_dump="1"
+  fi
+
+  viewport=""
+  if [ -f "${test_file%.coi}.viewport" ]; then
+    viewport="$(cat "${test_file%.coi}.viewport" | tr -d ' \t\r\n')"
+  fi
+
+  run_env=(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames")
+  if [ "$layout_dump_set" -eq 1 ]; then
+    run_env+=(COI_DESKTOP_LAYOUT_DUMP="$layout_dump")
+  fi
+  if [ -n "$viewport" ]; then
+    run_env+=(COI_DESKTOP_VIEWPORT="$viewport")
+  fi
+
   set +e
-  runtime_out="$(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames" stdbuf -o0 "$dist_dir/app" 2>&1)"
+  runtime_out="$(env "${run_env[@]}" stdbuf -o0 "$dist_dir/app" 2>&1)"
   runtime_rc=$?
   set -e
 
@@ -162,4 +183,3 @@ for failed_test in "${FAILED_TESTS[@]}"; do
 done
 echo -e "\n${GREEN}$PASSED passed${NC}, ${RED}$FAILURES failed${NC} out of $TOTAL tests"
 exit 1
-

@@ -1012,7 +1012,7 @@ int main(int argc, char **argv)
             out << "int main() {\n";
             out << "    app = new " << final_app_config.root_component << "();\n";
             out << "    app->view();\n";
-            out << "    coi::ui::flush();\n";
+            out << "    coi::desktop::flush();\n";
             out << "    const char* frames_env = std::getenv(\"COI_DESKTOP_FRAMES\");\n";
             out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
             out << "    if (frames == 0) return 0;\n";
@@ -1036,7 +1036,7 @@ int main(int argc, char **argv)
             if (session.components_with_tick.count(final_app_config.root_component)) {
                 out << "        if (app) app->tick(dt);\n";
             }
-            out << "        coi::ui::flush();\n";
+            out << "        coi::desktop::flush();\n";
             out << "        std::this_thread::sleep_for(std::chrono::milliseconds(16));\n";
             out << "    }\n";
             out << "    return 0;\n";
