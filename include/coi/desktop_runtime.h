@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -193,6 +194,10 @@ inline void scroll_to_top() {}
     #if defined(COI_DESKTOP_FONTSTASH)
         #define FONTSTASH_IMPLEMENTATION
     #endif
+    #if defined(COI_DESKTOP_CAPTURE)
+        #define STB_IMAGE_WRITE_STATIC
+        #define STB_IMAGE_WRITE_IMPLEMENTATION
+    #endif
     #include "sokol_app.h"
     #include "sokol_gfx.h"
     #include "sokol_gl.h"
@@ -202,6 +207,9 @@ inline void scroll_to_top() {}
     #if defined(COI_DESKTOP_FONTSTASH)
         #include "fontstash.h"
         #include "sokol_fontstash.h"
+    #endif
+    #if defined(COI_DESKTOP_CAPTURE)
+        #include "stb_image_write.h"
     #endif
 #endif
 
@@ -843,7 +851,393 @@ struct SokolRunner {
             }
         }
 #endif
+
+#if defined(COI_DESKTOP_CAPTURE)
+        capture_init();
+#endif
     }
+
+#if defined(COI_DESKTOP_CAPTURE)
+    static inline bool capture_enabled = false;
+    static inline int capture_every = 60;
+    static inline int capture_max = -1;
+    static inline int capture_index = 0;
+    static inline int capture_tolerance = 8; // max Hamming distance for dHash
+    static inline bool capture_overlay = false;
+    static inline bool capture_fail_on_mismatch = false;
+    static inline std::filesystem::path capture_dir;
+    static inline std::filesystem::path capture_baseline_dir;
+    static inline int capture_w = 0;
+    static inline int capture_h = 0;
+    static inline sg_image capture_img{};
+    static inline sg_view capture_view{};
+    static inline std::vector<uint8_t> capture_pixels;
+    static inline std::vector<uint8_t> capture_pixels_flipped;
+    static inline int exit_code = 0;
+
+    static inline bool parse_wh(const char* s, int& w, int& h) {
+        if (!s || !*s) return false;
+        int iw = 0, ih = 0;
+        if (std::sscanf(s, "%dx%d", &iw, &ih) == 2 || std::sscanf(s, "%d,%d", &iw, &ih) == 2 || std::sscanf(s, "%d %d", &iw, &ih) == 2) {
+            if (iw <= 0) iw = 1;
+            if (ih <= 0) ih = 1;
+            w = iw;
+            h = ih;
+            return true;
+        }
+        return false;
+    }
+
+    static inline uint64_t dhash_rgba8(const uint8_t* rgba, int w, int h) {
+        if (!rgba || w <= 0 || h <= 0) return 0;
+        uint8_t g[9 * 8]{};
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 9; x++) {
+                int sx = (int)(((x + 0.5) * (double)w) / 9.0);
+                int sy = (int)(((y + 0.5) * (double)h) / 8.0);
+                if (sx < 0) sx = 0;
+                if (sy < 0) sy = 0;
+                if (sx >= w) sx = w - 1;
+                if (sy >= h) sy = h - 1;
+                const uint8_t* p = rgba + (size_t)(sy * w + sx) * 4u;
+                const uint32_t r = p[0], gg = p[1], b = p[2];
+                const uint32_t gray = (r * 77u + gg * 150u + b * 29u) >> 8;
+                g[y * 9 + x] = (uint8_t)gray;
+            }
+        }
+        uint64_t out = 0;
+        int bit = 0;
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                uint8_t a = g[y * 9 + x];
+                uint8_t b = g[y * 9 + x + 1];
+                if (a > b) out |= (1ull << bit);
+                bit++;
+            }
+        }
+        return out;
+    }
+
+    static inline int popcount64(uint64_t v) {
+#if defined(__GNUC__) || defined(__clang__)
+        return __builtin_popcountll(v);
+#else
+        int c = 0;
+        while (v) {
+            v &= (v - 1);
+            c++;
+        }
+        return c;
+#endif
+    }
+
+    static inline bool read_hex_u64(const std::filesystem::path& p, uint64_t& out) {
+        std::ifstream f(p);
+        if (!f) return false;
+        std::string s;
+        f >> s;
+        if (s.empty()) return false;
+        try {
+            size_t idx = 0;
+            out = std::stoull(s, &idx, 16);
+            return idx > 0;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    static void capture_init() {
+        const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR");
+        if (!dir || !*dir) return;
+        capture_enabled = true;
+        capture_dir = std::filesystem::path(dir);
+
+        capture_w = sapp_width();
+        capture_h = sapp_height();
+        const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
+        (void)parse_wh(size, capture_w, capture_h);
+
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_EVERY")) {
+            capture_every = std::atoi(e);
+            if (capture_every <= 0) capture_every = 1;
+        }
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_MAX")) {
+            capture_max = std::atoi(e);
+        }
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_TOLERANCE")) {
+            capture_tolerance = std::atoi(e);
+            if (capture_tolerance < 0) capture_tolerance = 0;
+        }
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_OVERLAY")) {
+            capture_overlay = (std::string(e) != "0");
+        }
+        if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_FAIL_ON_MISMATCH")) {
+            capture_fail_on_mismatch = (std::string(e) != "0");
+        }
+        if (const char* base = std::getenv("COI_DESKTOP_CAPTURE_BASELINE")) {
+            if (*base) capture_baseline_dir = std::filesystem::path(base);
+        }
+
+        std::error_code ec;
+        std::filesystem::create_directories(capture_dir, ec);
+
+        capture_img = sg_image{};
+        capture_view = sg_view{};
+        capture_pixels.clear();
+        capture_pixels_flipped.clear();
+        capture_index = 0;
+    }
+
+    static void capture_shutdown() {
+        if (capture_view.id != SG_INVALID_ID) {
+            sg_destroy_view(capture_view);
+            capture_view.id = SG_INVALID_ID;
+        }
+        if (capture_img.id != SG_INVALID_ID) {
+            sg_destroy_image(capture_img);
+            capture_img.id = SG_INVALID_ID;
+        }
+        capture_pixels.clear();
+        capture_pixels_flipped.clear();
+    }
+
+    static void capture_ensure_target() {
+        if (!capture_enabled) return;
+        if (capture_w <= 0) capture_w = 1;
+        if (capture_h <= 0) capture_h = 1;
+
+        if (capture_img.id != SG_INVALID_ID) {
+            sg_image_desc d = sg_query_image_desc(capture_img);
+            if ((int)d.width == capture_w && (int)d.height == capture_h) return;
+            capture_shutdown();
+        }
+
+        sg_image_desc img_desc{};
+        img_desc.width = capture_w;
+        img_desc.height = capture_h;
+        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
+        img_desc.usage.color_attachment = true;
+        img_desc.label = "coi-capture-color";
+        capture_img = sg_make_image(&img_desc);
+
+        sg_view_desc view_desc{};
+        view_desc.color_attachment.image = capture_img;
+        view_desc.label = "coi-capture-view";
+        capture_view = sg_make_view(&view_desc);
+
+        capture_pixels.resize((size_t)capture_w * (size_t)capture_h * 4u);
+        capture_pixels_flipped.resize(capture_pixels.size());
+    }
+
+    static void capture_maybe(const sg_pass_action& action, double dt) {
+        (void)dt;
+        if (!capture_enabled) return;
+        if (capture_max >= 0 && capture_index >= capture_max) return;
+        if (capture_every > 1 && (frames % capture_every) != 0) return;
+
+        capture_ensure_target();
+        if (capture_view.id == SG_INVALID_ID) return;
+
+        // Render to an offscreen pass.
+        sg_pass cp{};
+        cp.action = action;
+        cp.attachments.colors[0] = capture_view;
+        sg_begin_pass(&cp);
+
+        sgl_defaults();
+        sgl_viewport(0, 0, capture_w, capture_h, true);
+        sgl_matrix_mode_projection();
+        sgl_load_identity();
+        sgl_ortho(0.0f, (float)capture_w, (float)capture_h, 0.0f, -1.0f, 1.0f);
+        sgl_matrix_mode_modelview();
+        sgl_load_identity();
+
+#if defined(COI_DESKTOP_CLAY)
+        // Re-layout for capture size (uses the existing Clay context).
+        Clay_RenderCommandArray cmds = ClayEngine::layout((float)capture_w, (float)capture_h);
+        const bool ok = (ClayEngine::ctx != nullptr);
+        if (ok) {
+            auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+            struct IRect {
+                int x = 0;
+                int y = 0;
+                int w = 0;
+                int h = 0;
+            };
+            auto intersect = [](const IRect& a, const IRect& b) -> IRect {
+                int x0 = std::max(a.x, b.x);
+                int y0 = std::max(a.y, b.y);
+                int x1 = std::min(a.x + a.w, b.x + b.w);
+                int y1 = std::min(a.y + a.h, b.y + b.h);
+                IRect out;
+                out.x = x0;
+                out.y = y0;
+                out.w = std::max(0, x1 - x0);
+                out.h = std::max(0, y1 - y0);
+                return out;
+            };
+            auto apply_scissor = [&](const IRect& r) {
+                sg_apply_scissor_rect(r.x, r.y, r.w, r.h, true /* origin_top_left */);
+            };
+
+            const IRect full{0, 0, capture_w, capture_h};
+            std::vector<IRect> scissor_stack;
+            apply_scissor(full);
+
+            bool quads_open = false;
+            auto begin_quads = [&]() {
+                if (!quads_open) {
+                    sgl_begin_quads();
+                    quads_open = true;
+                }
+            };
+            auto flush_quads = [&]() {
+                if (quads_open) {
+                    sgl_end();
+                    sgl_draw();
+                    quads_open = false;
+                }
+            };
+            auto quad = [&](float x, float y, float w, float h) {
+                float x0 = x, y0 = y, x1 = x + w, y1 = y + h;
+                sgl_v2f(x0, y0);
+                sgl_v2f(x1, y0);
+                sgl_v2f(x1, y1);
+                sgl_v2f(x0, y1);
+            };
+
+            begin_quads();
+            for (int32_t i = 0; i < cmds.length; i++) {
+                Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&cmds, i);
+                if (!cmd) continue;
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
+                    flush_quads();
+                    const auto& bb = cmd->boundingBox;
+                    IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+                    if (!scissor_stack.empty()) r = intersect(scissor_stack.back(), r);
+                    scissor_stack.push_back(r);
+                    apply_scissor(r);
+                    begin_quads();
+                    continue;
+                }
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
+                    flush_quads();
+                    if (!scissor_stack.empty()) scissor_stack.pop_back();
+                    apply_scissor(scissor_stack.empty() ? full : scissor_stack.back());
+                    begin_quads();
+                    continue;
+                }
+                const auto& bb = cmd->boundingBox;
+                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
+                    const auto& c = cmd->renderData.rectangle.backgroundColor;
+                    sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+                    quad(bb.x, bb.y, bb.width, bb.height);
+                } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_BORDER) {
+                    const auto& b = cmd->renderData.border;
+                    const auto& c = b.color;
+                    if (c.a <= 0) continue;
+                    float ww = std::max(0.0f, bb.width);
+                    float hh = std::max(0.0f, bb.height);
+                    float l = std::min<float>((float)b.width.left, ww);
+                    float r = std::min<float>((float)b.width.right, ww);
+                    float t = std::min<float>((float)b.width.top, hh);
+                    float bo = std::min<float>((float)b.width.bottom, hh);
+                    if ((l + r + t + bo) <= 0.0f) continue;
+                    sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+                    if (t > 0.0f) quad(bb.x, bb.y, ww, t);
+                    if (bo > 0.0f) quad(bb.x, bb.y + hh - bo, ww, bo);
+                    if (l > 0.0f) quad(bb.x, bb.y, l, hh);
+                    if (r > 0.0f) quad(bb.x + ww - r, bb.y, r, hh);
+                }
+            }
+            flush_quads();
+
+#if defined(COI_DESKTOP_FONTSTASH)
+            if (fons_ctx && fons_font != FONS_INVALID) {
+                sg_apply_scissor_rect(0, 0, capture_w, capture_h, true /* origin_top_left */);
+                fonsClearState(fons_ctx);
+                fonsSetFont(fons_ctx, fons_font);
+                fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
+                for (int32_t i = 0; i < cmds.length; i++) {
+                    Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&cmds, i);
+                    if (!cmd) continue;
+                    if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
+                    const auto& bb = cmd->boundingBox;
+                    const auto& t = cmd->renderData.text;
+                    fonsSetSize(fons_ctx, (float)t.fontSize);
+                    fonsSetSpacing(fons_ctx, (float)t.letterSpacing);
+                    fonsSetColor(fons_ctx, sfons_rgba(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a));
+                    const char* start = t.stringContents.chars;
+                    const char* end = start ? (start + t.stringContents.length) : nullptr;
+                    if (start && end && t.stringContents.length > 0) {
+                        (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
+                    }
+                }
+                sfons_flush(fons_ctx);
+                sgl_draw();
+            }
+#endif
+        }
+#endif
+
+        if (capture_overlay) {
+            sdtx_canvas((float)capture_w, (float)capture_h);
+            sdtx_font(0);
+            sdtx_origin(1.0f, 1.0f);
+            sdtx_home();
+            sdtx_color3f(1.0f, 1.0f, 1.0f);
+            sdtx_puts("CAPTURE\n");
+            sdtx_draw();
+        }
+
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, capture_w, capture_h, GL_RGBA, GL_UNSIGNED_BYTE, capture_pixels.data());
+        sg_end_pass();
+
+        const size_t stride = (size_t)capture_w * 4u;
+        for (int y = 0; y < capture_h; y++) {
+            const uint8_t* src = capture_pixels.data() + (size_t)(capture_h - 1 - y) * stride;
+            uint8_t* dst = capture_pixels_flipped.data() + (size_t)y * stride;
+            std::memcpy(dst, src, stride);
+        }
+
+        char name[64];
+        std::snprintf(name, sizeof(name), "frame_%06d.png", capture_index);
+        std::filesystem::path png_path = capture_dir / name;
+        const int ok_png = stbi_write_png(png_path.string().c_str(), capture_w, capture_h, 4, capture_pixels_flipped.data(), (int)stride);
+        if (!ok_png) {
+            std::cerr << "[capture] failed to write png: " << png_path.string() << "\n";
+        }
+
+        const uint64_t h = dhash_rgba8(capture_pixels_flipped.data(), capture_w, capture_h);
+        std::snprintf(name, sizeof(name), "frame_%06d.dhash", capture_index);
+        std::filesystem::path hash_path = capture_dir / name;
+        {
+            std::ofstream hf(hash_path);
+            hf << std::hex << h << "\n";
+        }
+
+        if (!capture_baseline_dir.empty()) {
+            std::filesystem::path base_hash = capture_baseline_dir / hash_path.filename();
+            uint64_t base = 0;
+            if (read_hex_u64(base_hash, base)) {
+                const int dist = popcount64(h ^ base);
+                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec
+                          << " baseline_dist=" << dist << " tol=" << capture_tolerance << "\n";
+                if (dist > capture_tolerance) {
+                    exit_code = 1;
+                    if (capture_fail_on_mismatch) sapp_request_quit();
+                }
+            } else {
+                std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec << " (no baseline)\n";
+            }
+        } else {
+            std::cout << "[capture] " << hash_path.filename().string() << " dhash=" << std::hex << h << std::dec << "\n";
+        }
+
+        capture_index++;
+    }
+#endif
 
     static inline float mouse_x = 0.0f;
     static inline float mouse_y = 0.0f;
@@ -1351,11 +1745,14 @@ struct SokolRunner {
         sdtx_draw();
 
         sg_end_pass();
+#if defined(COI_DESKTOP_CAPTURE)
+        capture_maybe(pass, dt);
+#endif
         sg_commit();
 
-        if (frames_limit > 0) {
-            frames++;
-            if (frames >= frames_limit) sapp_request_quit();
+        frames++;
+        if (frames_limit > 0 && frames >= frames_limit) {
+            sapp_request_quit();
         }
     }
 
@@ -1367,6 +1764,9 @@ struct SokolRunner {
         }
         fons_font = FONS_INVALID;
         font_bytes.clear();
+#endif
+#if defined(COI_DESKTOP_CAPTURE)
+        capture_shutdown();
 #endif
         sdtx_shutdown();
         sgl_shutdown();
@@ -1391,7 +1791,11 @@ struct SokolRunner {
         desc.event_cb = event_cb;
         desc.cleanup_cb = cleanup;
         sapp_run(&desc);
+#if defined(COI_DESKTOP_CAPTURE)
+        return exit_code;
+#else
         return 0;
+#endif
     }
 
 #if defined(COI_DESKTOP_FONTSTASH)
