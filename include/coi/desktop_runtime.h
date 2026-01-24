@@ -194,6 +194,14 @@ inline void scroll_to_top() {}
     #include "sokol_debugtext.h"
 #endif
 
+#if defined(COI_DESKTOP_CLAY)
+#ifndef COI_DESKTOP_RUNTIME_CLAY_INCLUDED
+#define COI_DESKTOP_RUNTIME_CLAY_INCLUDED
+    #define CLAY_IMPLEMENTATION
+    #include "clay.h"
+#endif
+#endif
+
 namespace coi::desktop {
 struct Rect {
     float x, y, w, h;
@@ -287,6 +295,78 @@ struct SokolRunner {
     static inline std::unordered_map<int32_t, Rect> layout;
     static inline std::vector<int32_t> draw_list;
 
+#if defined(COI_DESKTOP_CLAY)
+    static inline Clay_Context* clay_ctx = nullptr;
+    static inline void* clay_mem = nullptr;
+    static inline size_t clay_mem_size = 0;
+    static inline Clay_TextElementConfig* clay_text_cfg = nullptr;
+
+    static void clay_error_handler(Clay_ErrorData data) {
+        std::cerr << "[Clay] error " << (int)data.errorType << ": ";
+        if (data.errorText.chars && data.errorText.length > 0) {
+            std::cerr.write(data.errorText.chars, data.errorText.length);
+        } else {
+            std::cerr << "(no message)";
+        }
+        std::cerr << std::endl;
+    }
+
+    static Clay_Dimensions clay_measure_text(Clay_StringSlice text, Clay_TextElementConfig* config, void*) {
+        const float font_size = config ? (float)config->fontSize : 8.0f;
+        const float letter_spacing = config ? (float)config->letterSpacing : 0.0f;
+        const float line_h = (config && config->lineHeight) ? (float)config->lineHeight : font_size;
+        const float char_w = font_size + letter_spacing;
+        return Clay_Dimensions{(float)text.length * char_w, line_h};
+    }
+
+    static uint32_t clay_id_from_handle(int32_t h) {
+        return 0xC01D0000u ^ (uint32_t)h;
+    }
+
+    static Clay_String clay_string_from_webcc(const webcc::string& s) {
+        return Clay_String{false, (int32_t)std::strlen(s.c_str()), s.c_str()};
+    }
+
+    static void clay_build_node(int32_t id, bool is_root) {
+        auto it = coi::ui::g_nodes.find(id);
+        if (it == coi::ui::g_nodes.end()) return;
+        const auto& n = it->second;
+        if (n.tag == "comment") return;
+
+        const float pad = is_root ? 16.0f : 12.0f;
+        const float gap = 10.0f;
+
+        Clay_ElementDeclaration decl{};
+        decl.layout = Clay_LayoutConfig{
+            .sizing = Clay_Sizing{
+                .width = CLAY_SIZING_GROW(0),
+                .height = is_root ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIT(0),
+            },
+            .padding = Clay_Padding{(uint16_t)pad, (uint16_t)pad, (uint16_t)pad, (uint16_t)pad},
+            .childGap = (uint16_t)gap,
+            .childAlignment = Clay_ChildAlignment{CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP},
+            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+        };
+
+        if (!is_root) {
+            const webcc::string* cls = attr(n, "class");
+            uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
+            float cr, cg, cb;
+            color_from_hash(h, cr, cg, cb);
+            decl.backgroundColor = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 46.0f};
+        }
+
+        Clay_ElementId eid{.id = clay_id_from_handle(id)};
+        CLAY(eid, decl) {
+            if (!n.text.empty()) {
+                Clay_String t = clay_string_from_webcc(n.text);
+                CLAY_TEXT(t, clay_text_cfg);
+            }
+            for (int32_t c : n.children) clay_build_node(c, false);
+        }
+    }
+#endif
+
     static float layout_node(int32_t id, float x, float y, float w, float max_h) {
         auto it = coi::ui::g_nodes.find(id);
         if (it == coi::ui::g_nodes.end()) return 0.0f;
@@ -353,6 +433,34 @@ struct SokolRunner {
         ddesc.fonts[4] = sdtx_font_c64();
         ddesc.fonts[5] = sdtx_font_oric();
         sdtx_setup(&ddesc);
+
+#if defined(COI_DESKTOP_CLAY)
+        if (!clay_ctx) {
+            // clay needs persistent memory; allocate a bit more than the reported minimum.
+            uint32_t min_bytes = Clay_MinMemorySize();
+            clay_mem_size = (size_t)min_bytes + (size_t)min_bytes / 2 + 64 * 1024;
+            clay_mem = std::malloc(clay_mem_size);
+            if (!clay_mem) {
+                std::cerr << "[Clay] failed to allocate " << clay_mem_size << " bytes\n";
+            } else {
+                Clay_Arena arena = Clay_CreateArenaWithCapacityAndMemory(clay_mem_size, clay_mem);
+                clay_ctx = Clay_Initialize(
+                    arena,
+                    Clay_Dimensions{(float)sapp_width(), (float)sapp_height()},
+                    Clay_ErrorHandler{clay_error_handler, nullptr});
+                Clay_SetCurrentContext(clay_ctx);
+                Clay_SetMeasureTextFunction(clay_measure_text, nullptr);
+                clay_text_cfg = CLAY_TEXT_CONFIG({
+                    .textColor = {20, 20, 22, 255},
+                    .fontSize = 8,
+                    .letterSpacing = 0,
+                    .lineHeight = 8,
+                    .wrapMode = CLAY_TEXT_WRAP_WORDS,
+                    .textAlignment = CLAY_TEXT_ALIGN_LEFT,
+                });
+            }
+        }
+#endif
     }
 
     static void frame_cb(void) {
@@ -363,7 +471,21 @@ struct SokolRunner {
         }
 
         coi::ui::flush();
+
+#if defined(COI_DESKTOP_CLAY)
+        Clay_RenderCommandArray render_commands{};
+        if (clay_ctx) {
+            Clay_SetCurrentContext(clay_ctx);
+            Clay_SetLayoutDimensions(Clay_Dimensions{(float)sapp_width(), (float)sapp_height()});
+            Clay_BeginLayout();
+            clay_build_node(0, true);
+            render_commands = Clay_EndLayout();
+        } else {
+            layout_tree((float)sapp_width(), (float)sapp_height());
+        }
+#else
         layout_tree((float)sapp_width(), (float)sapp_height());
+#endif
 
         sg_pass_action pass{};
         pass.colors[0].load_action = SG_LOADACTION_CLEAR;
@@ -383,6 +505,44 @@ struct SokolRunner {
         sgl_load_identity();
 
         sgl_begin_quads();
+#if defined(COI_DESKTOP_CLAY)
+        if (clay_ctx) {
+            for (int32_t i = 0; i < render_commands.length; i++) {
+                Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
+                if (!cmd) continue;
+                if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) continue;
+                const auto& bb = cmd->boundingBox;
+                const auto& c = cmd->renderData.rectangle.backgroundColor;
+                sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+                float x0 = bb.x, y0 = bb.y, x1 = bb.x + bb.width, y1 = bb.y + bb.height;
+                sgl_v2f(x0, y0);
+                sgl_v2f(x1, y0);
+                sgl_v2f(x1, y1);
+                sgl_v2f(x0, y1);
+            }
+        } else {
+            for (int32_t id : draw_list) {
+                if (id == 0) continue;
+                auto itn = coi::ui::g_nodes.find(id);
+                if (itn == coi::ui::g_nodes.end()) continue;
+                const auto& n = itn->second;
+                if (n.tag == "comment") continue;
+                auto itr = layout.find(id);
+                if (itr == layout.end()) continue;
+                const Rect& r = itr->second;
+                const webcc::string* cls = attr(n, "class");
+                uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
+                float cr, cg, cb;
+                color_from_hash(h, cr, cg, cb);
+                sgl_c4f(cr, cg, cb, 0.18f);
+                float x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+                sgl_v2f(x0, y0);
+                sgl_v2f(x1, y0);
+                sgl_v2f(x1, y1);
+                sgl_v2f(x0, y1);
+            }
+        }
+#else
         for (int32_t id : draw_list) {
             if (id == 0) continue;
             auto itn = coi::ui::g_nodes.find(id);
@@ -403,6 +563,7 @@ struct SokolRunner {
             sgl_v2f(x1, y1);
             sgl_v2f(x0, y1);
         }
+#endif
         sgl_end();
         sgl_draw();
 
@@ -415,6 +576,57 @@ struct SokolRunner {
         sdtx_puts("COI desktop runtime (sokol)\n");
         sdtx_printf("dt: %.3f\n\n", dt);
 
+#if defined(COI_DESKTOP_CLAY)
+        if (clay_ctx) {
+            // Render clay text commands using sokol_debugtext (monospace-ish).
+            for (int32_t i = 0; i < render_commands.length; i++) {
+                Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
+                if (!cmd) continue;
+                if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
+                const auto& bb = cmd->boundingBox;
+                const auto& t = cmd->renderData.text;
+                const auto& col = t.textColor;
+                sdtx_origin(bb.x / cell, bb.y / cell);
+                sdtx_home();
+                sdtx_color3f(col.r / 255.0f, col.g / 255.0f, col.b / 255.0f);
+                sdtx_putr(t.stringContents.chars, t.stringContents.length);
+            }
+        } else {
+            for (int32_t id : draw_list) {
+                if (id == 0) continue;
+                auto itn = coi::ui::g_nodes.find(id);
+                if (itn == coi::ui::g_nodes.end()) continue;
+                const auto& n = itn->second;
+                if (n.tag == "comment") continue;
+                auto itr = layout.find(id);
+                if (itr == layout.end()) continue;
+                const Rect& r = itr->second;
+                const float pad = 12.0f;
+                const float x = r.x + pad;
+                const float y = r.y + pad;
+                const float w = std::max(1.0f, r.w - pad * 2.0f);
+                int cols = (int)std::floor(w / cell);
+                if (cols < 1) cols = 1;
+                if (!n.text.empty()) {
+                    sdtx_origin(x / cell, y / cell);
+                    sdtx_home();
+                    sdtx_color3f(0.05f, 0.05f, 0.06f);
+                    sdtx_put_wrapped(n.text.c_str(), cols);
+                } else {
+                    const webcc::string* cls = attr(n, "class");
+                    std::string label = n.tag.c_str();
+                    if (cls && !cls->empty()) {
+                        label += ".";
+                        label += cls->c_str();
+                    }
+                    sdtx_origin((r.x + 6.0f) / cell, (r.y + 6.0f) / cell);
+                    sdtx_home();
+                    sdtx_color3f(0.85f, 0.85f, 0.90f);
+                    sdtx_put_wrapped(label.c_str(), std::max(1, cols));
+                }
+            }
+        }
+#else
         for (int32_t id : draw_list) {
             if (id == 0) continue;
             auto itn = coi::ui::g_nodes.find(id);
@@ -448,6 +660,7 @@ struct SokolRunner {
                 sdtx_put_wrapped(label.c_str(), std::max(1, cols));
             }
         }
+#endif
 
         const char* show_dump = std::getenv("COI_DESKTOP_SHOW_DUMP");
         if (show_dump && *show_dump && std::string(show_dump) != std::string("0")) {
@@ -472,6 +685,17 @@ struct SokolRunner {
         sdtx_shutdown();
         sgl_shutdown();
         sg_shutdown();
+
+#if defined(COI_DESKTOP_CLAY)
+        // clay has no explicit shutdown; free the backing arena memory
+        if (clay_mem) {
+            std::free(clay_mem);
+            clay_mem = nullptr;
+            clay_mem_size = 0;
+            clay_ctx = nullptr;
+            clay_text_cfg = nullptr;
+        }
+#endif
     }
 
     static int run(AppT* app_in, int frames_limit_in) {
@@ -492,4 +716,3 @@ struct SokolRunner {
 };
 } // namespace coi::desktop
 #endif // COI_DESKTOP_SOKOL
-

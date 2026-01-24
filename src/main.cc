@@ -1352,6 +1352,8 @@ int main(int argc, char **argv)
 
 			            fs::path sokol_dir = exe_dir / "deps" / "sokol";
 			            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
+			            fs::path clay_dir = exe_dir / "deps" / "clay";
+			            const bool has_clay = fs::exists(clay_dir / "clay.h");
 
 		            fs::path abs_output_cc = fs::absolute(output_cc);
 		            fs::path abs_output_dir = fs::absolute(final_output_dir);
@@ -1360,6 +1362,10 @@ int main(int argc, char **argv)
 			            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
 			            cmd += " -I" + include_dir.string();
 			            cmd += " -I" + coi_include_dir.string();
+			            if (has_clay) {
+			                cmd += " -I" + clay_dir.string();
+			                cmd += " -DCOI_DESKTOP_CLAY";
+			            }
 			            if (has_sokol) {
 			                cmd += " -I" + sokol_dir.string();
 			                cmd += " -I" + (sokol_dir / "util").string();
