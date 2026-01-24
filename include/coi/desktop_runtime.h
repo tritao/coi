@@ -208,6 +208,28 @@ struct Rect {
     float x, y, w, h;
 };
 
+// Desktop event dispatch hooks (set by generated app code).
+// The dispatcher is expected to return true when the event was handled.
+inline webcc::function<bool(webcc::handle)> g_click_dispatcher;
+inline void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) {
+    g_click_dispatcher = std::move(cb);
+}
+
+inline bool dispatch_click_bubble(webcc::handle start) {
+    if (!g_click_dispatcher) return false;
+    webcc::handle h = start;
+    while (h.is_valid()) {
+        if (g_click_dispatcher(h)) return true;
+        auto it = coi::ui::g_nodes.find((int32_t)h);
+        if (it == coi::ui::g_nodes.end()) break;
+        h = it->second.parent;
+    }
+    return false;
+}
+
+// Flush hooks for headless runtime (tree dump + optional layout dump/click simulation).
+inline void flush();
+
 inline const webcc::string* attr(const coi::ui::Node& n, const char* key) {
     for (const auto& a : n.attrs) {
         if (a.key == key) return &a.value;
@@ -672,6 +694,38 @@ struct SokolRunner {
 #endif
     }
 
+    static inline float mouse_x = 0.0f;
+    static inline float mouse_y = 0.0f;
+    static inline bool mouse_down = false;
+    static inline bool click_pending = false;
+    static inline float click_x = 0.0f;
+    static inline float click_y = 0.0f;
+
+    static void event_cb(const sapp_event* ev) {
+        if (!ev) return;
+        switch (ev->type) {
+        case SAPP_EVENTTYPE_MOUSE_MOVE:
+            mouse_x = ev->mouse_x;
+            mouse_y = ev->mouse_y;
+            break;
+        case SAPP_EVENTTYPE_MOUSE_DOWN:
+            mouse_down = true;
+            mouse_x = ev->mouse_x;
+            mouse_y = ev->mouse_y;
+            break;
+        case SAPP_EVENTTYPE_MOUSE_UP:
+            mouse_down = false;
+            mouse_x = ev->mouse_x;
+            mouse_y = ev->mouse_y;
+            click_pending = true;
+            click_x = mouse_x;
+            click_y = mouse_y;
+            break;
+        default:
+            break;
+        }
+    }
+
     static void frame_cb(void) {
         double dt = sapp_frame_duration();
         if (dt > 0.1) dt = 0.1;
@@ -679,7 +733,7 @@ struct SokolRunner {
             if (app) app->tick(dt);
         }
 
-        coi::ui::flush();
+        coi::desktop::flush();
 
 #if defined(COI_DESKTOP_CLAY)
         Clay_RenderCommandArray render_commands = ClayEngine::layout((float)sapp_width(), (float)sapp_height());
@@ -687,6 +741,40 @@ struct SokolRunner {
         if (!clay_ok) layout_tree((float)sapp_width(), (float)sapp_height());
 #else
         layout_tree((float)sapp_width(), (float)sapp_height());
+#endif
+
+#if defined(COI_DESKTOP_CLAY)
+        if (clay_ok && click_pending && g_click_dispatcher) {
+            click_pending = false;
+            Clay_SetCurrentContext(ClayEngine::ctx);
+            Clay_SetPointerState(Clay_Vector2{click_x, click_y}, false);
+            Clay_ElementIdArray ids = Clay_GetPointerOverIds();
+            for (int32_t i = ids.length - 1; i >= 0; --i) {
+                Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
+                if (!eid) continue;
+                int32_t hid = (int32_t)(eid->id ^ 0xC01D0000u);
+                if (coi::ui::g_nodes.find(hid) == coi::ui::g_nodes.end()) continue;
+                dispatch_click_bubble(webcc::handle(hid));
+                break;
+            }
+        }
+#else
+        if (click_pending && g_click_dispatcher) {
+            click_pending = false;
+            // Fallback: pick last drawn rect containing the click point.
+            webcc::handle target;
+            for (auto it = draw_list.rbegin(); it != draw_list.rend(); ++it) {
+                int32_t id = *it;
+                auto itr = layout.find(id);
+                if (itr == layout.end()) continue;
+                const Rect& r = itr->second;
+                if (click_x >= r.x && click_x <= (r.x + r.w) && click_y >= r.y && click_y <= (r.y + r.h)) {
+                    target = webcc::handle(id);
+                    break;
+                }
+            }
+            if (target.is_valid()) dispatch_click_bubble(target);
+        }
 #endif
 
         sg_pass_action pass{};
@@ -904,6 +992,7 @@ struct SokolRunner {
         desc.window_title = "COI (Desktop)";
         desc.init_cb = init;
         desc.frame_cb = frame_cb;
+        desc.event_cb = event_cb;
         desc.cleanup_cb = cleanup;
         sapp_run(&desc);
         return 0;
@@ -911,6 +1000,18 @@ struct SokolRunner {
 };
 
 inline bool g_layout_dumped = false;
+inline bool g_click_done = false;
+
+inline bool parse_xy(const char* s, float& x, float& y) {
+    if (!s || !*s) return false;
+    int ix = 0, iy = 0;
+    if (std::sscanf(s, "%d,%d", &ix, &iy) == 2 || std::sscanf(s, "%d %d", &ix, &iy) == 2) {
+        x = (float)ix;
+        y = (float)iy;
+        return true;
+    }
+    return false;
+}
 
 inline bool parse_viewport(float& w, float& h) {
     const char* vw = std::getenv("COI_DESKTOP_VIEWPORT");
@@ -970,7 +1071,42 @@ inline void dump_layout() {
 #endif
 }
 
+inline void maybe_simulate_click() {
+    const char* c = std::getenv("COI_DESKTOP_CLICK");
+    if (!c || !*c) return;
+    if (g_click_done && std::string(c) != std::string("always")) return;
+
+    float x = 0.0f, y = 0.0f;
+    if (!parse_xy(c, x, y)) return;
+    if (!g_click_dispatcher) return;
+
+#if defined(COI_DESKTOP_CLAY)
+    float w = 0.0f, h = 0.0f;
+    parse_viewport(w, h);
+    (void)ClayEngine::layout(w, h);
+    if (!ClayEngine::ctx) return;
+    Clay_SetCurrentContext(ClayEngine::ctx);
+    Clay_SetPointerState(Clay_Vector2{x, y}, false);
+    Clay_ElementIdArray ids = Clay_GetPointerOverIds();
+    // ids are ordered from root->leaf, so traverse backwards to find a COI handle node.
+    for (int32_t i = ids.length - 1; i >= 0; --i) {
+        Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
+        if (!eid) continue;
+        int32_t hid = (int32_t)(eid->id ^ 0xC01D0000u);
+        if (coi::ui::g_nodes.find(hid) == coi::ui::g_nodes.end()) continue;
+        dispatch_click_bubble(webcc::handle(hid));
+        g_click_done = true;
+        return;
+    }
+#else
+    (void)x;
+    (void)y;
+#endif
+    g_click_done = true;
+}
+
 inline void flush() {
+    maybe_simulate_click();
     coi::ui::flush();
     const char* env = std::getenv("COI_DESKTOP_LAYOUT_DUMP");
     if (!env || !*env) return;

@@ -139,12 +139,20 @@ while IFS= read -r -d '' test_file; do
     viewport="$(cat "${test_file%.coi}.viewport" | tr -d ' \t\r\n')"
   fi
 
+  click=""
+  if [ -f "${test_file%.coi}.click" ]; then
+    click="$(cat "${test_file%.coi}.click" | tr -d ' \t\r\n')"
+  fi
+
   run_env=(COI_DESKTOP_DUMP="$dump_mode" COI_DESKTOP_FRAMES="$frames")
   if [ "$layout_dump_set" -eq 1 ]; then
     run_env+=(COI_DESKTOP_LAYOUT_DUMP="$layout_dump")
   fi
   if [ -n "$viewport" ]; then
     run_env+=(COI_DESKTOP_VIEWPORT="$viewport")
+  fi
+  if [ -n "$click" ]; then
+    run_env+=(COI_DESKTOP_CLICK="$click")
   fi
 
   set +e

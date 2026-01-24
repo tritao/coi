@@ -1012,6 +1012,7 @@ int main(int argc, char **argv)
             out << "int main() {\n";
             out << "    app = new " << final_app_config.root_component << "();\n";
             out << "    app->view();\n";
+            out << "    coi::desktop::set_click_dispatcher([](webcc::handle h) { return g_dispatcher.dispatch(h); });\n";
             out << "    coi::desktop::flush();\n";
             out << "    const char* frames_env = std::getenv(\"COI_DESKTOP_FRAMES\");\n";
             out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
