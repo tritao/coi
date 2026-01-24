@@ -1,0 +1,5 @@
+--- COI_DESKTOP_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root"></div>
+    <div coi-scope="App">Count:0</div>
+

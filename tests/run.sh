@@ -29,8 +29,8 @@ FAILED_TESTS=()
 TOTAL=0
 PASSED=0
 
-# Count total tests
-TOTAL=$(find "$SCRIPT_DIR" -name "*_pass.coi" -o -name "*_fail.coi" | wc -l)
+# Count total tests (exclude desktop snapshot tests; those are run via tests/run_desktop.sh)
+TOTAL=$(find "$SCRIPT_DIR" -path "$SCRIPT_DIR/desktop" -prune -o \( -name "*_pass.coi" -o -name "*_fail.coi" \) -print | wc -l)
 
 # Function to draw progress bar
 draw_progress_bar() {
@@ -90,7 +90,7 @@ while IFS= read -r -d '' test_file; do
     
     # Clean up any generated .cc files
     rm -f "${test_file%.coi}.cc" "$test_dir/app.cc"
-done < <(find "$SCRIPT_DIR" -name "*.coi" -type f -print0 | sort -z)
+done < <(find "$SCRIPT_DIR" -path "$SCRIPT_DIR/desktop" -prune -o -name "*.coi" -type f -print0 | sort -z)
 
 echo ""  # New line after progress
 

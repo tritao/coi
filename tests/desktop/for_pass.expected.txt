@@ -1,0 +1,7 @@
+--- COI_DESKTOP_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root"></div>
+    <div coi-scope="App" class="item">Item 0</div>
+    <div coi-scope="App" class="item">Item 1</div>
+    <div coi-scope="App" class="item">Item 2</div>
+

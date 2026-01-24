@@ -1,0 +1,19 @@
+component App {
+    mut bool show = true;
+
+    view {
+        <div class="root">
+            <if show>
+                <div class="yes">YES</div>
+            <else>
+                <div class="no">NO</div>
+            </else>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
