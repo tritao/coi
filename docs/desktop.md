@@ -11,6 +11,12 @@ coi build --target desktop
 ./dist/app
 ```
 
+To open a real window (Sokol backend) instead of running headless:
+
+```bash
+COI_DESKTOP_WINDOW=1 ./dist/app
+```
+
 To see a simple “render” dump of the UI tree on stdout:
 
 ```bash
@@ -28,6 +34,12 @@ COI_DESKTOP_DUMP=1 ./dist/app
 - **Web platform APIs are not supported** on `--target desktop` yet (e.g. `System.*`, `Input.*`, `Canvas*`, `Fetch*`, `WebSocket*`, DOM types). The compiler will error if they’re used.
 - **Router is not supported** (it depends on browser history/popstate).
 - Styling output is still CSS-oriented; the desktop target does not consume `app.css` yet.
+
+## Dependencies (Linux)
+
+- The desktop build uses `clang++` and (when Sokol is present) links against `X11`, `Xi`, `Xcursor`, and `GL`.
+- If you get missing-library errors, install: `libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev`
+- If you cloned without submodules: `git submodule update --init --recursive`
 
 ## Recommended direction (2B backend abstraction)
 
@@ -48,4 +60,3 @@ The missing pieces to become a real desktop UI are:
 3. Layout engine (e.g. Clay)
 4. Text system (e.g. Skribidi)
 5. Renderer (Skia/wgpu/OpenGL/etc.)
-

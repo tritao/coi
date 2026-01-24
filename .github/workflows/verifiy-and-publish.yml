@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang lld
+          sudo apt-get install -y ninja-build clang lld libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev
 
       - name: Build Compiler
         run: ./build.sh
