@@ -1678,6 +1678,12 @@ int main(int argc, char **argv)
             out << "        desc.environment = sglue_environment();\n";
             out << "        sg_setup(&desc);\n";
             out << "        sdtx_desc_t ddesc{};\n";
+            out << "        ddesc.fonts[0] = sdtx_font_kc853();\n";
+            out << "        ddesc.fonts[1] = sdtx_font_kc854();\n";
+            out << "        ddesc.fonts[2] = sdtx_font_z1013();\n";
+            out << "        ddesc.fonts[3] = sdtx_font_cpc();\n";
+            out << "        ddesc.fonts[4] = sdtx_font_c64();\n";
+            out << "        ddesc.fonts[5] = sdtx_font_oric();\n";
             out << "        sdtx_setup(&ddesc);\n";
             out << "    }\n";
             out << "\n";
@@ -1697,9 +1703,10 @@ int main(int argc, char **argv)
             out << "        p.swapchain = sglue_swapchain();\n";
             out << "        sg_begin_pass(&p);\n";
             out << "\n";
-            out << "        sdtx_canvas((float)sapp_width() / 2.0f, (float)sapp_height() / 2.0f);\n";
+            out << "        sdtx_canvas((float)sapp_width(), (float)sapp_height());\n";
             out << "        sdtx_origin(1, 1);\n";
             out << "        sdtx_home();\n";
+            out << "        sdtx_font(0);\n";
             out << "        sdtx_color3f(1.0f, 1.0f, 1.0f);\n";
             out << "        sdtx_puts(\"COI desktop runtime (sokol)\\n\\n\");\n";
             out << "        sdtx_printf(\"dt: %.3f\\n\", dt);\n";
