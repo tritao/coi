@@ -892,7 +892,11 @@ struct SokolRunner {
         sg_desc desc{};
         desc.environment = sglue_environment();
         sg_setup(&desc);
+        const sg_swapchain sc = sglue_swapchain();
         sgl_desc_t gld{};
+        gld.color_format = sc.color_format;
+        gld.depth_format = sc.depth_format;
+        gld.sample_count = sc.sample_count;
         sgl_setup(&gld);
 
         sdtx_desc_t ddesc{};
