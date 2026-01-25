@@ -221,6 +221,15 @@ inline void scroll_to_top() {}
 #endif
 #endif
 
+#if defined(COI_DESKTOP_SOKOL) && defined(COI_DESKTOP_CLAY) && defined(COI_DESKTOP_FONTSTASH)
+#ifndef COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED
+#define COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED
+    // Clay's reference sokol renderer + fontstash-based text measurement.
+    #define SOKOL_CLAY_IMPL
+    #include "renderers/sokol/sokol_clay.h"
+#endif
+#endif
+
 namespace coi::desktop {
 struct Rect {
     float x, y, w, h;
@@ -601,7 +610,6 @@ struct ClayEngine {
     static void ensure(float w, float h) {
         if (ctx) {
             Clay_SetCurrentContext(ctx);
-            Clay_SetLayoutDimensions(Clay_Dimensions{w, h});
             return;
         }
         uint32_t min_bytes = Clay_MinMemorySize();
@@ -617,6 +625,7 @@ struct ClayEngine {
         Clay_SetMeasureTextFunction(measure_text, nullptr);
         text_cfg = CLAY_TEXT_CONFIG({
             .textColor = {235, 235, 240, 255},
+            .fontId = 0,
             .fontSize = 8,
             .letterSpacing = 0,
             .lineHeight = 8,
@@ -747,11 +756,21 @@ struct ClayEngine {
         }
     }
 
-    static Clay_RenderCommandArray layout(float w, float h) {
-        ensure(w, h);
+    static Clay_RenderCommandArray layout(float w_px, float h_px, float dpi_scale = 1.0f) {
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+        const float safe_dpi = (dpi_scale > 0.0f) ? dpi_scale : 1.0f;
+        ensure(w_px / safe_dpi, h_px / safe_dpi);
+#else
+        (void)dpi_scale;
+        ensure(w_px, h_px);
+#endif
         if (!ctx) return Clay_RenderCommandArray{};
         Clay_SetCurrentContext(ctx);
-        Clay_SetLayoutDimensions(Clay_Dimensions{w, h});
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+        sclay_set_layout_dimensions(Clay_Dimensions{w_px, h_px}, (dpi_scale > 0.0f) ? dpi_scale : 1.0f);
+#else
+        Clay_SetLayoutDimensions(Clay_Dimensions{w_px, h_px});
+#endif
         pre_layout_update();
         Clay_BeginLayout();
         build_node(0, true);
@@ -887,17 +906,17 @@ struct SokolRunner {
         layout_node(0, 0.0f, 0.0f, w, h);
     }
 
-    static void init(void) {
-        stm_setup();
-        sg_desc desc{};
-        desc.environment = sglue_environment();
-        sg_setup(&desc);
-        const sg_swapchain sc = sglue_swapchain();
-        sgl_desc_t gld{};
-        gld.color_format = sc.color_format;
-        gld.depth_format = sc.depth_format;
-        gld.sample_count = sc.sample_count;
-        sgl_setup(&gld);
+	    static void init(void) {
+	        stm_setup();
+	        sg_desc desc{};
+	        desc.environment = sglue_environment();
+	        sg_setup(&desc);
+	        const sg_swapchain sc = sglue_swapchain();
+	        sgl_desc_t gld{};
+	        gld.color_format = sc.color_format;
+	        gld.depth_format = sc.depth_format;
+	        gld.sample_count = sc.sample_count;
+	        sgl_setup(&gld);
 
         sdtx_desc_t ddesc{};
         ddesc.fonts[0] = sdtx_font_kc853();
@@ -906,40 +925,66 @@ struct SokolRunner {
         ddesc.fonts[3] = sdtx_font_cpc();
         ddesc.fonts[4] = sdtx_font_c64();
         ddesc.fonts[5] = sdtx_font_oric();
-        sdtx_setup(&ddesc);
-
-#if defined(COI_DESKTOP_CLAY)
-        ClayEngine::ensure((float)sapp_width(), (float)sapp_height());
-#endif
+	        sdtx_setup(&ddesc);
 
 #if defined(COI_DESKTOP_FONTSTASH)
-        sfons_desc_t fs_desc{};
-        fs_desc.width = 512;
-        fs_desc.height = 512;
-        fons_ctx = sfons_create(&fs_desc);
-        if (!fons_ctx) {
-            std::cerr << "[font] sfons_create failed\n";
-        }
-        if (fons_ctx) {
-            const char* font_path = std::getenv("COI_DESKTOP_FONT");
-            if (!font_path || !*font_path) {
-                font_path = "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
-            }
-            if (read_file_bytes(font_path, font_bytes)) {
-                fons_font = fonsAddFontMem(fons_ctx, "coi-default", font_bytes.data(), (int)font_bytes.size(), 0);
-                if (fons_font == FONS_INVALID) {
-                    std::cerr << "[font] failed to load ttf from " << font_path << "\n";
-                }
-            } else {
-                std::cerr << "[font] failed to read ttf file: " << font_path << "\n";
-            }
-        }
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	        sclay_setup();
+	        const char* font_path = std::getenv("COI_DESKTOP_FONT");
+	        if (!font_path || !*font_path) {
+	            font_path = "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	        }
+	        if (read_file_bytes(font_path, font_bytes)) {
+	            clay_fonts[0] = sclay_add_font_mem(font_bytes.data(), (int)font_bytes.size());
+	            if (clay_fonts[0] == FONS_INVALID) {
+	                std::cerr << "[font] failed to load ttf from " << font_path << "\n";
+	            }
+	        } else {
+	            std::cerr << "[font] failed to read ttf file: " << font_path << "\n";
+	        }
+#else
+	        sfons_desc_t fs_desc{};
+	        fs_desc.width = 512;
+	        fs_desc.height = 512;
+	        fons_ctx = sfons_create(&fs_desc);
+	        if (!fons_ctx) {
+	            std::cerr << "[font] sfons_create failed\n";
+	        }
+	        if (fons_ctx) {
+	            const char* font_path = std::getenv("COI_DESKTOP_FONT");
+	            if (!font_path || !*font_path) {
+	                font_path = "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	            }
+	            if (read_file_bytes(font_path, font_bytes)) {
+	                fons_font = fonsAddFontMem(fons_ctx, "coi-default", font_bytes.data(), (int)font_bytes.size(), 0);
+	                if (fons_font == FONS_INVALID) {
+	                    std::cerr << "[font] failed to load ttf from " << font_path << "\n";
+	                }
+	            } else {
+	                std::cerr << "[font] failed to read ttf file: " << font_path << "\n";
+	            }
+	        }
+#endif
+#endif
+
+#if defined(COI_DESKTOP_CLAY)
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	        const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
+	        ClayEngine::ensure((float)sapp_width() / dpi, (float)sapp_height() / dpi);
+	        if (ClayEngine::ctx && clay_fonts[0] != FONS_INVALID) {
+	            Clay_SetCurrentContext(ClayEngine::ctx);
+	            Clay_SetMeasureTextFunction(sclay_measure_text, clay_fonts);
+	            Clay_ResetMeasureTextCache();
+	        }
+#else
+	        ClayEngine::ensure((float)sapp_width(), (float)sapp_height());
+#endif
 #endif
 
 #if defined(COI_DESKTOP_CAPTURE)
-        capture_init();
+	        capture_init();
 #endif
-    }
+	    }
 
 #if defined(COI_DESKTOP_CAPTURE)
     static inline bool capture_enabled = false;
@@ -1137,15 +1182,18 @@ struct SokolRunner {
             std::cerr << "[capture] ensure_target " << capture_w << "x" << capture_h << std::endl;
         }
 
-        sg_image_desc img_desc{};
-        img_desc.type = SG_IMAGETYPE_2D;
-        img_desc.width = capture_w;
-        img_desc.height = capture_h;
-        img_desc.num_mipmaps = 1;
-        img_desc.sample_count = 1;
-        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-        img_desc.usage.color_attachment = true;
-        img_desc.label = "coi-capture-color";
+	        sg_image_desc img_desc{};
+	        img_desc.type = SG_IMAGETYPE_2D;
+	        img_desc.width = capture_w;
+	        img_desc.height = capture_h;
+	        img_desc.num_mipmaps = 1;
+	        {
+	            const sg_swapchain sc = sglue_swapchain();
+	            img_desc.sample_count = (sc.sample_count > 0) ? sc.sample_count : 1;
+	            img_desc.pixel_format = (sc.color_format != SG_PIXELFORMAT_NONE) ? sc.color_format : SG_PIXELFORMAT_RGBA8;
+	        }
+	        img_desc.usage.color_attachment = true;
+	        img_desc.label = "coi-capture-color";
         if (capture_debug) {
             std::cerr << "[capture] sg_make_image..." << std::endl;
         }
@@ -1212,9 +1260,17 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_CLAY)
         // Re-layout for capture size (uses the existing Clay context).
-        Clay_RenderCommandArray cmds = ClayEngine::layout((float)capture_w, (float)capture_h);
+        Clay_RenderCommandArray cmds = ClayEngine::layout((float)capture_w, (float)capture_h, 1.0f);
         const bool ok = (ClayEngine::ctx != nullptr);
         if (ok) {
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+            sgl_matrix_mode_projection();
+            sgl_load_identity();
+            sgl_matrix_mode_modelview();
+            sgl_load_identity();
+            sclay_render(cmds, clay_fonts);
+            sgl_draw();
+#else
             auto iround = [](float v) -> int { return (int)std::lround((double)v); };
             struct IRect {
                 int x = 0;
@@ -1344,6 +1400,7 @@ struct SokolRunner {
                 sfons_flush(fons_ctx);
                 sgl_draw();
             }
+#endif
 #endif
         }
 #endif
@@ -1498,10 +1555,17 @@ struct SokolRunner {
         coi::desktop::flush();
 
 #if defined(COI_DESKTOP_CLAY)
-        ClayEngine::set_input(mouse_x, mouse_y, mouse_down, scroll_x, scroll_y, (float)dt);
+        const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
+        float mx = mouse_x;
+        float my = mouse_y;
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+        mx /= dpi;
+        my /= dpi;
+#endif
+        ClayEngine::set_input(mx, my, mouse_down, scroll_x, scroll_y, (float)dt);
         scroll_x = 0.0f;
         scroll_y = 0.0f;
-        Clay_RenderCommandArray render_commands = ClayEngine::layout((float)sapp_width(), (float)sapp_height());
+        Clay_RenderCommandArray render_commands = ClayEngine::layout((float)sapp_width(), (float)sapp_height(), dpi);
         const bool clay_ok = (ClayEngine::ctx != nullptr);
         if (!clay_ok) layout_tree((float)sapp_width(), (float)sapp_height());
 #else
@@ -1512,7 +1576,13 @@ struct SokolRunner {
         if (clay_ok && click_pending && g_click_dispatcher) {
             click_pending = false;
             Clay_SetCurrentContext(ClayEngine::ctx);
-            Clay_SetPointerState(Clay_Vector2{click_x, click_y}, false);
+            float cx = click_x;
+            float cy = click_y;
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+            cx /= dpi;
+            cy /= dpi;
+#endif
+            Clay_SetPointerState(Clay_Vector2{cx, cy}, false);
             Clay_ElementIdArray ids = Clay_GetPointerOverIds();
             for (int32_t i = ids.length - 1; i >= 0; --i) {
                 Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
@@ -1561,6 +1631,15 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_CLAY)
         if (clay_ok) {
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+            // Clay's reference sokol renderer expects an identity projection matrix.
+            sgl_matrix_mode_projection();
+            sgl_load_identity();
+            sgl_matrix_mode_modelview();
+            sgl_load_identity();
+            sclay_render(render_commands, clay_fonts);
+            sgl_draw();
+#else
             auto iround = [](float v) -> int { return (int)std::lround((double)v); };
             struct IRect {
                 int x = 0;
@@ -1680,6 +1759,7 @@ struct SokolRunner {
             }
             sgl_end();
             sgl_draw();
+#endif
         }
 #else
         sgl_begin_quads();
@@ -1709,7 +1789,7 @@ struct SokolRunner {
 
         const float cell = 8.0f;
 
-#if defined(COI_DESKTOP_CLAY) && defined(COI_DESKTOP_FONTSTASH)
+#if defined(COI_DESKTOP_CLAY) && defined(COI_DESKTOP_FONTSTASH) && !defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
         if (clay_ok && fons_ctx && fons_font != FONS_INVALID) {
             // Ensure font rendering isn't accidentally clipped by a stale scissor rect.
             // Also re-emit viewport/matrices because we may have already called sgl_draw()
@@ -1763,131 +1843,85 @@ struct SokolRunner {
             sdtx_puts("COI desktop runtime (sokol)\n");
             sdtx_printf("dt: %.3f\n\n", dt);
 #if defined(COI_DESKTOP_FONTSTASH)
-            sdtx_printf("fontstash: %s\n\n", (fons_ctx && fons_font != FONS_INVALID) ? "on" : "off");
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	            sdtx_printf("fontstash: %s\n\n", (clay_fonts[0] != FONS_INVALID) ? "on" : "off");
+#else
+	            sdtx_printf("fontstash: %s\n\n", (fons_ctx && fons_font != FONS_INVALID) ? "on" : "off");
+#endif
 #endif
 
 #if defined(COI_DESKTOP_CLAY)
-        if (clay_ok) {
-#if !defined(COI_DESKTOP_FONTSTASH)
-            auto iround = [](float v) -> int { return (int)std::lround((double)v); };
-            struct IRect {
-                int x = 0;
-                int y = 0;
-                int w = 0;
-                int h = 0;
-            };
-            auto intersects = [](const IRect& a, const IRect& b) -> bool {
-                int x0 = std::max(a.x, b.x);
-                int y0 = std::max(a.y, b.y);
-                int x1 = std::min(a.x + a.w, b.x + b.w);
-                int y1 = std::min(a.y + a.h, b.y + b.h);
-                return (x1 > x0) && (y1 > y0);
-            };
-            const IRect full{0, 0, sapp_width(), sapp_height()};
-            std::vector<IRect> scissor_stack;
-            IRect active = full;
-
-            // Render clay text commands using sokol_debugtext (fallback).
-            for (int32_t i = 0; i < render_commands.length; i++) {
-                Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
-                if (!cmd) continue;
-                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
-                    const auto& bb = cmd->boundingBox;
-                    IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
-                    if (!scissor_stack.empty()) {
-                        const IRect& prev = scissor_stack.back();
-                        int x0 = std::max(prev.x, r.x);
-                        int y0 = std::max(prev.y, r.y);
-                        int x1 = std::min(prev.x + prev.w, r.x + r.w);
-                        int y1 = std::min(prev.y + prev.h, r.y + r.h);
-                        r.x = x0;
-                        r.y = y0;
-                        r.w = std::max(0, x1 - x0);
-                        r.h = std::max(0, y1 - y0);
-                    }
-                    scissor_stack.push_back(r);
-                    active = r;
-                    continue;
-                }
-                if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
-                    if (!scissor_stack.empty()) scissor_stack.pop_back();
-                    active = scissor_stack.empty() ? full : scissor_stack.back();
-                    continue;
-                }
-                if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
-                const auto& bb = cmd->boundingBox;
-                IRect tbb{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
-                if (!intersects(active, tbb)) continue;
-                const auto& t = cmd->renderData.text;
-                const auto& col = t.textColor;
-                sdtx_origin(bb.x / cell, bb.y / cell);
-                sdtx_home();
-                sdtx_color3f(col.r / 255.0f, col.g / 255.0f, col.b / 255.0f);
-                sdtx_putr(t.stringContents.chars, t.stringContents.length);
-            }
+	        if (clay_ok) {
+	            bool fontstash_ok = false;
+#if defined(COI_DESKTOP_FONTSTASH)
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	            fontstash_ok = (clay_fonts[0] != FONS_INVALID);
 #else
-            if (!(fons_ctx && fons_font != FONS_INVALID)) {
-                auto iround = [](float v) -> int { return (int)std::lround((double)v); };
-                struct IRect {
-                    int x = 0;
-                    int y = 0;
-                    int w = 0;
-                    int h = 0;
-                };
-                auto intersects = [](const IRect& a, const IRect& b) -> bool {
-                    int x0 = std::max(a.x, b.x);
-                    int y0 = std::max(a.y, b.y);
-                    int x1 = std::min(a.x + a.w, b.x + b.w);
-                    int y1 = std::min(a.y + a.h, b.y + b.h);
-                    return (x1 > x0) && (y1 > y0);
-                };
-                const IRect full{0, 0, sapp_width(), sapp_height()};
-                std::vector<IRect> scissor_stack;
-                IRect active = full;
-
-                for (int32_t i = 0; i < render_commands.length; i++) {
-                    Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
-                    if (!cmd) continue;
-                    if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
-                        const auto& bb = cmd->boundingBox;
-                        IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
-                        if (!scissor_stack.empty()) {
-                            const IRect& prev = scissor_stack.back();
-                            int x0 = std::max(prev.x, r.x);
-                            int y0 = std::max(prev.y, r.y);
-                            int x1 = std::min(prev.x + prev.w, r.x + r.w);
-                            int y1 = std::min(prev.y + prev.h, r.y + r.h);
-                            r.x = x0;
-                            r.y = y0;
-                            r.w = std::max(0, x1 - x0);
-                            r.h = std::max(0, y1 - y0);
-                        }
-                        scissor_stack.push_back(r);
-                        active = r;
-                        continue;
-                    }
-                    if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
-                        if (!scissor_stack.empty()) scissor_stack.pop_back();
-                        active = scissor_stack.empty() ? full : scissor_stack.back();
-                        continue;
-                    }
-                    if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
-                    const auto& bb = cmd->boundingBox;
-                    IRect tbb{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
-                    if (!intersects(active, tbb)) continue;
-                    const auto& t = cmd->renderData.text;
-                    const auto& col = t.textColor;
-                    sdtx_origin(bb.x / cell, bb.y / cell);
-                    sdtx_home();
-                    sdtx_color3f(col.r / 255.0f, col.g / 255.0f, col.b / 255.0f);
-                    sdtx_putr(t.stringContents.chars, t.stringContents.length);
-                }
-            }
+	            fontstash_ok = (fons_ctx && fons_font != FONS_INVALID);
 #endif
-        } else {
-            for (int32_t id : draw_list) {
-                if (id == 0) continue;
-                auto itn = coi::ui::g_nodes.find(id);
+#endif
+	            if (!fontstash_ok) {
+	                auto iround = [](float v) -> int { return (int)std::lround((double)v); };
+	                struct IRect {
+	                    int x = 0;
+	                    int y = 0;
+	                    int w = 0;
+	                    int h = 0;
+	                };
+	                auto intersects = [](const IRect& a, const IRect& b) -> bool {
+	                    int x0 = std::max(a.x, b.x);
+	                    int y0 = std::max(a.y, b.y);
+	                    int x1 = std::min(a.x + a.w, b.x + b.w);
+	                    int y1 = std::min(a.y + a.h, b.y + b.h);
+	                    return (x1 > x0) && (y1 > y0);
+	                };
+	                const IRect full{0, 0, sapp_width(), sapp_height()};
+	                std::vector<IRect> scissor_stack;
+	                IRect active = full;
+
+	                // Render clay text commands using sokol_debugtext (fallback).
+	                for (int32_t i = 0; i < render_commands.length; i++) {
+	                    Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
+	                    if (!cmd) continue;
+	                    if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
+	                        const auto& bb = cmd->boundingBox;
+	                        IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+	                        if (!scissor_stack.empty()) {
+	                            const IRect& prev = scissor_stack.back();
+	                            int x0 = std::max(prev.x, r.x);
+	                            int y0 = std::max(prev.y, r.y);
+	                            int x1 = std::min(prev.x + prev.w, r.x + r.w);
+	                            int y1 = std::min(prev.y + prev.h, r.y + r.h);
+	                            r.x = x0;
+	                            r.y = y0;
+	                            r.w = std::max(0, x1 - x0);
+	                            r.h = std::max(0, y1 - y0);
+	                        }
+	                        scissor_stack.push_back(r);
+	                        active = r;
+	                        continue;
+	                    }
+	                    if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
+	                        if (!scissor_stack.empty()) scissor_stack.pop_back();
+	                        active = scissor_stack.empty() ? full : scissor_stack.back();
+	                        continue;
+	                    }
+	                    if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
+	                    const auto& bb = cmd->boundingBox;
+	                    IRect tbb{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
+	                    if (!intersects(active, tbb)) continue;
+	                    const auto& t = cmd->renderData.text;
+	                    const auto& col = t.textColor;
+	                    sdtx_origin(bb.x / cell, bb.y / cell);
+	                    sdtx_home();
+	                    sdtx_color3f(col.r / 255.0f, col.g / 255.0f, col.b / 255.0f);
+	                    sdtx_putr(t.stringContents.chars, t.stringContents.length);
+	                }
+	            }
+	        } else {
+	            for (int32_t id : draw_list) {
+	                if (id == 0) continue;
+	                auto itn = coi::ui::g_nodes.find(id);
                 if (itn == coi::ui::g_nodes.end()) continue;
                 const auto& n = itn->second;
                 if (n.tag == "comment") continue;
@@ -1985,12 +2019,18 @@ struct SokolRunner {
 
     static void cleanup(void) {
 #if defined(COI_DESKTOP_FONTSTASH)
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+        sclay_shutdown();
+        clay_fonts[0] = FONS_INVALID;
+        font_bytes.clear();
+#else
         if (fons_ctx) {
             sfons_destroy(fons_ctx);
             fons_ctx = nullptr;
         }
         fons_font = FONS_INVALID;
         font_bytes.clear();
+#endif
 #endif
 #if defined(COI_DESKTOP_CAPTURE)
         capture_shutdown();
@@ -2040,9 +2080,14 @@ struct SokolRunner {
     }
 
 #if defined(COI_DESKTOP_FONTSTASH)
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+    static inline sclay_font_t clay_fonts[1] = {FONS_INVALID};
+    static inline std::vector<unsigned char> font_bytes;
+#else
     static inline FONScontext* fons_ctx = nullptr;
     static inline int fons_font = FONS_INVALID;
     static inline std::vector<unsigned char> font_bytes;
+#endif
 #endif
 };
 
