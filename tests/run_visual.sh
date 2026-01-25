@@ -140,17 +140,17 @@ load_scenes() {
     if [[ -z "$line" ]]; then
       continue
     fi
-    IFS="|" read -r name path backends <<<"$line"
-    name="$(trim_ws "$name")"
-    path="$(trim_ws "$path")"
-    backends="$(trim_ws "$backends")"
-    if [[ -z "$name" || -z "$path" || -z "$backends" ]]; then
+    IFS="|" read -r scene_name scene_path scene_backends <<<"$line"
+    scene_name="$(trim_ws "$scene_name")"
+    scene_path="$(trim_ws "$scene_path")"
+    scene_backends="$(trim_ws "$scene_backends")"
+    if [[ -z "$scene_name" || -z "$scene_path" || -z "$scene_backends" ]]; then
       echo "error: invalid manifest line: $raw" >&2
       exit 1
     fi
-    _names+=("$name")
-    _paths+=("$path")
-    _backends+=("$backends")
+    _names+=("$scene_name")
+    _paths+=("$scene_path")
+    _backends+=("$scene_backends")
   done <"$MANIFEST"
 }
 
