@@ -71,6 +71,7 @@ Notes:
 - Web tests default to `--web-driver playwright` (using `playwright-core` + the system `google-chrome`).
 - Override browser path with `--browser /path/to/chrome` or `WEB_BROWSER=/path/to/chrome`.
 - Fallback driver (legacy): `./tests/run_visual.sh --backend web --web-driver chrome ...`
+- Add `--open` to open the capture output folder after the run.
 
 Generate per-scene outputs for both backends into a scratch folder and write an `index.html`
 that shows native/web images side-by-side:

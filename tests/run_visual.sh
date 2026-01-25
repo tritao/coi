@@ -15,6 +15,7 @@ BACKEND="desktop" # desktop | web
 MODE="compare"    # compare | update
 SCENE_FILTER=""
 LIST_ONLY=0
+OPEN_AFTER=0
 
 # Common
 BASELINE_DIR=""
@@ -45,6 +46,7 @@ Options:
   --scene <name>               Run only one scene (exact), or use prefix/glob (e.g. layout_*, layout_)
   --list                       List available scenes (honors --scene filter)
   --ci                         CI-friendly defaults (desktop: headless+auto, web: headless chrome)
+  --open                       Open output folder after run (xdg-open/open)
 
 Common capture:
   --baseline-dir <dir>         Baseline directory (default: tests/visual/baseline/<backend>)
@@ -74,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --update) MODE="update"; shift;;
     --scene) SCENE_FILTER="${2:-}"; shift 2;;
     --list) LIST_ONLY=1; shift;;
+    --open) OPEN_AFTER=1; shift;;
     --ci)
       if [[ "$BACKEND" == "desktop" ]]; then
         UI_MODE="headless"; CAPTURE_MODE="auto"; USE_XVFB="auto"
@@ -192,6 +195,24 @@ fi
 
 mkdir -p "$OUT_DIR"
 mkdir -p "$BASELINE_DIR"
+
+open_path() {
+  local p="$1"
+  if [[ -z "$p" ]]; then
+    return 0
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$p" >/dev/null 2>&1 &
+    disown || true
+    return 0
+  fi
+  if command -v open >/dev/null 2>&1; then
+    open "$p" >/dev/null 2>&1 &
+    disown || true
+    return 0
+  fi
+  return 1
+}
 
 pick_env_file() {
   local path="$1"
@@ -551,6 +572,8 @@ run_scene_web() {
 }
 
 fail=0
+ran_count=0
+last_scene_out=""
 
 for i in "${!names[@]}"; do
   name="${names[$i]}"
@@ -577,6 +600,8 @@ for i in "${!names[@]}"; do
 
   scene_out="$OUT_DIR/$name"
   scene_base="$BASELINE_DIR/$name"
+  ran_count=$((ran_count + 1))
+  last_scene_out="$scene_out"
 
   env_file="$(pick_env_file "$path")"
   script_file="$(pick_script_file "$path")"
@@ -642,5 +667,13 @@ for i in "${!names[@]}"; do
     echo "   OK: $name"
   fi
 done
+
+if [[ "$OPEN_AFTER" -eq 1 ]]; then
+  if [[ "$ran_count" -le 1 ]]; then
+    open_path "$last_scene_out" || echo "warn: couldn't open output: $last_scene_out" >&2
+  else
+    open_path "$OUT_DIR" || echo "warn: couldn't open output: $OUT_DIR" >&2
+  fi
+fi
 
 exit "$fail"
