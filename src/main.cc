@@ -1636,6 +1636,14 @@ int main(int argc, char **argv)
                 if (!final_app_config.description.empty()) {
                     tmpl_out << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
                 }
+                // Default typography for web output:
+                // - Use the same default font as native (Roboto) when available.
+                // - Pin font-size/line-height so UA defaults don't drift between environments.
+                tmpl_out << "    <style>\n";
+                tmpl_out << "      @font-face{font-family:'coi-default';src:url('coi-default.ttf') format('truetype');font-weight:400;font-style:normal;}\n";
+                tmpl_out << "      html,body{margin:0;padding:0;}\n";
+                tmpl_out << "      body{font-family:'coi-default',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:18px;}\n";
+                tmpl_out << "    </style>\n";
                 // Auto-include generated CSS
                 tmpl_out << "    <link rel=\"stylesheet\" href=\"app.css\">\n";
                 tmpl_out << "</head>\n";
@@ -1679,6 +1687,43 @@ int main(int argc, char **argv)
             {
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
+            }
+
+            // Copy default font next to index.html so the @font-face above can load it.
+            // Prefer COI_WEB_FONT when provided; otherwise use the same Roboto file used by native.
+            {
+                fs::path font_path;
+                if (const char* fp = std::getenv("COI_WEB_FONT"); fp && *fp) {
+                    font_path = fs::path(fp);
+                } else {
+                    font_path = exe_dir / "deps" / "clay" / "examples" / "sokol-video-demo" / "resources" / "Roboto-Regular.ttf";
+                }
+                std::error_code ec;
+                if (!fs::exists(font_path, ec)) {
+                    static const char* kFallbacks[] = {
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                        "/Library/Fonts/Arial.ttf",
+                    };
+                    for (const char* cand : kFallbacks) {
+                        fs::path p(cand);
+                        if (fs::exists(p, ec)) {
+                            font_path = p;
+                            break;
+                        }
+                    }
+                }
+                if (fs::exists(font_path, ec)) {
+                    fs::path out_font = abs_output_dir / "coi-default.ttf";
+                    fs::create_directories(abs_output_dir);
+                    fs::copy_file(font_path, out_font, fs::copy_options::overwrite_existing, ec);
+                    if (ec) {
+                        std::cerr << "warn: failed to copy web font from " << font_path << " to " << out_font << ": " << ec.message() << "\n";
+                    }
+                } else {
+                    std::cerr << "warn: COI web font not found; set COI_WEB_FONT to a .ttf path\n";
+                }
             }
 	        }
 
