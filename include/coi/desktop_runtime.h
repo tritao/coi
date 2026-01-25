@@ -730,18 +730,18 @@ struct ClayEngine {
         CLAY(eid, (ClayEngine::declaration_for_node(n, is_root, id))) {
             if (!n.text.empty()) {
                 Clay_String t = clay_string(n.text);
-                if (text_cfg) {
-                    Clay_TextElementConfig cfg = *text_cfg;
+                Clay_TextElementConfig* cfgp = text_cfg;
+                if (cfgp) {
+                    Clay_TextElementConfig cfg = *cfgp;
                     DesktopClassStyle st = parse_desktop_class_style(n, is_root);
-                    if (st.has_font_size) cfg.fontSize = st.font_size;
-                    if (st.has_letter_spacing) cfg.letterSpacing = st.letter_spacing;
-                    if (st.has_line_height) cfg.lineHeight = st.line_height;
+                    if (st.has_font_size) cfg.fontSize = (uint16_t)st.font_size;
+                    if (st.has_letter_spacing) cfg.letterSpacing = (uint16_t)st.letter_spacing;
+                    if (st.has_line_height) cfg.lineHeight = (uint16_t)st.line_height;
                     if (st.has_text_align) cfg.textAlignment = st.text_align;
                     cfg.userData = (void*)(intptr_t)id;
-                    CLAY_TEXT(t, &cfg);
-                } else {
-                    CLAY_TEXT(t, nullptr);
+                    cfgp = Clay__StoreTextElementConfig(cfg);
                 }
+                CLAY_TEXT(t, cfgp);
             }
             for (int32_t c : n.children) build_node(c, false);
         }
