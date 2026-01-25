@@ -38,9 +38,9 @@ using tick_fn = void (*)(void*, double);
 
 void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb);
 
-// Desktop-only flush (scripts, dumps, etc). Generated code calls this in the desktop main loop.
+// Native-only flush (scripts, dumps, etc). Generated code calls this in the native main loop.
 void flush();
 
-// Run the Sokol+Clay desktop runtime. Only valid when compiled with `COI_NATIVE_SOKOL`.
+// Run the Sokol+Clay native runtime. Only valid when compiled with `COI_NATIVE_SOKOL`.
 int run_sokol(void* app, int frames, tick_fn tick);
 } // namespace coi::native
