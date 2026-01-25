@@ -301,6 +301,18 @@ inline void color_from_hash(uint32_t h, float& r, float& g, float& b) {
 	    bool has_opacity = false;
 	    float opacity = 1.0f; // 0..1
 
+	    bool has_floating = false;
+	    Clay_FloatingAttachToElement floating_attach_to = CLAY_ATTACH_TO_NONE;
+	    Clay_FloatingClipToElement floating_clip_to = CLAY_CLIP_TO_NONE;
+	    Clay_PointerCaptureMode floating_pointer_mode = CLAY_POINTER_CAPTURE_MODE_CAPTURE;
+	    Clay_FloatingAttachPoints floating_attach_points = Clay_FloatingAttachPoints{CLAY_ATTACH_POINT_LEFT_TOP, CLAY_ATTACH_POINT_LEFT_TOP};
+	    bool has_float_x = false;
+	    float float_x = 0.0f;
+	    bool has_float_y = false;
+	    float float_y = 0.0f;
+	    bool has_z_index = false;
+	    int16_t z_index = 0;
+
 	    bool has_pad = false;
 	    uint16_t pad = 0;
 
@@ -412,6 +424,26 @@ inline void _for_each_class_token(const webcc::string& s, const webcc::function<
 	                st.opacity = std::clamp((float)ov / 100.0f, 0.0f, 1.0f);
 	                return;
 	            }
+	        }
+	        if (t == "float" || t == "floating") {
+	            st.has_floating = true;
+	            st.floating_attach_to = CLAY_ATTACH_TO_ROOT;
+	            return;
+	        }
+	        if (t == "float-parent") {
+	            st.has_floating = true;
+	            st.floating_attach_to = CLAY_ATTACH_TO_PARENT;
+	            return;
+	        }
+	        if (t == "float-pass") {
+	            st.has_floating = true;
+	            st.floating_pointer_mode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH;
+	            return;
+	        }
+	        if (t == "float-clip") {
+	            st.has_floating = true;
+	            st.floating_clip_to = CLAY_CLIP_TO_ATTACHED_PARENT;
+	            return;
 	        }
 	        if (t == "text-left") {
 	            st.has_text_align = true;
@@ -540,16 +572,23 @@ inline void _for_each_class_token(const webcc::string& s, const webcc::function<
             flag = true;
             return true;
         };
-        auto parse_i32_from_u16_suffix = [&](const char* prefix, int32_t& out, bool& flag) {
-            uint16_t v = 0;
-            if (!parse_u16_suffix(prefix, v, flag)) return false;
-            out = (int32_t)v;
-            return true;
-        };
-        auto parse_f32_suffix = [&](const char* prefix, float& out, bool& flag) {
-            size_t plen = std::strlen(prefix);
-            if (t.size() <= plen) return false;
-            if (t.compare(0, plen, prefix) != 0) return false;
+	        auto parse_i32_from_u16_suffix = [&](const char* prefix, int32_t& out, bool& flag) {
+	            uint16_t v = 0;
+	            if (!parse_u16_suffix(prefix, v, flag)) return false;
+	            out = (int32_t)v;
+	            return true;
+	        };
+	        auto parse_i16_from_u16_suffix = [&](const char* prefix, int16_t& out, bool& flag) {
+	            uint16_t v = 0;
+	            if (!parse_u16_suffix(prefix, v, flag)) return false;
+	            out = (int16_t)std::min<uint16_t>(v, 32767);
+	            flag = true;
+	            return true;
+	        };
+	        auto parse_f32_suffix = [&](const char* prefix, float& out, bool& flag) {
+	            size_t plen = std::strlen(prefix);
+	            if (t.size() <= plen) return false;
+	            if (t.compare(0, plen, prefix) != 0) return false;
             float v = 0.0f;
             if (!_parse_f32(t.c_str() + plen, v)) return false;
             out = v;
@@ -587,16 +626,19 @@ inline void _for_each_class_token(const webcc::string& s, const webcc::function<
                 return;
             }
         }
-        if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
-        if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
-        if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
-        if (parse_f32_suffix("max-w-", st.w_max, st.w_has_max)) return;
-        if (parse_f32_suffix("min-h-", st.h_min, st.h_has_min)) return;
-        if (parse_f32_suffix("max-h-", st.h_max, st.h_has_max)) return;
+	        if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
+	        if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
+	        if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
+	        if (parse_f32_suffix("max-w-", st.w_max, st.w_has_max)) return;
+	        if (parse_f32_suffix("min-h-", st.h_min, st.h_has_min)) return;
+	        if (parse_f32_suffix("max-h-", st.h_max, st.h_has_max)) return;
+	        if (parse_f32_suffix("fx-", st.float_x, st.has_float_x)) return;
+	        if (parse_f32_suffix("fy-", st.float_y, st.has_float_y)) return;
+	        if (parse_i16_from_u16_suffix("z-", st.z_index, st.has_z_index)) return;
 
-        uint16_t bw = 0;
-        if (parse_u16_suffix("border-", bw, st.has_border)) {
-            st.border_width.left = bw;
+	        uint16_t bw = 0;
+	        if (parse_u16_suffix("border-", bw, st.has_border)) {
+	            st.border_width.left = bw;
             st.border_width.right = bw;
             st.border_width.top = bw;
             st.border_width.bottom = bw;
@@ -776,6 +818,21 @@ struct ClayEngine {
 	        }
 	        if (st.has_corner_radius) {
 	            decl.cornerRadius = st.corner_radius;
+	        }
+	        if (st.has_floating && st.floating_attach_to != CLAY_ATTACH_TO_NONE) {
+	            const float ox = st.has_float_x ? st.float_x : 0.0f;
+	            const float oy = st.has_float_y ? st.float_y : 0.0f;
+	            const int16_t zi = st.has_z_index ? st.z_index : 1;
+	            decl.floating = Clay_FloatingElementConfig{
+	                .offset = Clay_Vector2{ox, oy},
+	                .expand = Clay_Dimensions{0, 0},
+	                .parentId = 0,
+	                .zIndex = zi,
+	                .attachPoints = st.floating_attach_points,
+	                .pointerCaptureMode = st.floating_pointer_mode,
+	                .attachTo = st.floating_attach_to,
+	                .clipTo = st.floating_clip_to,
+	            };
 	        }
 	        return decl;
 	    }
