@@ -31,6 +31,7 @@ CAPTURE_MODE="offscreen" # offscreen | x11 | auto
 USE_XVFB="auto"          # auto | 0 | 1
 
 # Web-only knobs
+WEB_DRIVER="playwright" # playwright | chrome
 WEB_BROWSER="${WEB_BROWSER:-$(command -v google-chrome || true)}"
 
 usage() {
@@ -61,6 +62,7 @@ Desktop-specific:
   --xvfb / --no-xvfb           Force/disable xvfb-run wrapper
 
 Web-specific:
+  --web-driver <playwright|chrome> Web driver (default: $WEB_DRIVER)
   --browser <path>             Browser binary (default: $WEB_BROWSER)
 EOF
 }
@@ -92,6 +94,7 @@ while [[ $# -gt 0 ]]; do
     --xvfb) USE_XVFB="1"; shift;;
     --no-xvfb) USE_XVFB="0"; shift;;
 
+    --web-driver) WEB_DRIVER="${2:-}"; shift 2;;
     --browser) WEB_BROWSER="${2:-}"; shift 2;;
     *) echo "error: unknown arg: $1"; usage; exit 1;;
   esac
@@ -431,22 +434,35 @@ web_stop_server() {
 web_capture_one() {
   local url="$1"
   local png_out="$2"
-  local budget_ms="$3"
+  local _budget_ms="$3"
 
+  if [[ "$WEB_DRIVER" == "playwright" ]]; then
+    if [[ ! -f "$ROOT_DIR/tests/visual/node_modules/playwright-core/package.json" ]]; then
+      echo "error: missing web deps: tests/visual/node_modules/playwright-core" >&2
+      echo "hint: run: (cd tests/visual && npm install)" >&2
+      return 1
+    fi
+    if [[ -z "$WEB_BROWSER" || ! -x "$WEB_BROWSER" ]]; then
+      echo "error: web browser not found; set WEB_BROWSER or pass --browser" >&2
+      return 1
+    fi
+    node "$ROOT_DIR/tests/visual/web_capture_playwright.mjs" --url "$url" --out "$png_out" --size "$CAPTURE_SIZE" --timeout-ms 12000 --browser "$WEB_BROWSER"
+    return $?
+  fi
+
+  # Legacy driver: raw headless Chrome screenshot with virtual-time budget.
   if [[ -z "$WEB_BROWSER" || ! -x "$WEB_BROWSER" ]]; then
     echo "error: web browser not found; set WEB_BROWSER or pass --browser" >&2
     return 1
   fi
-
   local size_csv="${CAPTURE_SIZE/x/,}"
-
   "$WEB_BROWSER" \
     --headless=new \
     --disable-gpu \
     --hide-scrollbars \
     --no-sandbox \
     --window-size="$size_csv" \
-    --virtual-time-budget="$budget_ms" \
+    --virtual-time-budget="$_budget_ms" \
     --screenshot="$png_out" \
     "$url" >/dev/null 2>&1
 }

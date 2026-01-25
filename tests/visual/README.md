@@ -60,11 +60,17 @@ Native/desktop:
 Web (headless Chrome):
 
 ```bash
+cd tests/visual && npm install
+
 ./tests/run_visual.sh --backend web --scene paint_rects --update
 ./tests/run_visual.sh --backend web --scene paint_rects
 ```
 
 ## Native vs web gallery (manual inspection)
+Notes:
+- Web tests default to `--web-driver playwright` (using `playwright-core` + the system `google-chrome`).
+- Override browser path with `--browser /path/to/chrome` or `WEB_BROWSER=/path/to/chrome`.
+- Fallback driver (legacy): `./tests/run_visual.sh --backend web --web-driver chrome ...`
 
 Generate per-scene outputs for both backends into a scratch folder and write an `index.html`
 that shows native/web images side-by-side:
