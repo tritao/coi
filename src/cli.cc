@@ -579,7 +579,7 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--headless" << RESET << "        (run) Desktop headless mode" << std::endl;
     std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit desktop frames" << std::endl;
     std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Desktop tree dump mode" << std::endl;
-    std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (desktop window mode)" << std::endl;
+    std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (desktop)" << std::endl;
     std::cout << "    " << DIM << "--capture-every <n>" << RESET << " (run) Capture every N frames (default: 60)" << std::endl;
     std::cout << "    " << DIM << "--capture-max <n>" << RESET << "   (run) Stop after N captures" << std::endl;
     std::cout << "    " << DIM << "--capture-size <WxH>" << RESET << " (run) Offscreen capture size" << std::endl;

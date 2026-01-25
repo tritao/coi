@@ -157,6 +157,11 @@ if command -v xvfb-run >/dev/null 2>&1; then
   have_xvfb=1
 fi
 
+is_linux=0
+if [[ "$(uname -s)" == "Linux" ]]; then
+  is_linux=1
+fi
+
 ui_args=(--headless)
 if [[ "$UI_MODE" == "window" ]]; then
   ui_args=(--window)
@@ -209,17 +214,17 @@ run_scene() {
         return 1
       fi
     elif [[ "$USE_XVFB" == "auto" ]]; then
-      if [[ "${try_ui_args[0]}" == "--window" && -z "${DISPLAY:-}" ]]; then
+      if [[ "$is_linux" -eq 1 && -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
         if [[ "$have_xvfb" -eq 1 ]]; then
           try_prefix=(xvfb-run -a)
         else
-          echo "error: capture-mode=$try_cap needs a window but DISPLAY is not set (install xvfb or use --capture-mode offscreen)"
+          echo "error: DISPLAY/WAYLAND_DISPLAY not set and xvfb-run not found (install xvfb, set DISPLAY, or use --xvfb)"
           continue
         fi
       fi
     elif [[ "$USE_XVFB" == "0" ]]; then
-      if [[ "${try_ui_args[0]}" == "--window" && -z "${DISPLAY:-}" ]]; then
-        echo "error: --no-xvfb set but DISPLAY is not set (use --capture-mode offscreen or enable xvfb)"
+      if [[ "$is_linux" -eq 1 && -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+        echo "error: --no-xvfb set but DISPLAY/WAYLAND_DISPLAY is not set"
         continue
       fi
     fi
