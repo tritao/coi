@@ -575,7 +575,7 @@ run_scene_web() {
       budget_ms=$(( (max_frame + 10) * 20 + 3000 ))
     fi
 
-    local url="http://127.0.0.1:$port/index.html?coi_visual=1&coi_visual_capture_index=$i"
+    local url="http://127.0.0.1:$port/index.html?coi_visual=1&coi_visual_capture_index=$i&coi_visual_every=$EVERY"
     web_capture_one "$url" "$png" "$budget_ms" || { fail=1; break; }
 
     python3 "$ROOT_DIR/tests/visual/dhash_png.py" "$png" --write "$dh" >/dev/null
