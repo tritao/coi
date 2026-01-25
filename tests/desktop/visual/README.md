@@ -8,17 +8,17 @@ On Linux the default capture mode is `COI_DESKTOP_CAPTURE_MODE=x11` (read back p
 
 ```bash
 ./coi run tests/desktop/visual/scenes/font_window_demo.coi --target desktop --window --frames 120 \
-  --capture tests/desktop/visual/baseline/font_window_demo \
+  --capture tests/visual/baseline/desktop/font_window_demo \
   --capture-size 960x540 \
   --capture-every 60 \
   --capture-max 2
 ```
 
 This writes:
-- `tests/desktop/visual/baseline/font_window_demo/frame_000000.png`
-- `tests/desktop/visual/baseline/font_window_demo/frame_000000.dhash`
-- `tests/desktop/visual/baseline/font_window_demo/frame_000001.png`
-- `tests/desktop/visual/baseline/font_window_demo/frame_000001.dhash`
+- `tests/visual/baseline/desktop/font_window_demo/frame_000000.png`
+- `tests/visual/baseline/desktop/font_window_demo/frame_000000.dhash`
+- `tests/visual/baseline/desktop/font_window_demo/frame_000001.png`
+- `tests/visual/baseline/desktop/font_window_demo/frame_000001.dhash`
 
 ## Compare against a baseline
 
@@ -28,7 +28,7 @@ This writes:
   --capture-size 960x540 \
   --capture-every 60 \
   --capture-max 2 \
-  --capture-baseline tests/desktop/visual/baseline/font_window_demo \
+  --capture-baseline tests/visual/baseline/desktop/font_window_demo \
   --capture-tolerance 8 \
   --capture-fail
 ```
@@ -42,6 +42,6 @@ Notes:
 Use `tests/run_visual_desktop.sh` to run/update baselines:
 
 ```bash
-./tests/run_visual_desktop.sh --update
-./tests/run_visual_desktop.sh
+./tests/run_visual.sh --backend desktop --update
+./tests/run_visual.sh --backend desktop
 ```

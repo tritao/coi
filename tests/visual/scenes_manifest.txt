@@ -1,7 +1,40 @@
 # name|path|backends
-# backends: web (comma-separated)
+# backends: desktop,web (comma-separated)
 
-paint_rects|tests/visual/scenes/paint_rects.coi|web
-input_zindex_click|tests/visual/scenes/input_zindex_click.coi|web
-input_clip_click|tests/visual/scenes/input_clip_click.coi|web
+font_window_demo|tests/desktop/visual/scenes/font_window_demo.coi|desktop,web
 
+paint_rects|tests/desktop/visual/scenes/paint/rects.coi|desktop,web
+paint_border_widths|tests/desktop/visual/scenes/paint/border_widths.coi|desktop,web
+paint_bg_none|tests/desktop/visual/scenes/paint/bg_none.coi|desktop,web
+paint_corner_radius_basic|tests/desktop/visual/scenes/paint/corner_radius_basic.coi|desktop,web
+paint_corner_radius_per_corner|tests/desktop/visual/scenes/paint/corner_radius_per_corner.coi|desktop,web
+paint_opacity_overlap|tests/desktop/visual/scenes/paint/opacity_overlap.coi|desktop,web
+paint_border_radius_combo|tests/desktop/visual/scenes/paint/border_radius_combo.coi|desktop,web
+paint_floating_zindex|tests/desktop/visual/scenes/paint/floating_zindex.coi|desktop,web
+paint_image_basic|tests/desktop/visual/scenes/paint/image_basic.coi|desktop,web
+paint_image_clip_radius_edges|tests/desktop/visual/scenes/paint/image_clip_radius_edges.coi|desktop,web
+
+layout_row_fixed_and_grow|tests/desktop/visual/scenes/layout/row_fixed_and_grow.coi|desktop,web
+layout_col_fixed_and_grow|tests/desktop/visual/scenes/layout/col_fixed_and_grow.coi|desktop,web
+layout_nested_flex|tests/desktop/visual/scenes/layout/nested_flex.coi|desktop,web
+layout_min_max_constraints|tests/desktop/visual/scenes/layout/min_max_constraints.coi|desktop,web
+layout_align_main_cross|tests/desktop/visual/scenes/layout/align_main_cross.coi|desktop,web
+
+clip_overflow_hidden|tests/desktop/visual/scenes/clip/overflow_hidden.coi|desktop,web
+
+scroll_y_basic|tests/desktop/visual/scenes/scroll/scroll_y_basic.coi|desktop,web
+scroll_nested_clip|tests/desktop/visual/scenes/scroll/nested_clip.coi|desktop,web
+
+text_glyphs_basic|tests/desktop/visual/scenes/text/glyphs_basic.coi|desktop,web
+text_wrap_measure|tests/desktop/visual/scenes/text/wrap_measure.coi|desktop,web
+text_alignment|tests/desktop/visual/scenes/text/alignment.coi|desktop,web
+
+input_zindex_click|tests/desktop/visual/scenes/input/zindex_click.coi|desktop,web
+input_clip_click|tests/desktop/visual/scenes/input/clip_click.coi|desktop,web
+
+# Desktop-only “render dump pass” golden scenes
+border_render_dump_pass|tests/desktop/runtime/border_render_dump_pass.coi|desktop
+border_between_render_dump_pass|tests/desktop/runtime/border_between_render_dump_pass.coi|desktop
+clip_render_dump_pass|tests/desktop/runtime/clip_render_dump_pass.coi|desktop
+scroll_render_dump_pass|tests/desktop/runtime/scroll_render_dump_pass.coi|desktop
+text_render_dump_pass|tests/desktop/runtime/text_render_dump_pass.coi|desktop

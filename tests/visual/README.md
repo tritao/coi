@@ -1,11 +1,22 @@
-# Web visual + integration tests
+# Visual tests (web + native)
 
-This folder contains lightweight tooling to:
+This folder contains shared tooling for COI visual testing:
 
-- capture **web** scene screenshots for manual review (gallery)
-- run **web integration tests** with Playwright (scripted interactions + assertions)
+- **Web visual gallery** (Playwright screenshot capture for manual review)
+- **Web integration tests** (Playwright scripted interactions + assertions)
+- **Cross-backend visual regression** (native + web PNG capture + dHash compare)
 
-## Setup
+## Layout
+
+- `scenes_manifest.txt`: list of named scenes and which backends they run on.
+- `baseline/desktop/`: native/desktop PNG + `.dhash` baselines.
+- `baseline/web/`: web PNG + `.dhash` baselines.
+- `dhash_png.py`: helper to compute / compare dHash from a PNG.
+- `gen_web_visual_js.py`: generates `coi_visual.js` to replay `.desktop_script` input on the web backend.
+
+## Setup (web-only)
+
+Only required for Playwright-based web runners (`run_web_visual.sh`, `run_web_integration.sh`, and `run_visual.sh --backend web`):
 
 ```bash
 cd tests/visual
@@ -37,3 +48,18 @@ Run:
 ./tests/run_web_integration.sh --list
 ```
 
+## Cross-backend visual regression (native + web)
+
+Native/desktop:
+
+```bash
+./tests/run_visual.sh --backend desktop
+./tests/run_visual.sh --backend desktop --update
+```
+
+Web (headless Chrome):
+
+```bash
+./tests/run_visual.sh --backend web --scene paint_rects --update
+./tests/run_visual.sh --backend web --scene paint_rects
+```
