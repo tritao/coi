@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -204,13 +205,13 @@ inline void scroll_to_top() {}
     #include "sokol_glue.h"
     #include "sokol_time.h"
     #include "sokol_debugtext.h"
-    #if defined(COI_DESKTOP_FONTSTASH)
-        #include "fontstash.h"
-        #include "sokol_fontstash.h"
-    #endif
-    #if defined(COI_DESKTOP_CAPTURE)
-        #include "stb_image_write.h"
-    #endif
+	    #if defined(COI_DESKTOP_FONTSTASH)
+	        #include "fontstash.h"
+	        #include "sokol_fontstash.h"
+	    #endif
+	    #if defined(COI_DESKTOP_CAPTURE)
+	        #include "stb_image_write.h"
+	    #endif
 #endif
 
 #if defined(COI_DESKTOP_CLAY)
@@ -235,10 +236,10 @@ struct Rect {
     float x, y, w, h;
 };
 
-inline bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
-    out.clear();
-    if (!path || !*path) return false;
-    std::ifstream f(path, std::ios::binary);
+	inline bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
+	    out.clear();
+	    if (!path || !*path) return false;
+	    std::ifstream f(path, std::ios::binary);
     if (!f) return false;
     f.seekg(0, std::ios::end);
     std::streampos size = f.tellg();
@@ -246,12 +247,161 @@ inline bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
     out.resize((size_t)size);
     f.seekg(0, std::ios::beg);
     f.read((char*)out.data(), size);
-    return (bool)f;
-}
+	    return (bool)f;
+	}
 
-// Desktop event dispatch hooks (set by generated app code).
-// The dispatcher is expected to return true when the event was handled.
-inline webcc::function<bool(webcc::handle)> g_click_dispatcher;
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	inline bool load_tga_rgba8(const char* path, std::vector<uint8_t>& out_rgba, int& out_w, int& out_h) {
+	    out_rgba.clear();
+	    out_w = 0;
+	    out_h = 0;
+	    if (!path || !*path) return false;
+
+	    std::ifstream f(path, std::ios::binary);
+	    if (!f) return false;
+	    uint8_t hdr[18]{};
+	    f.read((char*)hdr, 18);
+	    if (!f) return false;
+
+	    const uint8_t id_len = hdr[0];
+	    const uint8_t cmap_type = hdr[1];
+	    const uint8_t image_type = hdr[2];
+	    if (cmap_type != 0) return false;
+	    if (image_type != 2) return false; // uncompressed truecolor
+
+	    const uint16_t w = (uint16_t)(hdr[12] | (hdr[13] << 8));
+	    const uint16_t h = (uint16_t)(hdr[14] | (hdr[15] << 8));
+	    const uint8_t bpp = hdr[16];
+	    const uint8_t desc = hdr[17];
+	    const bool origin_top = (desc & 0x20) != 0;
+	    if (w == 0 || h == 0) return false;
+	    if (bpp != 24 && bpp != 32) return false;
+
+	    if (id_len > 0) {
+	        f.seekg(id_len, std::ios::cur);
+	        if (!f) return false;
+	    }
+
+	    const size_t src_bpp = (size_t)bpp / 8u;
+	    const size_t src_size = (size_t)w * (size_t)h * src_bpp;
+	    std::vector<uint8_t> src;
+	    src.resize(src_size);
+	    f.read((char*)src.data(), (std::streamsize)src.size());
+	    if (!f) return false;
+
+	    out_rgba.resize((size_t)w * (size_t)h * 4u);
+	    for (uint16_t y = 0; y < h; y++) {
+	        const uint16_t sy = origin_top ? y : (uint16_t)(h - 1 - y);
+	        const uint8_t* row = src.data() + (size_t)sy * (size_t)w * src_bpp;
+	        uint8_t* dst = out_rgba.data() + (size_t)y * (size_t)w * 4u;
+	        for (uint16_t x = 0; x < w; x++) {
+	            const uint8_t b = row[x * src_bpp + 0];
+	            const uint8_t g = row[x * src_bpp + 1];
+	            const uint8_t r = row[x * src_bpp + 2];
+	            const uint8_t a = (bpp == 32) ? row[x * src_bpp + 3] : 255;
+	            dst[x * 4u + 0] = r;
+	            dst[x * 4u + 1] = g;
+	            dst[x * 4u + 2] = b;
+	            dst[x * 4u + 3] = a;
+	        }
+	    }
+	    out_w = (int)w;
+	    out_h = (int)h;
+	    return true;
+	}
+
+	struct DesktopImage {
+	    int w = 0;
+	    int h = 0;
+	    sg_image img{};
+	    sg_view view{};
+	    sclay_image scl{};
+	};
+
+	struct DesktopImageCache {
+	    static inline std::unordered_map<std::string, std::unique_ptr<DesktopImage>> images;
+
+	    static const DesktopImage* get_or_load(const char* src) {
+	        if (!src || !*src) return nullptr;
+	        std::error_code ec;
+	        std::filesystem::path p(src);
+	        // Keep relative paths relative; just normalize.
+	        p = p.lexically_normal();
+	        const std::string key = p.string();
+
+	        auto it = images.find(key);
+	        if (it != images.end()) return it->second.get();
+
+	        std::vector<uint8_t> rgba;
+	        int w = 0, h = 0;
+	        if (!load_tga_rgba8(key.c_str(), rgba, w, h)) {
+	            std::cerr << "[img] failed to load (tga) " << key << "\n";
+	            images.emplace(key, nullptr);
+	            return nullptr;
+	        }
+
+	        auto img = std::make_unique<DesktopImage>();
+	        img->w = w;
+	        img->h = h;
+
+	        sg_image_desc img_desc{};
+	        img_desc.width = w;
+	        img_desc.height = h;
+	        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
+	        img_desc.data.mip_levels[0].ptr = rgba.data();
+	        img_desc.data.mip_levels[0].size = rgba.size();
+	        img_desc.label = "coi-image";
+	        img->img = sg_make_image(&img_desc);
+
+	        if (img->img.id == SG_INVALID_ID) {
+	            std::cerr << "[img] sg_make_image failed for " << key << "\n";
+	            images.emplace(key, nullptr);
+	            return nullptr;
+	        }
+
+	        sg_view_desc view_desc{};
+	        view_desc.texture.image = img->img;
+	        view_desc.label = "coi-image-view";
+	        img->view = sg_make_view(&view_desc);
+	        if (img->view.id == SG_INVALID_ID) {
+	            std::cerr << "[img] sg_make_view failed for " << key << "\n";
+	            sg_destroy_image(img->img);
+	            images.emplace(key, nullptr);
+	            return nullptr;
+	        }
+
+	        img->scl.view = img->view;
+	        img->scl.sampler = sg_sampler{};
+	        img->scl.uv.u0 = 0.0f;
+	        img->scl.uv.v0 = 0.0f;
+	        img->scl.uv.u1 = 1.0f;
+	        img->scl.uv.v1 = 1.0f;
+
+	        const DesktopImage* out = img.get();
+	        images.emplace(key, std::move(img));
+	        return out;
+	    }
+
+	    static void shutdown() {
+	        for (auto& kv : images) {
+	            if (!kv.second) continue;
+	            if (kv.second->view.id != SG_INVALID_ID) {
+	                sg_destroy_view(kv.second->view);
+	                kv.second->view.id = SG_INVALID_ID;
+	            }
+	            if (kv.second->img.id != SG_INVALID_ID) {
+	                sg_destroy_image(kv.second->img);
+	                kv.second->img.id = SG_INVALID_ID;
+	            }
+	        }
+	        images.clear();
+	    }
+	};
+#endif
+
+	// Desktop event dispatch hooks (set by generated app code).
+	// The dispatcher is expected to return true when the event was handled.
+	inline webcc::function<bool(webcc::handle)> g_click_dispatcher;
 inline void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) {
     g_click_dispatcher = std::move(cb);
 }
@@ -748,27 +898,50 @@ struct ClayEngine {
         text_cfg = nullptr;
     }
 
-    static Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_root) {
-        DesktopClassStyle st = parse_desktop_class_style(n, is_root);
-        const uint16_t default_pad = is_root ? 0 : 12;
-        const uint16_t default_gap = is_root ? 0 : 10;
-        const uint16_t pad = st.has_pad ? st.pad : default_pad;
-        const uint16_t gap = st.has_gap ? st.gap : default_gap;
-        const Clay_LayoutDirection dir = st.has_dir ? st.dir : CLAY_TOP_TO_BOTTOM;
-        const Clay_LayoutAlignmentX ax = st.has_align_x ? st.align_x : CLAY_ALIGN_X_LEFT;
-        const Clay_LayoutAlignmentY ay = st.has_align_y ? st.align_y : CLAY_ALIGN_Y_TOP;
+	    static Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_root) {
+	        DesktopClassStyle st = parse_desktop_class_style(n, is_root);
+	        const bool is_img = (n.tag == "img");
+	        const uint16_t default_pad = (is_root || is_img) ? 0 : 12;
+	        const uint16_t default_gap = (is_root || is_img) ? 0 : 10;
+	        const uint16_t pad = st.has_pad ? st.pad : default_pad;
+	        const uint16_t gap = st.has_gap ? st.gap : default_gap;
+	        const Clay_LayoutDirection dir = st.has_dir ? st.dir : CLAY_TOP_TO_BOTTOM;
+	        const Clay_LayoutAlignmentX ax = st.has_align_x ? st.align_x : CLAY_ALIGN_X_LEFT;
+	        const Clay_LayoutAlignmentY ay = st.has_align_y ? st.align_y : CLAY_ALIGN_Y_TOP;
 
-        Clay_SizingAxis sx = CLAY_SIZING_GROW(0);
-        Clay_SizingAxis sy = is_root ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIT(0);
-        if (st.w_fixed) sx = CLAY_SIZING_FIXED(st.w);
-        if (st.h_fixed) sy = CLAY_SIZING_FIXED(st.h);
-        if (st.w_grow) sx = CLAY_SIZING_GROW(0);
-        if (st.h_grow) sy = CLAY_SIZING_GROW(0);
+	        Clay_SizingAxis sx = CLAY_SIZING_GROW(0);
+	        Clay_SizingAxis sy = is_root ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIT(0);
+	        if (st.w_fixed) sx = CLAY_SIZING_FIXED(st.w);
+	        if (st.h_fixed) sy = CLAY_SIZING_FIXED(st.h);
+	        if (st.w_grow) sx = CLAY_SIZING_GROW(0);
+	        if (st.h_grow) sy = CLAY_SIZING_GROW(0);
 
-        // Apply optional min/max constraints (Clay uses minMax even for FIT/GROW/FIXED).
-        if (sx.type != CLAY__SIZING_TYPE_PERCENT) {
-            if (st.w_has_min) sx.size.minMax.min = std::max(0.0f, st.w_min);
-            if (st.w_has_max) sx.size.minMax.max = std::max(0.0f, st.w_max);
+	        const DesktopImage* img = nullptr;
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	        if (is_img) {
+	            const webcc::string* src = attr(n, "src");
+	            img = DesktopImageCache::get_or_load(src ? src->c_str() : nullptr);
+	            if (img) {
+	                if (!st.w_fixed && !st.w_grow) {
+	                    sx = CLAY_SIZING_FIXED((float)img->w);
+	                }
+	                if (!st.h_fixed && !st.h_grow) {
+	                    sy = CLAY_SIZING_FIXED((float)img->h);
+	                }
+	                if (st.w_fixed && !st.h_fixed && img->w > 0) {
+	                    sy = CLAY_SIZING_FIXED(st.w * ((float)img->h / (float)img->w));
+	                }
+	                if (st.h_fixed && !st.w_fixed && img->h > 0) {
+	                    sx = CLAY_SIZING_FIXED(st.h * ((float)img->w / (float)img->h));
+	                }
+	            }
+	        }
+#endif
+
+	        // Apply optional min/max constraints (Clay uses minMax even for FIT/GROW/FIXED).
+	        if (sx.type != CLAY__SIZING_TYPE_PERCENT) {
+	            if (st.w_has_min) sx.size.minMax.min = std::max(0.0f, st.w_min);
+	            if (st.w_has_max) sx.size.minMax.max = std::max(0.0f, st.w_max);
         }
         if (sy.type != CLAY__SIZING_TYPE_PERCENT) {
             if (st.h_has_min) sy.size.minMax.min = std::max(0.0f, st.h_min);
@@ -800,7 +973,13 @@ struct ClayEngine {
 	                .width = st.border_width,
 	            };
 	        }
-	        if (is_root || st.bg_none) {
+	        if (is_img) {
+	            if (st.has_opacity && st.opacity < 1.0f) {
+	                decl.backgroundColor = Clay_Color{255, 255, 255, 255.0f * st.opacity};
+	            } else {
+	                decl.backgroundColor = Clay_Color{0, 0, 0, 0};
+	            }
+	        } else if (is_root || st.bg_none) {
 	            decl.backgroundColor = Clay_Color{0, 0, 0, 0};
 	        } else {
 	            const webcc::string* cls = attr(n, "class");
@@ -809,7 +988,7 @@ struct ClayEngine {
 	            color_from_hash(h, cr, cg, cb);
 	            decl.backgroundColor = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 46.0f};
 	        }
-	        if (st.has_opacity && st.opacity < 1.0f) {
+	        if (!is_img && st.has_opacity && st.opacity < 1.0f) {
 	            decl.backgroundColor.a *= st.opacity;
 	            if (decl.border.width.left || decl.border.width.right || decl.border.width.top || decl.border.width.bottom ||
 	                decl.border.width.betweenChildren) {
@@ -819,6 +998,11 @@ struct ClayEngine {
 	        if (st.has_corner_radius) {
 	            decl.cornerRadius = st.corner_radius;
 	        }
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+	        if (is_img && img) {
+	            decl.image = Clay_ImageElementConfig{.imageData = (void*)&img->scl};
+	        }
+#endif
 	        if (st.has_floating && st.floating_attach_to != CLAY_ATTACH_TO_NONE) {
 	            const float ox = st.has_float_x ? st.float_x : 0.0f;
 	            const float oy = st.has_float_y ? st.float_y : 0.0f;
@@ -2205,7 +2389,7 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
         }
     }
 
-    static void cleanup(void) {
+	    static void cleanup(void) {
 #if defined(COI_DESKTOP_FONTSTASH)
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
         sclay_shutdown();
@@ -2221,16 +2405,21 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 #endif
 #endif
 #if defined(COI_DESKTOP_CAPTURE)
-        capture_shutdown();
+		        capture_shutdown();
 #endif
-        sdtx_shutdown();
-        sgl_shutdown();
-        sg_shutdown();
+		        sdtx_shutdown();
+		        sgl_shutdown();
+
+#if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
+		        DesktopImageCache::shutdown();
+#endif
+
+		        sg_shutdown();
 
 #if defined(COI_DESKTOP_CLAY)
-        ClayEngine::shutdown();
+		        ClayEngine::shutdown();
 #endif
-    }
+		    }
 
 	    static int run(AppT* app_in, int frames_limit_in) {
 	        app = app_in;

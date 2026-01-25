@@ -104,6 +104,7 @@ scenes=(
   "paint_opacity_overlap:$ROOT_DIR/tests/desktop/visual/scenes/paint/opacity_overlap.coi"
   "paint_border_radius_combo:$ROOT_DIR/tests/desktop/visual/scenes/paint/border_radius_combo.coi"
   "paint_floating_zindex:$ROOT_DIR/tests/desktop/visual/scenes/paint/floating_zindex.coi"
+  "paint_image_basic:$ROOT_DIR/tests/desktop/visual/scenes/paint/image_basic.coi"
   "layout_row_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/row_fixed_and_grow.coi"
   "layout_col_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/col_fixed_and_grow.coi"
   "layout_nested_flex:$ROOT_DIR/tests/desktop/visual/scenes/layout/nested_flex.coi"
