@@ -242,6 +242,10 @@ struct Rect {
     float x, y, w, h;
 };
 
+// Used to avoid running desktop scripts/simulated input in the "pre-run" flush
+// that happens before sapp_run() starts when window/capture is enabled.
+inline bool g_sokol_frame_started = false;
+
 	inline bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
 	    out.clear();
 	    if (!path || !*path) return false;
@@ -909,7 +913,10 @@ struct ClayEngine {
             decl.clip = Clay_ClipElementConfig{
                 .horizontal = st.scroll_x,
                 .vertical = st.scroll_y,
-                .childOffset = (st.scroll_x || st.scroll_y) ? Clay_GetScrollOffset() : Clay_Vector2{0, 0},
+                // Note: for scroll containers, childOffset must be queried from inside the
+                // CLAY() macro (after the element is opened). We'll patch it up in
+                // declaration_for_node_open().
+                .childOffset = Clay_Vector2{0, 0},
             };
         }
 	        if (st.has_border && (st.border_width.left || st.border_width.right || st.border_width.top || st.border_width.bottom ||
@@ -976,6 +983,32 @@ struct ClayEngine {
         return decl;
     }
 
+    // Must be called from inside CLAY(...) so that Clay_GetScrollOffset() refers to the opened element.
+    static Clay_ElementDeclaration declaration_for_node_open(const coi::ui::Node& n, bool is_root, int32_t id) {
+        Clay_ElementDeclaration decl = declaration_for_node(n, is_root, id);
+        DesktopClassStyle st = parse_desktop_class_style(n, is_root);
+        if (st.has_clip && (st.scroll_x || st.scroll_y)) {
+            // Clay_GetScrollOffset() returns the scroll offset by matching the current open
+            // layout element pointer. At this point (between OpenElement and ConfigureOpenElement),
+            // the cached scroll container mapping hasn't been updated to point at the new
+            // per-frame layout element yet. Query by elementId instead.
+            Clay_Context* c = Clay_GetCurrentContext();
+            Clay_LayoutElement* open = Clay__GetOpenLayoutElement();
+            Clay_Vector2 off{0, 0};
+            if (c && open) {
+                for (int32_t i = 0; i < c->scrollContainerDatas.length; i++) {
+                    Clay__ScrollContainerDataInternal* mapping = Clay__ScrollContainerDataInternalArray_Get(&c->scrollContainerDatas, i);
+                    if (mapping && mapping->elementId == open->id) {
+                        off = mapping->scrollPosition;
+                        break;
+                    }
+                }
+            }
+            decl.clip.childOffset = off;
+        }
+        return decl;
+    }
+
     static void build_node(int32_t id, bool is_root) {
         auto it = coi::ui::g_nodes.find(id);
         if (it == coi::ui::g_nodes.end()) return;
@@ -983,7 +1016,7 @@ struct ClayEngine {
         if (n.tag == "comment") return;
 
         Clay_ElementId eid = element_id(id);
-        CLAY(eid, (ClayEngine::declaration_for_node(n, is_root, id))) {
+        CLAY(eid, (ClayEngine::declaration_for_node_open(n, is_root, id))) {
 	            if (!n.text.empty()) {
 	                Clay_String t = clay_string(n.text);
 	                Clay_TextElementConfig* cfgp = text_cfg;
@@ -1871,6 +1904,7 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
     }
 
     static void frame_cb(void) {
+        g_sokol_frame_started = true;
         double dt = sapp_frame_duration();
         if (dt > 0.1) dt = 0.1;
         if constexpr (requires(AppT* a, double d) { a->tick(d); }) {
@@ -2817,6 +2851,10 @@ struct DesktopScriptRunner {
     bool dump_tree = true;
     bool dump_layout = false;
     bool dump_render = false;
+
+    size_t next_line = 0;
+    int step = 0;
+    int wait_frames = 0;
 };
 
 inline DesktopScriptRunner g_script;
@@ -2837,6 +2875,10 @@ inline void load_script_if_any() {
         g_script.dump_tree = false;
         g_script.dump_layout = false;
         g_script.dump_render = false;
+        std::string raw = trim_copy(std::string(dumps));
+        if (raw == "0" || raw == "off" || raw == "none") {
+            // Explicitly disable all dumps.
+        } else {
         std::string s = dumps;
         for (char& c : s) c = (c == ';') ? ',' : c;
         auto parts = split_ws(s);
@@ -2867,6 +2909,7 @@ inline void load_script_if_any() {
         }
         // default if parsed nothing
         if (!g_script.dump_tree && !g_script.dump_layout && !g_script.dump_render) g_script.dump_tree = true;
+        }
     }
 
     std::ifstream f(g_script.path);
@@ -2890,10 +2933,16 @@ inline void script_snapshot(int step, const std::string& line) {
 inline void run_script_if_any() {
     load_script_if_any();
     if (!g_script.loaded || g_script.ran) return;
-    g_script.ran = true;
 
-    int step = 0;
-    for (const auto& raw : g_script.lines) {
+    // Handle waits across frames.
+    if (g_script.wait_frames > 0) {
+        g_script.wait_frames--;
+        if (g_script.wait_frames > 0) return;
+        // If wait reached zero, continue executing remaining script lines below.
+    }
+
+    for (; g_script.next_line < g_script.lines.size(); g_script.next_line++) {
+        const auto& raw = g_script.lines[g_script.next_line];
         std::string line = trim_copy(raw);
         if (line.empty()) continue;
         if (line[0] == '#') continue;
@@ -2912,6 +2961,14 @@ inline void run_script_if_any() {
                 if (!ok && toks.size() >= 3) {
                     ok = parse_wh(toks[1] + " " + toks[2], g_script.viewport_w, g_script.viewport_h);
                 }
+            }
+        } else if (cmd == "wait" || cmd == "frames") {
+            if (toks.size() < 2) {
+                ok = false;
+            } else {
+                int n = std::atoi(toks[1].c_str());
+                if (n < 0) n = 0;
+                g_script.wait_frames = n;
             }
         } else if (cmd == "pointer" || cmd == "move") {
             if (toks.size() < 3) {
@@ -2947,18 +3004,42 @@ inline void run_script_if_any() {
             ok = false;
         }
 
-        step++;
+        g_script.step++;
         if (!ok) {
             std::cerr << "[desktop-script] parse error in: " << g_script.path << ": " << line << "\n";
         }
-        script_snapshot(step, line);
+        script_snapshot(g_script.step, line);
+
+        // Yield to the next frame if we just scheduled a wait.
+        if ((cmd == "wait" || cmd == "frames") && g_script.wait_frames > 0) {
+            g_script.next_line++;
+            return;
+        }
     }
+
+    g_script.ran = true;
 }
 
 inline void flush() {
-    run_script_if_any();
-    maybe_simulate_scroll();
-    maybe_simulate_click();
+    const bool has_window_env = []() -> bool {
+        const char* e = std::getenv("COI_DESKTOP_WINDOW");
+        return (e && *e && std::string(e) != std::string("0"));
+    }();
+    const bool has_capture_env = []() -> bool {
+        const char* e = std::getenv("COI_DESKTOP_CAPTURE_DIR");
+        return (e && *e);
+    }();
+    const bool pre_sokol = (has_window_env || has_capture_env) && !g_sokol_frame_started;
+
+    // Desktop scripts and simulated input should run during the actual main loop.
+    // When window/capture is enabled, the generated main() calls coi::desktop::flush()
+    // once before starting the Sokol loop; running scripts there would consume steps
+    // before the first captured frame.
+    if (!pre_sokol) {
+        run_script_if_any();
+        maybe_simulate_scroll();
+        maybe_simulate_click();
+    }
     coi::ui::flush();
 
     const char* render_env = std::getenv("COI_DESKTOP_RENDER_DUMP");
