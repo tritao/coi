@@ -1441,8 +1441,8 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	        // Offscreen capture-only mode doesn't need a visible window; we only use sokol_app
 	        // to get a GL context. Hide the X11 window to avoid popups during visual runs.
 	        if (!render_swapchain) {
-	            Display* dpy = (Display*)sapp_x11_display();
-	            Window win = (Window)(uintptr_t)sapp_x11_window();
+	            Display* dpy = (Display*)sapp_x11_get_display();
+	            Window win = (Window)(uintptr_t)sapp_x11_get_window();
 	            if (dpy && win) {
 	                XUnmapWindow(dpy, win);
 	                XFlush(dpy);
