@@ -166,7 +166,7 @@ Open `http://localhost:8000` in your browser.
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
 > [!NOTE]
-> Experimental native desktop builds are available via `--target desktop`. See `docs/desktop.md`.
+> Experimental native builds are available via `--target native`. See `docs/native.md`.
 
 ### Project Structure
 

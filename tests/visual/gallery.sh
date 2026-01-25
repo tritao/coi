@@ -20,7 +20,7 @@ Examples:
   $0 --set golden
 
 Outputs:
-  <out>/desktop/<scene>/frame_*.png
+  <out>/native/<scene>/frame_*.png
   <out>/web/<scene>/frame_*.png
   <out>/index.html
 EOF
@@ -62,17 +62,17 @@ fi
 
 mkdir -p "$OUT_DIR"
 
-DESKTOP_BASE="$OUT_DIR/desktop"
+NATIVE_BASE="$OUT_DIR/native"
 WEB_BASE="$OUT_DIR/web"
 
 if [[ "$RUN" -eq 1 ]]; then
   for pat in "${SCENE_PATTERNS[@]}"; do
-    "$ROOT_DIR/tests/run_visual.sh" --backend desktop --update --scene "$pat" --baseline-dir "$DESKTOP_BASE" --out-dir "$OUT_DIR/.out/desktop"
+    "$ROOT_DIR/tests/run_visual.sh" --backend native --update --scene "$pat" --baseline-dir "$NATIVE_BASE" --out-dir "$OUT_DIR/.out/native"
     "$ROOT_DIR/tests/run_visual.sh" --backend web --update --scene "$pat" --baseline-dir "$WEB_BASE" --out-dir "$OUT_DIR/.out/web"
   done
 fi
 
-python3 "$ROOT_DIR/tests/visual/make_gallery.py" --desktop "$DESKTOP_BASE" --web "$WEB_BASE" --out "$OUT_DIR/index.html" --title "COI Desktop vs Web"
+python3 "$ROOT_DIR/tests/visual/make_gallery.py" --native "$NATIVE_BASE" --web "$WEB_BASE" --out "$OUT_DIR/index.html" --title "COI Native vs Web"
 
 echo "wrote: $OUT_DIR/index.html"
 

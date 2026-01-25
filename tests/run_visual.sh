@@ -11,7 +11,7 @@ if [[ ! -x "$COI_BIN" ]]; then
   exit 1
 fi
 
-BACKEND="desktop" # desktop | web
+BACKEND="native"  # native | web
 MODE="compare"    # compare | update
 SCENE_FILTER=""
 LIST_ONLY=0
@@ -26,7 +26,7 @@ EVERY="60"
 MAX_CAPTURES="2"
 TOLERANCE="8"
 
-# Desktop-only knobs (kept for compatibility)
+# Native-only knobs
 UI_MODE="headless"       # headless | window
 CAPTURE_MODE="offscreen" # offscreen | x11 | auto
 USE_XVFB="auto"          # auto | 0 | 1
@@ -38,26 +38,26 @@ WEB_BROWSER="${WEB_BROWSER:-$(command -v google-chrome || true)}"
 usage() {
   cat <<EOF
 Usage:
-  $0 [--backend <desktop|web>] [--update] [--scene <name>] [options]
+  $0 [--backend <native|web>] [--update] [--scene <name>] [options]
 
 Options:
-  --backend <desktop|web>      Backend runner (default: $BACKEND)
+  --backend <native|web>       Backend runner (default: $BACKEND)
   --update                     Write baselines into tests/visual/baseline/<backend>/<scene>/
   --scene <name>               Run only one scene (exact), or use prefix/glob (e.g. layout_*, layout_)
   --list                       List available scenes (honors --scene filter)
-  --ci                         CI-friendly defaults (desktop: headless+auto, web: headless chrome)
+  --ci                         CI-friendly defaults (native: headless+auto, web: headless chrome)
   --open                       Serve and open an HTML view of captures
 
 Common capture:
   --baseline-dir <dir>         Baseline directory (default: tests/visual/baseline/<backend>)
   --out-dir <dir>              Capture output directory (default: \$TMPDIR/coi-visual/<backend>)
   --size <WxH>                 Capture size (default: $CAPTURE_SIZE)
-  --frames <n>                 Total frames (desktop) (default: $FRAMES)
-  --every <n>                  Capture every N frames (desktop) (default: $EVERY)
+  --frames <n>                 Total frames (native) (default: $FRAMES)
+  --every <n>                  Capture every N frames (native) (default: $EVERY)
   --max <n>                    Max captures per run (default: $MAX_CAPTURES)
   --tolerance <n>              dHash tolerance (default: $TOLERANCE)
 
-Desktop-specific:
+Native-specific:
   --window                     Run scenes with a visible window (default: headless)
   --headless                   Run scenes headlessly (default)
   --capture-mode <mode>        Capture mode: offscreen|x11|auto (default: $CAPTURE_MODE)
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
     --list) LIST_ONLY=1; shift;;
     --open) OPEN_AFTER=1; shift;;
     --ci)
-      if [[ "$BACKEND" == "desktop" ]]; then
+      if [[ "$BACKEND" == "native" ]]; then
         UI_MODE="headless"; CAPTURE_MODE="auto"; USE_XVFB="auto"
       fi
       shift
@@ -103,8 +103,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$BACKEND" != "desktop" && "$BACKEND" != "web" ]]; then
-  echo "error: invalid --backend: $BACKEND (expected: desktop|web)"
+if [[ "$BACKEND" != "native" && "$BACKEND" != "web" ]]; then
+  echo "error: invalid --backend: $BACKEND (expected: native|web)"
   exit 1
 fi
 
@@ -262,8 +262,8 @@ pick_env_file() {
     echo "${base}.visual_env"
   elif [[ -f "${base}.${BACKEND}_env" ]]; then
     echo "${base}.${BACKEND}_env"
-  elif [[ -f "${base}.desktop_env" ]]; then
-    echo "${base}.desktop_env"
+  elif [[ -f "${base}.native_env" ]]; then
+    echo "${base}.native_env"
   else
     echo ""
   fi
@@ -276,8 +276,8 @@ pick_script_file() {
     echo "${base}.visual_script"
   elif [[ -f "${base}.${BACKEND}_script" ]]; then
     echo "${base}.${BACKEND}_script"
-  elif [[ -f "${base}.desktop_script" ]]; then
-    echo "${base}.desktop_script"
+  elif [[ -f "${base}.native_script" ]]; then
+    echo "${base}.native_script"
   else
     echo ""
   fi
@@ -307,9 +307,9 @@ read_env_file() {
   done <"$env_file"
 }
 
-# ---- Desktop runner (mostly identical to the legacy script) ----
+# ---- Native runner (mostly identical to the legacy script) ----
 
-run_scene_desktop() {
+run_scene_native() {
   local mode="$1" # update | compare
   local path="$2"
   local out_dir="$3"
@@ -317,8 +317,8 @@ run_scene_desktop() {
   shift 4
   local -a extra_env_local=("$@")
 
-  if [[ -z "${COI_DESKTOP_ASSET_ROOT:-}" ]]; then
-    extra_env_local+=("COI_DESKTOP_ASSET_ROOT=$ROOT_DIR")
+  if [[ -z "${COI_NATIVE_ASSET_ROOT:-}" ]]; then
+    extra_env_local+=("COI_NATIVE_ASSET_ROOT=$ROOT_DIR")
   fi
 
   if [[ "$CAPTURE_MODE" != "offscreen" && "$CAPTURE_MODE" != "x11" && "$CAPTURE_MODE" != "auto" ]]; then
@@ -387,17 +387,17 @@ run_scene_desktop() {
     fi
 
     echo "   run: ui=$try_ui capture=$try_cap (attempt $attempt_idx/${#attempts[@]})"
-    local -a cap_env=(env COI_DESKTOP_CAPTURE_MODE="$try_cap")
+    local -a cap_env=(env COI_NATIVE_CAPTURE_MODE="$try_cap")
 
     rm -f "$out_dir"/*.png "$out_dir"/*.dhash 2>/dev/null || true
 
     set +e
     if [[ "$mode" == "update" ]]; then
-      "${try_prefix[@]}" "${cap_env[@]}" env "${extra_env_local[@]}" "$COI_BIN" run "$path" --target desktop "${try_ui_args[@]}" --frames "$FRAMES" \
+      "${try_prefix[@]}" "${cap_env[@]}" env "${extra_env_local[@]}" "$COI_BIN" run "$path" --target native "${try_ui_args[@]}" --frames "$FRAMES" \
         --capture "$out_dir" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES"
       attempt_rc=$?
     else
-      "${try_prefix[@]}" "${cap_env[@]}" env "${extra_env_local[@]}" "$COI_BIN" run "$path" --target desktop "${try_ui_args[@]}" --frames "$FRAMES" \
+      "${try_prefix[@]}" "${cap_env[@]}" env "${extra_env_local[@]}" "$COI_BIN" run "$path" --target native "${try_ui_args[@]}" --frames "$FRAMES" \
         --capture "$out_dir" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES" \
         --capture-baseline "$base_dir" --capture-tolerance "$TOLERANCE" --capture-fail
       attempt_rc=$?
@@ -654,26 +654,26 @@ for i in "${!names[@]}"; do
   extra_env=()
   read_env_file "$env_file" extra_env
 
-  if [[ "$BACKEND" == "desktop" && -n "$script_file" ]]; then
-    extra_env+=("COI_DESKTOP_SCRIPT=$script_file")
+  if [[ "$BACKEND" == "native" && -n "$script_file" ]]; then
+    extra_env+=("COI_NATIVE_SCRIPT=$script_file")
     has_dumps=0
     for kv in "${extra_env[@]}"; do
-      if [[ "$kv" == COI_DESKTOP_SCRIPT_DUMPS=* ]]; then
+      if [[ "$kv" == COI_NATIVE_SCRIPT_DUMPS=* ]]; then
         has_dumps=1
         break
       fi
     done
     if [[ "$has_dumps" -eq 0 ]]; then
-      extra_env+=("COI_DESKTOP_SCRIPT_DUMPS=0")
+      extra_env+=("COI_NATIVE_SCRIPT_DUMPS=0")
     fi
   fi
 
   if [[ "$MODE" == "update" ]]; then
-    if [[ "$BACKEND" == "desktop" ]]; then
+    if [[ "$BACKEND" == "native" ]]; then
       rm -rf "$scene_out"
       mkdir -p "$scene_out"
       mkdir -p "$scene_base"
-      run_scene_desktop "update" "$path" "$scene_out" "$scene_base" "${extra_env[@]}" || { fail=1; continue; }
+      run_scene_native "update" "$path" "$scene_out" "$scene_base" "${extra_env[@]}" || { fail=1; continue; }
       rm -rf "$scene_base"
       mkdir -p "$scene_base"
       cp -f "$scene_out"/*.dhash "$scene_base/" 2>/dev/null || true
@@ -693,10 +693,10 @@ for i in "${!names[@]}"; do
   fi
 
   set +e
-  if [[ "$BACKEND" == "desktop" ]]; then
+  if [[ "$BACKEND" == "native" ]]; then
     rm -rf "$scene_out"
     mkdir -p "$scene_out"
-    run_scene_desktop "compare" "$path" "$scene_out" "$scene_base" "${extra_env[@]}"
+    run_scene_native "compare" "$path" "$scene_out" "$scene_base" "${extra_env[@]}"
     rc=$?
   else
     run_scene_web "compare" "$name" "$path" "$scene_out" "$scene_base" "$script_file"

@@ -34,47 +34,47 @@ def relpath(from_dir: Path, to_file: Path) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--desktop", type=Path, required=True, help="Directory containing desktop scene subdirs")
+    ap.add_argument("--native", type=Path, required=True, help="Directory containing native scene subdirs")
     ap.add_argument("--web", type=Path, required=True, help="Directory containing web scene subdirs")
     ap.add_argument("--out", type=Path, required=True, help="Output HTML path")
     ap.add_argument("--title", type=str, default="COI Visual Gallery")
     args = ap.parse_args()
 
-    desktop_root = args.desktop
+    native_root = args.native
     web_root = args.web
     out_path = args.out
     out_dir = out_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    scenes = sorted(find_scenes(desktop_root) | find_scenes(web_root))
+    scenes = sorted(find_scenes(native_root) | find_scenes(web_root))
 
     rows: list[str] = []
     for scene in scenes:
-        ddir = desktop_root / scene
+        ndir = native_root / scene
         wdir = web_root / scene
-        frames = sorted(set(find_frames(ddir)) | set(find_frames(wdir)))
+        frames = sorted(set(find_frames(ndir)) | set(find_frames(wdir)))
         if not frames:
             continue
 
         rows.append(f'<h2 id="{html.escape(scene)}">{html.escape(scene)}</h2>')
         rows.append("<div class='scene'>")
         for frame in frames:
-            dfile = ddir / frame
+            nfile = ndir / frame
             wfile = wdir / frame
             rows.append("<div class='frame'>")
             rows.append(f"<div class='framehdr'>{html.escape(frame)}</div>")
             rows.append("<div class='cols'>")
 
-            if dfile.exists():
-                src = relpath(out_dir, dfile)
+            if nfile.exists():
+                src = relpath(out_dir, nfile)
                 rows.append(
                     "<div class='col'>"
-                    "<div class='label'>desktop</div>"
+                    "<div class='label'>native</div>"
                     f"<img loading='lazy' src='{html.escape(src)}' />"
                     "</div>"
                 )
             else:
-                rows.append("<div class='col missing'><div class='label'>desktop</div><div class='miss'>missing</div></div>")
+                rows.append("<div class='col missing'><div class='label'>native</div><div class='miss'>missing</div></div>")
 
             if wfile.exists():
                 src = relpath(out_dir, wfile)
@@ -216,7 +216,7 @@ def main() -> int:
 <body>
   <header>
     <div><strong>{html.escape(args.title)}</strong></div>
-    <div class="paths">desktop: {html.escape(str(desktop_root))} · web: {html.escape(str(web_root))}</div>
+    <div class="paths">native: {html.escape(str(native_root))} · web: {html.escape(str(web_root))}</div>
   </header>
   <main>
     <nav>
@@ -235,4 +235,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

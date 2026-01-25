@@ -1,7 +1,0 @@
---- COI_DESKTOP_RENDER_DUMP ---
-SCISSOR_START x=0 y=0 w=60 h=20
-RECT id=1048578 tag=div class="a w-60 h-10 pad-0" x=0 y=-20 w=60 h=10
-RECT id=1048579 tag=div class="b w-60 h-10 pad-0" x=0 y=-10 w=60 h=10
-RECT id=1048580 tag=div class="c w-60 h-10 pad-0" x=0 y=0 w=60 h=10
-RECT id=1048581 tag=div class="d w-60 h-10 pad-0" x=0 y=10 w=60 h=10
-SCISSOR_END

@@ -1,41 +1,41 @@
 # name|path|backends
-# backends: desktop,web (comma-separated)
+# backends: native,web (comma-separated)
 
-font_window_demo|tests/desktop/visual/scenes/font_window_demo.coi|desktop,web
+font_window_demo|tests/native/visual/scenes/font_window_demo.coi|native,web
 
-paint_rects|tests/desktop/visual/scenes/paint/rects.coi|desktop,web
-paint_border_widths|tests/desktop/visual/scenes/paint/border_widths.coi|desktop,web
-paint_bg_none|tests/desktop/visual/scenes/paint/bg_none.coi|desktop,web
-paint_corner_radius_basic|tests/desktop/visual/scenes/paint/corner_radius_basic.coi|desktop,web
-paint_corner_radius_per_corner|tests/desktop/visual/scenes/paint/corner_radius_per_corner.coi|desktop,web
-paint_opacity_overlap|tests/desktop/visual/scenes/paint/opacity_overlap.coi|desktop,web
-paint_border_radius_combo|tests/desktop/visual/scenes/paint/border_radius_combo.coi|desktop,web
-paint_floating_zindex|tests/desktop/visual/scenes/paint/floating_zindex.coi|desktop,web
-paint_image_basic|tests/desktop/visual/scenes/paint/image_basic.coi|desktop,web
-paint_image_clip_radius_edges|tests/desktop/visual/scenes/paint/image_clip_radius_edges.coi|desktop,web
+paint_rects|tests/native/visual/scenes/paint/rects.coi|native,web
+paint_border_widths|tests/native/visual/scenes/paint/border_widths.coi|native,web
+paint_bg_none|tests/native/visual/scenes/paint/bg_none.coi|native,web
+paint_corner_radius_basic|tests/native/visual/scenes/paint/corner_radius_basic.coi|native,web
+paint_corner_radius_per_corner|tests/native/visual/scenes/paint/corner_radius_per_corner.coi|native,web
+paint_opacity_overlap|tests/native/visual/scenes/paint/opacity_overlap.coi|native,web
+paint_border_radius_combo|tests/native/visual/scenes/paint/border_radius_combo.coi|native,web
+paint_floating_zindex|tests/native/visual/scenes/paint/floating_zindex.coi|native,web
+paint_image_basic|tests/native/visual/scenes/paint/image_basic.coi|native,web
+paint_image_clip_radius_edges|tests/native/visual/scenes/paint/image_clip_radius_edges.coi|native,web
 
-layout_row_fixed_and_grow|tests/desktop/visual/scenes/layout/row_fixed_and_grow.coi|desktop,web
-layout_col_fixed_and_grow|tests/desktop/visual/scenes/layout/col_fixed_and_grow.coi|desktop,web
-layout_nested_flex|tests/desktop/visual/scenes/layout/nested_flex.coi|desktop,web
-layout_min_max_constraints|tests/desktop/visual/scenes/layout/min_max_constraints.coi|desktop,web
-layout_align_main_cross|tests/desktop/visual/scenes/layout/align_main_cross.coi|desktop,web
+layout_row_fixed_and_grow|tests/native/visual/scenes/layout/row_fixed_and_grow.coi|native,web
+layout_col_fixed_and_grow|tests/native/visual/scenes/layout/col_fixed_and_grow.coi|native,web
+layout_nested_flex|tests/native/visual/scenes/layout/nested_flex.coi|native,web
+layout_min_max_constraints|tests/native/visual/scenes/layout/min_max_constraints.coi|native,web
+layout_align_main_cross|tests/native/visual/scenes/layout/align_main_cross.coi|native,web
 
-clip_overflow_hidden|tests/desktop/visual/scenes/clip/overflow_hidden.coi|desktop,web
-clip_overflow_axes|tests/desktop/visual/scenes/clip/overflow_axes.coi|desktop
+clip_overflow_hidden|tests/native/visual/scenes/clip/overflow_hidden.coi|native,web
+clip_overflow_axes|tests/native/visual/scenes/clip/overflow_axes.coi|native
 
-scroll_y_basic|tests/desktop/visual/scenes/scroll/scroll_y_basic.coi|desktop,web
-scroll_nested_clip|tests/desktop/visual/scenes/scroll/nested_clip.coi|desktop,web
+scroll_y_basic|tests/native/visual/scenes/scroll/scroll_y_basic.coi|native,web
+scroll_nested_clip|tests/native/visual/scenes/scroll/nested_clip.coi|native,web
 
-text_glyphs_basic|tests/desktop/visual/scenes/text/glyphs_basic.coi|desktop,web
-text_wrap_measure|tests/desktop/visual/scenes/text/wrap_measure.coi|desktop,web
-text_alignment|tests/desktop/visual/scenes/text/alignment.coi|desktop,web
+text_glyphs_basic|tests/native/visual/scenes/text/glyphs_basic.coi|native,web
+text_wrap_measure|tests/native/visual/scenes/text/wrap_measure.coi|native,web
+text_alignment|tests/native/visual/scenes/text/alignment.coi|native,web
 
-input_zindex_click|tests/desktop/visual/scenes/input/zindex_click.coi|desktop,web
-input_clip_click|tests/desktop/visual/scenes/input/clip_click.coi|desktop,web
+input_zindex_click|tests/native/visual/scenes/input/zindex_click.coi|native,web
+input_clip_click|tests/native/visual/scenes/input/clip_click.coi|native,web
 
-# Desktop-only “render dump pass” golden scenes
-border_render_dump_pass|tests/desktop/runtime/border_render_dump_pass.coi|desktop
-border_between_render_dump_pass|tests/desktop/runtime/border_between_render_dump_pass.coi|desktop
-clip_render_dump_pass|tests/desktop/runtime/clip_render_dump_pass.coi|desktop
-scroll_render_dump_pass|tests/desktop/runtime/scroll_render_dump_pass.coi|desktop
-text_render_dump_pass|tests/desktop/runtime/text_render_dump_pass.coi|desktop
+# Native-only “render dump pass” golden scenes
+border_render_dump_pass|tests/native/runtime/border_render_dump_pass.coi|native
+border_between_render_dump_pass|tests/native/runtime/border_between_render_dump_pass.coi|native
+clip_render_dump_pass|tests/native/runtime/clip_render_dump_pass.coi|native
+scroll_render_dump_pass|tests/native/runtime/scroll_render_dump_pass.coi|native
+text_render_dump_pass|tests/native/runtime/text_render_dump_pass.coi|native

@@ -1,5 +1,0 @@
---- COI_DESKTOP_RENDER_DUMP ---
-SCISSOR_START x=0 y=0 w=60 h=20
-RECT id=1048577 tag=div class="clipper w-60 h-20 pad-0 clip" x=0 y=0 w=60 h=20
-RECT id=1048578 tag=div class="inner w-100 h-20 pad-0" x=0 y=0 w=100 h=20
-SCISSOR_END

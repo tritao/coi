@@ -1,8 +1,0 @@
---- COI_DESKTOP_DUMP ---
-<body></body>
-  <div coi-scope="App" class="root fill pad-0 gap-0"></div>
-    <div coi-scope="App" class="btn w-100 h-30 pad-0">Count:0</div>
---- COI_DESKTOP_DUMP ---
-<body></body>
-  <div coi-scope="App" class="root fill pad-0 gap-0"></div>
-    <div coi-scope="App" class="btn w-100 h-30 pad-0">Count:1</div>

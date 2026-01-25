@@ -1,4 +1,4 @@
-# Visual tests (web + native)
+# Visual tests (native + web)
 
 This folder contains shared tooling for COI visual testing:
 
@@ -9,10 +9,10 @@ This folder contains shared tooling for COI visual testing:
 ## Layout
 
 - `scenes_manifest.txt`: list of named scenes and which backends they run on.
-- `baseline/desktop/`: native/desktop PNG + `.dhash` baselines.
+- `baseline/native/`: native PNG + `.dhash` baselines.
 - `baseline/web/`: web PNG + `.dhash` baselines.
 - `dhash_png.py`: helper to compute / compare dHash from a PNG.
-- `gen_web_visual_js.py`: generates `coi_visual.js` to replay `.desktop_script` input on the web backend.
+- `gen_web_visual_js.py`: generates `coi_visual.js` to replay `.native_script` input on the web backend.
 
 ## Setup (web-only)
 
@@ -50,28 +50,27 @@ Run:
 
 ## Cross-backend visual regression (native + web)
 
-Native/desktop:
+Native:
 
 ```bash
-./tests/run_visual.sh --backend desktop
-./tests/run_visual.sh --backend desktop --update
+./tests/run_visual.sh --backend native
+./tests/run_visual.sh --backend native --update
 ```
 
 Web (headless Chrome):
 
 ```bash
-cd tests/visual && npm install
-
 ./tests/run_visual.sh --backend web --scene paint_rects --update
 ./tests/run_visual.sh --backend web --scene paint_rects
 ```
 
-## Native vs web gallery (manual inspection)
 Notes:
 - Web tests default to `--web-driver playwright` (using `playwright-core` + the system `google-chrome`).
 - Override browser path with `--browser /path/to/chrome` or `WEB_BROWSER=/path/to/chrome`.
 - Fallback driver (legacy): `./tests/run_visual.sh --backend web --web-driver chrome ...`
 - Add `--open` to serve and open an HTML view of the capture output.
+
+## Native vs web gallery (manual inspection)
 
 Generate per-scene outputs for both backends into a scratch folder and write an `index.html`
 that shows native/web images side-by-side:
@@ -82,3 +81,4 @@ that shows native/web images side-by-side:
 ./tests/visual/gallery.sh --set golden --out /tmp/coi-golden
 ./tests/visual/gallery.sh --set golden --out /tmp/coi-golden --open
 ```
+

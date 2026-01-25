@@ -446,7 +446,7 @@ int main(int argc, char **argv)
             if (i + 1 < argc) {
                 target = argv[++i];
             } else {
-                ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                ErrorHandler::cli_error("--target requires an argument (web|native)");
                 return 1;
             }
         }
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
                 if (i + 1 < argc) {
                     target = argv[++i];
                 } else {
-                    ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                    ErrorHandler::cli_error("--target requires an argument (web|native)");
                     return 1;
                 }
             } else if (arg == "--window") {
@@ -563,41 +563,41 @@ int main(int argc, char **argv)
             }
         }
 
-        if (target != "web" && target != "desktop") {
-            ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or desktop");
+        if (target != "web" && target != "native") {
+            ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or native");
             return 1;
         }
-        if (target == "desktop" && !window_set) {
-            window = true; // run defaults to windowed for desktop
+        if (target == "native" && !window_set) {
+            window = true; // run defaults to windowed for native
         }
 
         if (!capture_dir.empty() || !capture_size.empty() || capture_every >= 0 || capture_max >= 0 || !capture_baseline.empty() ||
             capture_tolerance >= 0 || capture_overlay || capture_fail) {
-            if (target != "desktop") {
-                ErrorHandler::cli_error("--capture* options require --target desktop");
+            if (target != "native") {
+                ErrorHandler::cli_error("--capture* options require --target native");
                 return 1;
             }
 #if defined(_WIN32)
             auto putenv_kv = [](const std::string& k, const std::string& v) {
                 _putenv_s(k.c_str(), v.c_str());
             };
-            if (!capture_dir.empty()) putenv_kv("COI_DESKTOP_CAPTURE_DIR", capture_dir);
-            if (!capture_size.empty()) putenv_kv("COI_DESKTOP_CAPTURE_SIZE", capture_size);
-            if (capture_every >= 0) putenv_kv("COI_DESKTOP_CAPTURE_EVERY", std::to_string(capture_every));
-            if (capture_max >= 0) putenv_kv("COI_DESKTOP_CAPTURE_MAX", std::to_string(capture_max));
-            if (!capture_baseline.empty()) putenv_kv("COI_DESKTOP_CAPTURE_BASELINE", capture_baseline);
-            if (capture_tolerance >= 0) putenv_kv("COI_DESKTOP_CAPTURE_TOLERANCE", std::to_string(capture_tolerance));
-            if (capture_overlay) putenv_kv("COI_DESKTOP_CAPTURE_OVERLAY", "1");
-            if (capture_fail) putenv_kv("COI_DESKTOP_CAPTURE_FAIL_ON_MISMATCH", "1");
+            if (!capture_dir.empty()) putenv_kv("COI_NATIVE_CAPTURE_DIR", capture_dir);
+            if (!capture_size.empty()) putenv_kv("COI_NATIVE_CAPTURE_SIZE", capture_size);
+            if (capture_every >= 0) putenv_kv("COI_NATIVE_CAPTURE_EVERY", std::to_string(capture_every));
+            if (capture_max >= 0) putenv_kv("COI_NATIVE_CAPTURE_MAX", std::to_string(capture_max));
+            if (!capture_baseline.empty()) putenv_kv("COI_NATIVE_CAPTURE_BASELINE", capture_baseline);
+            if (capture_tolerance >= 0) putenv_kv("COI_NATIVE_CAPTURE_TOLERANCE", std::to_string(capture_tolerance));
+            if (capture_overlay) putenv_kv("COI_NATIVE_CAPTURE_OVERLAY", "1");
+            if (capture_fail) putenv_kv("COI_NATIVE_CAPTURE_FAIL_ON_MISMATCH", "1");
 #else
-            if (!capture_dir.empty()) setenv("COI_DESKTOP_CAPTURE_DIR", capture_dir.c_str(), 1);
-            if (!capture_size.empty()) setenv("COI_DESKTOP_CAPTURE_SIZE", capture_size.c_str(), 1);
-            if (capture_every >= 0) setenv("COI_DESKTOP_CAPTURE_EVERY", std::to_string(capture_every).c_str(), 1);
-            if (capture_max >= 0) setenv("COI_DESKTOP_CAPTURE_MAX", std::to_string(capture_max).c_str(), 1);
-            if (!capture_baseline.empty()) setenv("COI_DESKTOP_CAPTURE_BASELINE", capture_baseline.c_str(), 1);
-            if (capture_tolerance >= 0) setenv("COI_DESKTOP_CAPTURE_TOLERANCE", std::to_string(capture_tolerance).c_str(), 1);
-            if (capture_overlay) setenv("COI_DESKTOP_CAPTURE_OVERLAY", "1", 1);
-            if (capture_fail) setenv("COI_DESKTOP_CAPTURE_FAIL_ON_MISMATCH", "1", 1);
+            if (!capture_dir.empty()) setenv("COI_NATIVE_CAPTURE_DIR", capture_dir.c_str(), 1);
+            if (!capture_size.empty()) setenv("COI_NATIVE_CAPTURE_SIZE", capture_size.c_str(), 1);
+            if (capture_every >= 0) setenv("COI_NATIVE_CAPTURE_EVERY", std::to_string(capture_every).c_str(), 1);
+            if (capture_max >= 0) setenv("COI_NATIVE_CAPTURE_MAX", std::to_string(capture_max).c_str(), 1);
+            if (!capture_baseline.empty()) setenv("COI_NATIVE_CAPTURE_BASELINE", capture_baseline.c_str(), 1);
+            if (capture_tolerance >= 0) setenv("COI_NATIVE_CAPTURE_TOLERANCE", std::to_string(capture_tolerance).c_str(), 1);
+            if (capture_overlay) setenv("COI_NATIVE_CAPTURE_OVERLAY", "1", 1);
+            if (capture_fail) setenv("COI_NATIVE_CAPTURE_FAIL_ON_MISMATCH", "1", 1);
 #endif
         }
 
@@ -626,7 +626,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                ErrorHandler::cli_error("--target requires an argument (web|desktop)");
+                ErrorHandler::cli_error("--target requires an argument (web|native)");
                 return 1;
             }
         }
@@ -657,9 +657,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (target != "web" && target != "desktop")
+    if (target != "web" && target != "native")
     {
-        ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or desktop");
+        ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or native");
         return 1;
     }
 
@@ -820,7 +820,7 @@ int main(int argc, char **argv)
                 if (!headers.empty()) headers += ", ";
                 headers += h;
             }
-            ErrorHandler::cli_error("Desktop target does not support web platform APIs yet",
+            ErrorHandler::cli_error("Native target does not support web platform APIs yet",
                                     "Unsupported def headers: " + headers);
             return 1;
         }
@@ -830,7 +830,7 @@ int main(int argc, char **argv)
                 out << "#include \"webcc/" << header << ".h\"\n";
             }
         } else {
-            // Desktop target: use only WebCC core containers/types (no webcc/webcc.h, no web platform headers).
+            // Native target: use only WebCC core containers/types (no webcc/webcc.h, no web platform headers).
             out << "#include <algorithm>\n";
             out << "#include <chrono>\n";
             out << "#include <cmath>\n";
@@ -904,7 +904,7 @@ int main(int argc, char **argv)
             out << "    }\n";
             out << "    struct _coi_rgb { uint8_t r, g, b; };\n";
             out << "    static inline _coi_rgb _coi_pick_color(webcc::string_view cls) {\n";
-            out << "        // Match desktop runtime: use a hash of the full class string.\n";
+            out << "        // Match native runtime: use a hash of the full class string.\n";
             out << "        const uint32_t h = _coi_fnv1a(cls);\n";
             out << "        uint32_t rv = 64u + (((h >> 0) & 0xFFu) * 166u) / 255u;\n";
             out << "        uint32_t gv = 64u + (((h >> 8) & 0xFFu) * 166u) / 255u;\n";
@@ -1062,7 +1062,7 @@ int main(int argc, char **argv)
             out << "        if (has_lh) { st += \"line-height:\"; st += (int)lh; st += \"px;\"; }\n";
             out << "        if (has_ls) { st += \"letter-spacing:\"; st += (int)ls; st += \"px;\"; }\n";
             out << "\n";
-            // Match desktop runtime alpha defaults:
+            // Match native runtime alpha defaults:
             // - fill alpha = 46/255 ~= 0.18
             // - border alpha = 180/255 ~= 0.71
             out << "        // Visual defaults for token-driven scenes: assign deterministic colors if not bg-none.\n";
@@ -1109,7 +1109,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            out << "#include \"coi/desktop_runtime.h\"\n\n";
+            out << "#include \"coi/native_runtime.h\"\n\n";
         }
 
         // Generic event dispatcher template
@@ -1177,7 +1177,7 @@ int main(int argc, char **argv)
             {
                 if (comp->router)
                 {
-                    ErrorHandler::cli_error("Desktop target does not support router yet",
+                    ErrorHandler::cli_error("Native target does not support router yet",
                                             "Router uses browser history/popstate APIs.");
                     return 1;
                 }
@@ -1324,20 +1324,20 @@ int main(int argc, char **argv)
 	            out << "int main() {\n";
 	            out << "    app = new " << final_app_config.root_component << "();\n";
 	            out << "    app->view();\n";
-	            out << "    coi::desktop::set_click_dispatcher([](webcc::handle h) { return g_dispatcher.dispatch(h); });\n";
-	            out << "    coi::desktop::flush();\n";
-	            out << "    const char* frames_env = std::getenv(\"COI_DESKTOP_FRAMES\");\n";
+	            out << "    coi::native::set_click_dispatcher([](webcc::handle h) { return g_dispatcher.dispatch(h); });\n";
+	            out << "    coi::native::flush();\n";
+	            out << "    const char* frames_env = std::getenv(\"COI_NATIVE_FRAMES\");\n";
 	            out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
 	            out << "    if (frames == 0) return 0;\n";
-	            out << "    const char* window_env = std::getenv(\"COI_DESKTOP_WINDOW\");\n";
+	            out << "    const char* window_env = std::getenv(\"COI_NATIVE_WINDOW\");\n";
 	            out << "    const bool want_window = (window_env && *window_env && std::string(window_env) != std::string(\"0\"));\n";
-	            out << "    const char* capture_env = std::getenv(\"COI_DESKTOP_CAPTURE_DIR\");\n";
+	            out << "    const char* capture_env = std::getenv(\"COI_NATIVE_CAPTURE_DIR\");\n";
 	            out << "    const bool want_capture = (capture_env && *capture_env);\n";
 	            out << "    if (want_window || want_capture) {\n";
-	            out << "#if defined(COI_DESKTOP_SOKOL)\n";
-	            out << "        return coi::desktop::SokolRunner<" << final_app_config.root_component << ">::run(app, frames);\n";
+	            out << "#if defined(COI_NATIVE_SOKOL)\n";
+	            out << "        return coi::native::SokolRunner<" << final_app_config.root_component << ">::run(app, frames);\n";
 	            out << "#else\n";
-	            out << "        std::cerr << \"COI desktop window/capture requested but this binary was built without Sokol support\\n\";\n";
+	            out << "        std::cerr << \"COI native window/capture requested but this binary was built without Sokol support\\n\";\n";
 	            out << "#endif\n";
 	            out << "    }\n";
 	            out << "    using clock = std::chrono::steady_clock;\n";
@@ -1352,7 +1352,7 @@ int main(int argc, char **argv)
             if (session.components_with_tick.count(final_app_config.root_component)) {
                 out << "        if (app) app->tick(dt);\n";
             }
-            out << "        coi::desktop::flush();\n";
+            out << "        coi::native::flush();\n";
             out << "        std::this_thread::sleep_for(std::chrono::milliseconds(16));\n";
             out << "    }\n";
             out << "    return 0;\n";
@@ -1384,7 +1384,7 @@ int main(int argc, char **argv)
                 css_out << "}\n\n";
                 css_out << "body {\n";
                 css_out << "    margin: 0;\n";
-                // Match desktop clear color (0.08, 0.08, 0.10) ~= #14141a
+                // Match native clear color (0.08, 0.08, 0.10) ~= #14141a
                 css_out << "    background: #14141a;\n";
                 css_out << "    color: #f2f2f2;\n";
                 css_out << "    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;\n";
@@ -1656,24 +1656,24 @@ int main(int argc, char **argv)
 			            fs::path include_dir = exe_dir / "deps" / "webcc" / "include";
 			            if (!fs::exists(include_dir))
 			            {
-			                ErrorHandler::cli_error("Could not find WebCC core headers for desktop build",
+			                ErrorHandler::cli_error("Could not find WebCC core headers for native build",
 			                                        "Expected: " + include_dir.string());
 			                return 1;
 			            }
 
 			            fs::path coi_include_dir = exe_dir / "include";
-			            fs::path desktop_runtime_h = coi_include_dir / "coi" / "desktop_runtime.h";
-			            if (!fs::exists(desktop_runtime_h))
+			            fs::path native_runtime_h = coi_include_dir / "coi" / "native_runtime.h";
+			            if (!fs::exists(native_runtime_h))
 			            {
-			                ErrorHandler::cli_error("Could not find COI desktop runtime headers",
-			                                        "Expected: " + desktop_runtime_h.string());
+			                ErrorHandler::cli_error("Could not find COI native runtime headers",
+			                                        "Expected: " + native_runtime_h.string());
 			                return 1;
 			            }
-			            fs::path desktop_runtime_cc = coi_include_dir / "coi" / "desktop" / "runtime.cc";
-			            if (!fs::exists(desktop_runtime_cc))
+			            fs::path native_runtime_cc = coi_include_dir / "coi" / "native" / "runtime.cc";
+			            if (!fs::exists(native_runtime_cc))
 			            {
-			                ErrorHandler::cli_error("Could not find COI desktop runtime source",
-			                                        "Expected: " + desktop_runtime_cc.string());
+			                ErrorHandler::cli_error("Could not find COI native runtime source",
+			                                        "Expected: " + native_runtime_cc.string());
 			                return 1;
 			            }
 
@@ -1695,25 +1695,25 @@ int main(int argc, char **argv)
 			            cmd += " -I" + coi_include_dir.string();
 			            if (has_clay) {
 			                cmd += " -I" + clay_dir.string();
-			                cmd += " -DCOI_DESKTOP_CLAY";
+			                cmd += " -DCOI_NATIVE_CLAY";
 			            }
 			            if (has_sokol) {
 			                cmd += " -I" + sokol_dir.string();
 			                cmd += " -I" + (sokol_dir / "util").string();
 			                if (has_fontstash) {
 			                    cmd += " -I" + fontstash_dir.string();
-			                    cmd += " -DCOI_DESKTOP_FONTSTASH";
+			                    cmd += " -DCOI_NATIVE_FONTSTASH";
 			                }
 			                if (has_stb_write) {
 			                    cmd += " -I" + stb_dir.string();
-			                    cmd += " -DCOI_DESKTOP_CAPTURE";
+			                    cmd += " -DCOI_NATIVE_CAPTURE";
 			                }
 #if defined(__linux__) || defined(__unix__)
-			                cmd += " -DCOI_DESKTOP_SOKOL";
+			                cmd += " -DCOI_NATIVE_SOKOL";
 		                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
 #endif
 		            }
-		            cmd += " " + desktop_runtime_cc.string();
+		            cmd += " " + native_runtime_cc.string();
 		            cmd += " " + abs_output_cc.string();
 		            cmd += " -o " + out_bin.string();
 
@@ -1721,7 +1721,7 @@ int main(int argc, char **argv)
 		            int ret = system(cmd.c_str());
 		            if (ret != 0)
 		            {
-		                ErrorHandler::cli_error("Desktop compilation failed",
+		                ErrorHandler::cli_error("Native compilation failed",
 		                                        "Try installing a C++20 compiler toolchain (clang++ or g++).\n"
 		                                        "If you enabled the Sokol window backend, install X11/GL dev libs or run:\n"
 		                                        "  git submodule update --init --recursive");

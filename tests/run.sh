@@ -29,8 +29,8 @@ FAILED_TESTS=()
 TOTAL=0
 PASSED=0
 
-# Count total tests (exclude desktop snapshot tests; those are run via tests/run_desktop.sh)
-TOTAL=$(find "$SCRIPT_DIR" -path "$SCRIPT_DIR/desktop" -prune -o \( -name "*_pass.coi" -o -name "*_fail.coi" \) -print | wc -l)
+# Count total tests (exclude native snapshot tests; those are run via tests/run_native.sh)
+TOTAL=$(find "$SCRIPT_DIR" -path "$SCRIPT_DIR/native" -prune -o \( -name "*_pass.coi" -o -name "*_fail.coi" \) -print | wc -l)
 
 # Function to draw progress bar
 draw_progress_bar() {

@@ -1,0 +1,35 @@
+component App {
+  view {
+    <div class="col gap-24 pad-24">
+      <div class="row gap-24">
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-260">
+          <div>Intrinsic size (128x128)</div>
+          <img src="tests/native/visual/assets/test_rgba.tga" class="border-6 r-24" />
+        </div>
+
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-260">
+          <div>Scaled (w-256)</div>
+          <img src="tests/native/visual/assets/test_rgba.tga" class="w-256 border-6 r-24" />
+        </div>
+      </div>
+
+      <div class="row gap-24">
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-260">
+          <div>Clip + rounded container</div>
+          <div class="clip border-8 r-28 w-320 h-180">
+            <img src="tests/native/visual/assets/test_rgba.tga" class="w-360" />
+          </div>
+        </div>
+
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-260">
+          <div>Opacity tint (op-120)</div>
+          <img src="tests/native/visual/assets/test_rgba.tga" class="w-256 border-6 r-24 op-120" />
+        </div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

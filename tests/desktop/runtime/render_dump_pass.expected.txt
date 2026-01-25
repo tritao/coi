@@ -1,3 +1,0 @@
---- COI_DESKTOP_RENDER_DUMP ---
-RECT id=1048577 tag=div class="a w-50 h-20 pad-0" x=0 y=0 w=50 h=20
-RECT id=1048578 tag=div class="b w-70 h-30 pad-0" x=0 y=20 w=70 h=30

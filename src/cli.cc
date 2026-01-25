@@ -371,13 +371,13 @@ int dev_project(bool keep_cc, bool cc_only, const std::string& target)
 
     fs::path dist_dir = fs::current_path() / "dist";
 
-    if (target == "desktop")
+    if (target == "native")
     {
         fs::path bin_path = dist_dir / "app";
         if (!fs::exists(bin_path))
         {
-            ErrorHandler::cli_error("Desktop build did not produce dist/app",
-                                    "Try: coi build --target desktop");
+            ErrorHandler::cli_error("Native build did not produce dist/app",
+                                    "Try: coi build --target native");
             return 1;
         }
         std::cout << "  " << GREEN << "➜" << RESET << "  Running: " << CYAN << BOLD << bin_path.string() << RESET << std::endl;
@@ -453,33 +453,33 @@ if __name__ == '__main__':
     return run_system(cmd);
 }
 
-static int run_desktop_binary(const fs::path& bin_path, bool window, int frames, const std::string& dump)
+static int run_native_binary(const fs::path& bin_path, bool window, int frames, const std::string& dump)
 {
     if (!fs::exists(bin_path))
     {
-        ErrorHandler::cli_error("Desktop build did not produce " + bin_path.string(),
-                                "Try: coi build --target desktop");
+        ErrorHandler::cli_error("Native build did not produce " + bin_path.string(),
+                                "Try: coi build --target native");
         return 1;
     }
 
     std::string env;
-    // Ensure desktop runtime can find built-in assets (e.g. the default TTF) even when `coi run`
+    // Ensure native runtime can find built-in assets (e.g. the default TTF) even when `coi run`
     // is invoked from outside the project directory (so the child process CWD is elsewhere).
-    if (!std::getenv("COI_DESKTOP_ASSET_ROOT"))
+    if (!std::getenv("COI_NATIVE_ASSET_ROOT"))
     {
-        env += "COI_DESKTOP_ASSET_ROOT=" + get_executable_dir().string() + " ";
+        env += "COI_NATIVE_ASSET_ROOT=" + get_executable_dir().string() + " ";
     }
     if (!dump.empty())
     {
-        env += "COI_DESKTOP_DUMP=" + dump + " ";
+        env += "COI_NATIVE_DUMP=" + dump + " ";
     }
     if (frames >= 0)
     {
-        env += "COI_DESKTOP_FRAMES=" + std::to_string(frames) + " ";
+        env += "COI_NATIVE_FRAMES=" + std::to_string(frames) + " ";
     }
     if (window)
     {
-        env += "COI_DESKTOP_WINDOW=1 ";
+        env += "COI_NATIVE_WINDOW=1 ";
     }
 
     std::cout << "  " << GREEN << "➜" << RESET << "  Running: " << CYAN << BOLD << bin_path.string() << RESET << std::endl;
@@ -550,10 +550,10 @@ int run_project(bool keep_cc, bool cc_only, const std::string& target,
         }
     }
 
-    if (target == "desktop")
+    if (target == "native")
     {
         fs::path bin_path = dist_dir / "app";
-        return run_desktop_binary(bin_path, window, frames, dump);
+        return run_native_binary(bin_path, window, frames, dump);
     }
 
     std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
@@ -573,19 +573,19 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " init" << RESET << " [name]              Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
     std::cout << "    " << CYAN << program_name << " dev" << RESET << "                      Build and start dev server" << std::endl;
-    std::cout << "    " << CYAN << program_name << " run" << RESET << "                      Build and run (desktop opens window)" << std::endl;
+    std::cout << "    " << CYAN << program_name << " run" << RESET << "                      Build and run (native opens window)" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Options:" << RESET << std::endl;
     std::cout << "    " << DIM << "--out, -o <dir>" << RESET << "    Output directory" << std::endl;
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
-    std::cout << "    " << DIM << "--target <web|desktop>" << RESET << "  Target platform (default: web)" << std::endl;
-    std::cout << "    " << DIM << "--window" << RESET << "          (run) Open a desktop window" << std::endl;
-    std::cout << "    " << DIM << "--headless" << RESET << "        (run) Desktop headless mode" << std::endl;
-    std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit desktop frames" << std::endl;
-    std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Desktop tree dump mode" << std::endl;
-    std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (desktop)" << std::endl;
+    std::cout << "    " << DIM << "--target <web|native>" << RESET << "  Target platform (default: web)" << std::endl;
+    std::cout << "    " << DIM << "--window" << RESET << "          (run) Open a native window" << std::endl;
+    std::cout << "    " << DIM << "--headless" << RESET << "        (run) Native headless mode" << std::endl;
+    std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit native frames" << std::endl;
+    std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Native tree dump mode" << std::endl;
+    std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (native)" << std::endl;
     std::cout << "    " << DIM << "--capture-every <n>" << RESET << " (run) Capture every N frames (default: 60)" << std::endl;
     std::cout << "    " << DIM << "--capture-max <n>" << RESET << "   (run) Stop after N captures" << std::endl;
     std::cout << "    " << DIM << "--capture-size <WxH>" << RESET << " (run) Offscreen capture size" << std::endl;
@@ -597,6 +597,6 @@ void print_help(const char *program_name)
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
-    std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi run --target desktop" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi run --target native" << std::endl;
     std::cout << std::endl;
 }

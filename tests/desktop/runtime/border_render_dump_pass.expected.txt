@@ -1,4 +1,0 @@
---- COI_DESKTOP_RENDER_DUMP ---
-RECT id=1048577 tag=div class="box w-60 h-30 pad-0 border-2" x=0 y=0 w=60 h=30
-RECT id=1048578 tag=div class="inner w-10 h-10 pad-0" x=0 y=0 w=10 h=10
-BORDER owner=1048577 tag=div class="box w-60 h-30 pad-0 border-2" x=0 y=0 w=60 h=30 l=2 r=2 t=2 b=2 between=0 color=168,154,213,180
