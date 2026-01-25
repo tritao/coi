@@ -117,6 +117,7 @@ scenes=(
   "text_glyphs_basic:$ROOT_DIR/tests/desktop/visual/scenes/text/glyphs_basic.coi"
   "text_wrap_measure:$ROOT_DIR/tests/desktop/visual/scenes/text/wrap_measure.coi"
   "text_alignment:$ROOT_DIR/tests/desktop/visual/scenes/text/alignment.coi"
+  "input_zindex_click:$ROOT_DIR/tests/desktop/visual/scenes/input/zindex_click.coi"
   "border_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_render_dump_pass.coi"
   "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_between_render_dump_pass.coi"
   "clip_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/clip_render_dump_pass.coi"
