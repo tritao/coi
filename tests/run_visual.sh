@@ -29,7 +29,7 @@ TOLERANCE="8"
 # Native-only knobs
 UI_MODE="headless"       # headless | window
 CAPTURE_MODE="offscreen" # offscreen | x11 | auto
-USE_XVFB="auto"          # auto | 0 | 1
+USE_XVFB="auto"          # auto | 0 | 1 (note: native offscreen capture now hides its X11 window)
 
 # Web-only knobs
 WEB_DRIVER="playwright" # playwright | chrome
