@@ -1,0 +1,35 @@
+component App {
+  view {
+    <div class="col gap-24 pad-24">
+      <div class="row gap-24">
+        <div class="col gap-16 pad-16 border-2 r-8 w-420 h-220">
+          <div class="w-360 h-80 border-8 r-28">border-8 r-28</div>
+          <div class="w-360 h-80 border-1 r-4">border-1 r-4</div>
+        </div>
+
+        <div class="col gap-16 pad-16 border-2 r-8 w-420 h-220">
+          <div class="w-360 h-80 border-6 r-tl-32 r-tr-8 r-bl-8 r-br-32">per-corner radius</div>
+          <div class="w-360 h-80 border-6 r-tl-8 r-tr-32 r-bl-32 r-br-8">per-corner radius (swapped)</div>
+        </div>
+      </div>
+
+      <div class="row gap-24">
+        <div class="col gap-12 pad-16 border-6 r-24 w-420 h-220">
+          <div class="w-360 h-160 border-4 r-20">nested border + radius</div>
+        </div>
+
+        <div class="col gap-12 pad-16 border-2 r-24 w-420 h-220">
+          <div class="row gap-12 border-between-8 r-18 pad-12">
+            <div class="w-90 h-90 r-12">A</div>
+            <div class="w-90 h-90 r-12">B</div>
+            <div class="w-90 h-90 r-12">C</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

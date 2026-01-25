@@ -101,6 +101,8 @@ scenes=(
   "paint_bg_none:$ROOT_DIR/tests/desktop/visual/scenes/paint/bg_none.coi"
   "paint_corner_radius_basic:$ROOT_DIR/tests/desktop/visual/scenes/paint/corner_radius_basic.coi"
   "paint_corner_radius_per_corner:$ROOT_DIR/tests/desktop/visual/scenes/paint/corner_radius_per_corner.coi"
+  "paint_opacity_overlap:$ROOT_DIR/tests/desktop/visual/scenes/paint/opacity_overlap.coi"
+  "paint_border_radius_combo:$ROOT_DIR/tests/desktop/visual/scenes/paint/border_radius_combo.coi"
   "layout_row_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/row_fixed_and_grow.coi"
   "layout_col_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/col_fixed_and_grow.coi"
   "layout_nested_flex:$ROOT_DIR/tests/desktop/visual/scenes/layout/nested_flex.coi"

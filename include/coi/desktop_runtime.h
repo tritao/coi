@@ -294,12 +294,15 @@ inline void color_from_hash(uint32_t h, float& r, float& g, float& b) {
 }
 
 #if defined(COI_DESKTOP_CLAY)
-struct DesktopClassStyle {
-    bool has_dir = false;
-    Clay_LayoutDirection dir = CLAY_TOP_TO_BOTTOM;
+	struct DesktopClassStyle {
+	    bool has_dir = false;
+	    Clay_LayoutDirection dir = CLAY_TOP_TO_BOTTOM;
 
-    bool has_pad = false;
-    uint16_t pad = 0;
+	    bool has_opacity = false;
+	    float opacity = 1.0f; // 0..1
+
+	    bool has_pad = false;
+	    uint16_t pad = 0;
 
     bool has_gap = false;
     uint16_t gap = 0;
@@ -390,18 +393,31 @@ inline void _for_each_class_token(const webcc::string& s, const webcc::function<
     }
 }
 
-inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root) {
-    DesktopClassStyle st{};
-    const webcc::string* cls = attr(n, "class");
-    if (!cls) return st;
+	inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root) {
+	    DesktopClassStyle st{};
+	    const webcc::string* cls = attr(n, "class");
+	    if (!cls) return st;
 
-    _for_each_class_token(*cls, webcc::function<void(const char*, int)>([&](const char* tok, int len) {
-        std::string t(tok, (size_t)len);
-        if (t == "text-left") {
-            st.has_text_align = true;
-            st.text_align = CLAY_TEXT_ALIGN_LEFT;
-            return;
-        }
+	    _for_each_class_token(*cls, webcc::function<void(const char*, int)>([&](const char* tok, int len) {
+	        std::string t(tok, (size_t)len);
+	        {
+	            uint16_t ov = 0;
+	            if (t.rfind("op-", 0) == 0 && _parse_u16(t.c_str() + 3, ov)) {
+	                st.has_opacity = true;
+	                st.opacity = std::clamp((float)ov / 255.0f, 0.0f, 1.0f);
+	                return;
+	            }
+	            if (t.rfind("opacity-", 0) == 0 && _parse_u16(t.c_str() + 8, ov)) {
+	                st.has_opacity = true;
+	                st.opacity = std::clamp((float)ov / 100.0f, 0.0f, 1.0f);
+	                return;
+	            }
+	        }
+	        if (t == "text-left") {
+	            st.has_text_align = true;
+	            st.text_align = CLAY_TEXT_ALIGN_LEFT;
+	            return;
+	        }
         if (t == "text-center") {
             st.has_text_align = true;
             st.text_align = CLAY_TEXT_ALIGN_CENTER;
@@ -732,30 +748,37 @@ struct ClayEngine {
                 .childOffset = (st.scroll_x || st.scroll_y) ? Clay_GetScrollOffset() : Clay_Vector2{0, 0},
             };
         }
-        if (st.has_border && (st.border_width.left || st.border_width.right || st.border_width.top || st.border_width.bottom ||
-                              st.border_width.betweenChildren)) {
-            uint32_t h = hash_u32((attr(n, "class") ? attr(n, "class")->c_str() : n.tag.c_str()));
-            float cr, cg, cb;
-            color_from_hash(h, cr, cg, cb);
-            decl.border = Clay_BorderElementConfig{
-                .color = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 180.0f},
-                .width = st.border_width,
-            };
-        }
-        if (is_root || st.bg_none) {
-            decl.backgroundColor = Clay_Color{0, 0, 0, 0};
-        } else {
-            const webcc::string* cls = attr(n, "class");
-            uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
-            float cr, cg, cb;
-            color_from_hash(h, cr, cg, cb);
-            decl.backgroundColor = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 46.0f};
-        }
-        if (st.has_corner_radius) {
-            decl.cornerRadius = st.corner_radius;
-        }
-        return decl;
-    }
+	        if (st.has_border && (st.border_width.left || st.border_width.right || st.border_width.top || st.border_width.bottom ||
+	                              st.border_width.betweenChildren)) {
+	            uint32_t h = hash_u32((attr(n, "class") ? attr(n, "class")->c_str() : n.tag.c_str()));
+	            float cr, cg, cb;
+	            color_from_hash(h, cr, cg, cb);
+	            decl.border = Clay_BorderElementConfig{
+	                .color = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 180.0f},
+	                .width = st.border_width,
+	            };
+	        }
+	        if (is_root || st.bg_none) {
+	            decl.backgroundColor = Clay_Color{0, 0, 0, 0};
+	        } else {
+	            const webcc::string* cls = attr(n, "class");
+	            uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
+	            float cr, cg, cb;
+	            color_from_hash(h, cr, cg, cb);
+	            decl.backgroundColor = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 46.0f};
+	        }
+	        if (st.has_opacity && st.opacity < 1.0f) {
+	            decl.backgroundColor.a *= st.opacity;
+	            if (decl.border.width.left || decl.border.width.right || decl.border.width.top || decl.border.width.bottom ||
+	                decl.border.width.betweenChildren) {
+	                decl.border.color.a *= st.opacity;
+	            }
+	        }
+	        if (st.has_corner_radius) {
+	            decl.cornerRadius = st.corner_radius;
+	        }
+	        return decl;
+	    }
 
     static Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_root, int32_t id) {
         Clay_ElementDeclaration decl = declaration_for_node(n, is_root);
@@ -771,21 +794,22 @@ struct ClayEngine {
 
         Clay_ElementId eid = element_id(id);
         CLAY(eid, (ClayEngine::declaration_for_node(n, is_root, id))) {
-            if (!n.text.empty()) {
-                Clay_String t = clay_string(n.text);
-                Clay_TextElementConfig* cfgp = text_cfg;
-                if (cfgp) {
-                    Clay_TextElementConfig cfg = *cfgp;
-                    DesktopClassStyle st = parse_desktop_class_style(n, is_root);
-                    if (st.has_font_size) cfg.fontSize = (uint16_t)st.font_size;
-                    if (st.has_letter_spacing) cfg.letterSpacing = (uint16_t)st.letter_spacing;
-                    if (st.has_line_height) cfg.lineHeight = (uint16_t)st.line_height;
-                    if (st.has_text_align) cfg.textAlignment = st.text_align;
-                    cfg.userData = (void*)(intptr_t)id;
-                    cfgp = Clay__StoreTextElementConfig(cfg);
-                }
-                CLAY_TEXT(t, cfgp);
-            }
+	            if (!n.text.empty()) {
+	                Clay_String t = clay_string(n.text);
+	                Clay_TextElementConfig* cfgp = text_cfg;
+	                if (cfgp) {
+	                    Clay_TextElementConfig cfg = *cfgp;
+	                    DesktopClassStyle st = parse_desktop_class_style(n, is_root);
+	                    if (st.has_font_size) cfg.fontSize = (uint16_t)st.font_size;
+	                    if (st.has_letter_spacing) cfg.letterSpacing = (uint16_t)st.letter_spacing;
+	                    if (st.has_line_height) cfg.lineHeight = (uint16_t)st.line_height;
+	                    if (st.has_text_align) cfg.textAlignment = st.text_align;
+	                    if (st.has_opacity && st.opacity < 1.0f) cfg.textColor.a *= st.opacity;
+	                    cfg.userData = (void*)(intptr_t)id;
+	                    cfgp = Clay__StoreTextElementConfig(cfg);
+	                }
+	                CLAY_TEXT(t, cfgp);
+	            }
             for (int32_t c : n.children) build_node(c, false);
         }
     }
