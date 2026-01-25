@@ -21,6 +21,7 @@ layout_min_max_constraints|tests/desktop/visual/scenes/layout/min_max_constraint
 layout_align_main_cross|tests/desktop/visual/scenes/layout/align_main_cross.coi|desktop,web
 
 clip_overflow_hidden|tests/desktop/visual/scenes/clip/overflow_hidden.coi|desktop,web
+clip_overflow_axes|tests/desktop/visual/scenes/clip/overflow_axes.coi|desktop
 
 scroll_y_basic|tests/desktop/visual/scenes/scroll/scroll_y_basic.coi|desktop,web
 scroll_nested_clip|tests/desktop/visual/scenes/scroll/nested_clip.coi|desktop,web
