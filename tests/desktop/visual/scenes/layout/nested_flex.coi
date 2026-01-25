@@ -1,0 +1,42 @@
+component App {
+    view {
+        <div class="root row pad-20 gap-20 fill bg-none">
+            <div class="L col w-420 h-500 pad-20 gap-20 bg-none border-6">
+                <div class="L1 row row w-360 h-160 pad-20 gap-20 bg-none border-6">
+                    <div class="L1a w-120 h-100 pad-0 border-8"></div>
+                    <div class="L1b grow h-100 pad-0 border-8"></div>
+                </div>
+                <div class="L2 col w-360 grow grow-y pad-20 gap-20 bg-none border-6">
+                    <div class="L2a w-300 h-90 pad-0 border-8"></div>
+                    <div class="L2b row row w-300 grow grow-y pad-20 gap-20 bg-none border-6">
+                        <div class="L2b1 w-120 h-120 pad-0 border-8"></div>
+                        <div class="L2b2 grow h-120 pad-0 border-8"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="R col grow h-500 pad-20 gap-20 bg-none border-6">
+                <div class="R1 row row grow h-140 pad-20 gap-20 bg-none border-6">
+                    <div class="R1a w-180 h-80 pad-0 border-8"></div>
+                    <div class="R1b grow h-80 pad-0 border-8"></div>
+                    <div class="R1c w-120 h-80 pad-0 border-8"></div>
+                </div>
+                <div class="R2 row row grow grow-y pad-20 gap-20 bg-none border-6">
+                    <div class="R2a col w-240 grow grow-y pad-20 gap-20 bg-none border-6">
+                        <div class="R2a1 w-180 h-90 pad-0 border-8"></div>
+                        <div class="R2a2 grow grow-y w-180 pad-0 border-8"></div>
+                    </div>
+                    <div class="R2b grow grow-y pad-20 gap-20 bg-none border-6">
+                        <div class="R2b1 grow h-160 pad-0 border-8"></div>
+                        <div class="R2b2 grow h-140 pad-0 border-8"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

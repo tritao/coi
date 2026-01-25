@@ -1,0 +1,34 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row w-920 h-180 pad-20 gap-20 bg-none border-6 y-bottom">
+                <div class="a w-180 h-80 pad-0 border-8"></div>
+                <div class="b w-220 h-120 pad-0 border-8"></div>
+                <div class="c w-140 h-60 pad-0 border-8"></div>
+            </div>
+
+            <div class="row row w-920 h-180 pad-20 gap-20 bg-none border-6 y-center">
+                <div class="a2 w-180 h-80 pad-0 border-8"></div>
+                <div class="b2 w-220 h-120 pad-0 border-8"></div>
+                <div class="c2 w-140 h-60 pad-0 border-8"></div>
+            </div>
+
+            <div class="row row w-920 h-160 pad-20 gap-20 bg-none border-6 x-center">
+                <div class="x1 w-160 h-80 pad-0 border-8"></div>
+                <div class="x2 w-160 h-80 pad-0 border-8"></div>
+                <div class="x3 w-160 h-80 pad-0 border-8"></div>
+            </div>
+
+            <div class="row row w-920 h-160 pad-20 gap-20 bg-none border-6 x-right">
+                <div class="r1 w-160 h-80 pad-0 border-8"></div>
+                <div class="r2 w-160 h-80 pad-0 border-8"></div>
+                <div class="r3 w-160 h-80 pad-0 border-8"></div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
