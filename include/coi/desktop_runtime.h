@@ -444,8 +444,11 @@ inline void color_from_hash(uint32_t h, float& r, float& g, float& b) {
     bool bg_none = false;
 
     bool has_clip = false;
-    // These map to Clay's clip config horizontal/vertical flags which also control scrollability.
-    // If both are false but has_clip is true, we still get scissoring (overflow hidden).
+    // These map directly to Clay_ClipElementConfig horizontal/vertical clip flags.
+    // scroll_x/scroll_y are a COI runtime convention: only when one of these is true do we
+    // apply Clay's scroll offset to decl.clip.childOffset (enabling scrolling).
+    bool clip_x = false;
+    bool clip_y = false;
     bool scroll_x = false;
     bool scroll_y = false;
 
@@ -579,30 +582,42 @@ inline void _for_each_class_token(const webcc::string& s, const webcc::function<
         }
         if (t == "clip") {
             st.has_clip = true;
+            st.clip_x = true;
+            st.clip_y = true;
             return;
         }
         if (t == "clip-x") {
             st.has_clip = true;
+            st.clip_x = true;
             return;
         }
         if (t == "clip-y") {
             st.has_clip = true;
+            st.clip_y = true;
             return;
         }
         if (t == "scroll") {
             st.has_clip = true;
             st.scroll_x = true;
             st.scroll_y = true;
+            st.clip_x = true;
+            st.clip_y = true;
             return;
         }
         if (t == "scroll-x") {
             st.has_clip = true;
             st.scroll_x = true;
+            // Scroll-x implies the other axis is clipped (overflow hidden).
+            st.clip_x = true;
+            st.clip_y = true;
             return;
         }
         if (t == "scroll-y") {
             st.has_clip = true;
             st.scroll_y = true;
+            // Scroll-y implies the other axis is clipped (overflow hidden).
+            st.clip_x = true;
+            st.clip_y = true;
             return;
         }
         if (t == "border") {
@@ -911,8 +926,8 @@ struct ClayEngine {
         };
         if (st.has_clip) {
             decl.clip = Clay_ClipElementConfig{
-                .horizontal = st.scroll_x,
-                .vertical = st.scroll_y,
+                .horizontal = st.clip_x,
+                .vertical = st.clip_y,
                 // Note: for scroll containers, childOffset must be queried from inside the
                 // CLAY() macro (after the element is opened). We'll patch it up in
                 // declaration_for_node_open().
