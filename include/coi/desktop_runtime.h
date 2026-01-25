@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -11,11 +12,22 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 #include "webcc/core/handle.h"
 #include "webcc/core/string_view.h"
@@ -246,6 +258,89 @@ struct Rect {
 // that happens before sapp_run() starts when window/capture is enabled.
 inline bool g_sokol_frame_started = false;
 
+	inline bool asset_debug_enabled() {
+	    const char* e = std::getenv("COI_DESKTOP_ASSET_DEBUG");
+	    if (!e || !*e) return false;
+	    return !(e[0] == '0' && e[1] == '\0');
+	}
+
+	inline std::optional<std::filesystem::path> try_get_executable_path() {
+#if defined(__linux__)
+	    std::array<char, 4096> buf{};
+	    ssize_t n = ::readlink("/proc/self/exe", buf.data(), buf.size() - 1);
+	    if (n > 0) {
+	        buf[(size_t)n] = '\0';
+	        return std::filesystem::path(buf.data());
+	    }
+#elif defined(__APPLE__)
+	    std::array<char, 4096> buf{};
+	    uint32_t size = (uint32_t)buf.size();
+	    if (_NSGetExecutablePath(buf.data(), &size) == 0) {
+	        return std::filesystem::path(buf.data());
+	    }
+#elif defined(_WIN32)
+	    std::array<char, 4096> buf{};
+	    DWORD n = GetModuleFileNameA(nullptr, buf.data(), (DWORD)buf.size());
+	    if (n > 0 && n < buf.size()) {
+	        buf[(size_t)n] = '\0';
+	        return std::filesystem::path(buf.data());
+	    }
+#endif
+	    return std::nullopt;
+	}
+
+	inline std::filesystem::path resolve_existing_path(const std::filesystem::path& in) {
+	    std::filesystem::path p = in.lexically_normal();
+	    std::error_code ec;
+	    if (p.is_absolute()) {
+	        if (std::filesystem::exists(p, ec)) return p;
+	        return {};
+	    }
+
+	    if (std::filesystem::exists(p, ec)) return p;
+
+	    if (const char* root = std::getenv("COI_DESKTOP_ASSET_ROOT"); root && *root) {
+	        std::filesystem::path cand = std::filesystem::path(root) / p;
+	        cand = cand.lexically_normal();
+	        if (std::filesystem::exists(cand, ec)) {
+	            if (asset_debug_enabled()) {
+	                std::cerr << "[asset] resolved " << p.string() << " via COI_DESKTOP_ASSET_ROOT to " << cand.string() << "\n";
+	            }
+	            return cand;
+	        }
+	    }
+
+	    auto search_up_from = [&](std::filesystem::path base) -> std::filesystem::path {
+	        for (int i = 0; i < 14; i++) {
+	            std::filesystem::path cand = (base / p).lexically_normal();
+	            if (std::filesystem::exists(cand, ec)) {
+	                if (asset_debug_enabled()) {
+	                    std::cerr << "[asset] resolved " << p.string() << " via search-up from " << base.string() << " to " << cand.string() << "\n";
+	                }
+	                return cand;
+	            }
+	            if (!base.has_parent_path()) break;
+	            std::filesystem::path parent = base.parent_path();
+	            if (parent == base) break;
+	            base = parent;
+	        }
+	        return {};
+	    };
+
+	    if (auto exe = try_get_executable_path()) {
+	        std::filesystem::path found = search_up_from(exe->parent_path());
+	        if (!found.empty()) return found;
+	    }
+
+	    std::filesystem::path cwd = std::filesystem::current_path(ec);
+	    if (!ec && !cwd.empty()) {
+	        std::filesystem::path found = search_up_from(cwd);
+	        if (!found.empty()) return found;
+	    }
+
+	    return {};
+	}
+
 	inline bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
 	    out.clear();
 	    if (!path || !*path) return false;
@@ -276,9 +371,10 @@ inline bool g_sokol_frame_started = false;
 	        if (!src || !*src) return nullptr;
 	        std::error_code ec;
 	        std::filesystem::path p(src);
-	        // Keep relative paths relative; just normalize.
 	        p = p.lexically_normal();
-	        const std::string key = p.string();
+	        std::filesystem::path resolved = resolve_existing_path(p);
+	        const std::filesystem::path& load_path = resolved.empty() ? p : resolved;
+	        const std::string key = load_path.string();
 
 	        auto it = images.find(key);
 	        if (it != images.end()) return it->second.get();
@@ -1244,17 +1340,37 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 #if defined(COI_DESKTOP_FONTSTASH)
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
 	        sclay_setup();
-	        const char* font_path = std::getenv("COI_DESKTOP_FONT");
-	        if (!font_path || !*font_path) {
-	            font_path = "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	        const char* font_path_env = std::getenv("COI_DESKTOP_FONT");
+	        std::filesystem::path font_path = resolve_existing_path(
+	            (font_path_env && *font_path_env) ? std::filesystem::path(font_path_env)
+	                                              : std::filesystem::path("deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf"));
+	        if (font_path.empty()) {
+	            // Fallbacks for "run from anywhere" on Linux/macOS.
+	            static const char* kFallbacks[] = {
+	                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+	                "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+	                "/Library/Fonts/Arial.ttf",
+	            };
+	            for (const char* fp : kFallbacks) {
+	                std::filesystem::path cand(fp);
+	                std::error_code e2;
+	                if (std::filesystem::exists(cand, e2)) {
+	                    font_path = cand;
+	                    break;
+	                }
+	            }
 	        }
-	        if (read_file_bytes(font_path, font_bytes)) {
+	        const std::string font_path_s = font_path.empty() ? std::string() : font_path.string();
+	        if (!font_path_s.empty() && read_file_bytes(font_path_s.c_str(), font_bytes)) {
 	            clay_fonts[0] = sclay_add_font_mem(font_bytes.data(), (int)font_bytes.size());
 	            if (clay_fonts[0] == FONS_INVALID) {
-	                std::cerr << "[font] failed to load ttf from " << font_path << "\n";
+	                std::cerr << "[font] failed to load ttf from " << font_path_s << "\n";
 	            }
 	        } else {
-	            std::cerr << "[font] failed to read ttf file: " << font_path << "\n";
+	            const char* shown = (font_path_env && *font_path_env) ? font_path_env
+	                                                                  : "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	            std::cerr << "[font] failed to read ttf file: " << shown << "\n";
 	        }
 #else
 	        sfons_desc_t fs_desc{};
@@ -1265,17 +1381,36 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	            std::cerr << "[font] sfons_create failed\n";
 	        }
 	        if (fons_ctx) {
-	            const char* font_path = std::getenv("COI_DESKTOP_FONT");
-	            if (!font_path || !*font_path) {
-	                font_path = "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	            const char* font_path_env = std::getenv("COI_DESKTOP_FONT");
+	            std::filesystem::path font_path = resolve_existing_path(
+	                (font_path_env && *font_path_env) ? std::filesystem::path(font_path_env)
+	                                                  : std::filesystem::path("deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf"));
+	            if (font_path.empty()) {
+	                static const char* kFallbacks[] = {
+	                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	                    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+	                    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+	                    "/Library/Fonts/Arial.ttf",
+	                };
+	                for (const char* fp : kFallbacks) {
+	                    std::filesystem::path cand(fp);
+	                    std::error_code e2;
+	                    if (std::filesystem::exists(cand, e2)) {
+	                        font_path = cand;
+	                        break;
+	                    }
+	                }
 	            }
-	            if (read_file_bytes(font_path, font_bytes)) {
+	            const std::string font_path_s = font_path.empty() ? std::string() : font_path.string();
+	            if (!font_path_s.empty() && read_file_bytes(font_path_s.c_str(), font_bytes)) {
 	                fons_font = fonsAddFontMem(fons_ctx, "coi-default", font_bytes.data(), (int)font_bytes.size(), 0);
 	                if (fons_font == FONS_INVALID) {
-	                    std::cerr << "[font] failed to load ttf from " << font_path << "\n";
+	                    std::cerr << "[font] failed to load ttf from " << font_path_s << "\n";
 	                }
 	            } else {
-	                std::cerr << "[font] failed to read ttf file: " << font_path << "\n";
+	                const char* shown = (font_path_env && *font_path_env) ? font_path_env
+	                                                                      : "deps/clay/examples/sokol-video-demo/resources/Roboto-Regular.ttf";
+	                std::cerr << "[font] failed to read ttf file: " << shown << "\n";
 	            }
 	        }
 #endif

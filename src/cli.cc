@@ -463,6 +463,12 @@ static int run_desktop_binary(const fs::path& bin_path, bool window, int frames,
     }
 
     std::string env;
+    // Ensure desktop runtime can find built-in assets (e.g. the default TTF) even when `coi run`
+    // is invoked from outside the project directory (so the child process CWD is elsewhere).
+    if (!std::getenv("COI_DESKTOP_ASSET_ROOT"))
+    {
+        env += "COI_DESKTOP_ASSET_ROOT=" + get_executable_dir().string() + " ";
+    }
     if (!dump.empty())
     {
         env += "COI_DESKTOP_DUMP=" + dump + " ";

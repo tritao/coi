@@ -317,6 +317,10 @@ run_scene_desktop() {
   shift 4
   local -a extra_env_local=("$@")
 
+  if [[ -z "${COI_DESKTOP_ASSET_ROOT:-}" ]]; then
+    extra_env_local+=("COI_DESKTOP_ASSET_ROOT=$ROOT_DIR")
+  fi
+
   if [[ "$CAPTURE_MODE" != "offscreen" && "$CAPTURE_MODE" != "x11" && "$CAPTURE_MODE" != "auto" ]]; then
     echo "error: invalid --capture-mode: $CAPTURE_MODE (expected: offscreen|x11|auto)"
     return 1
