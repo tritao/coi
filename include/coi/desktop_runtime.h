@@ -330,6 +330,19 @@ struct DesktopClassStyle {
 
     bool has_align_y = false;
     Clay_LayoutAlignmentY align_y = CLAY_ALIGN_Y_TOP;
+
+    // Text styling (applies when the node contains a text payload).
+    bool has_font_size = false;
+    int32_t font_size = 8;
+
+    bool has_letter_spacing = false;
+    int32_t letter_spacing = 0;
+
+    bool has_line_height = false;
+    int32_t line_height = 8;
+
+    bool has_text_align = false;
+    Clay_TextAlignment text_align = CLAY_TEXT_ALIGN_LEFT;
 };
 
 inline bool _parse_u16(const char* s, uint16_t& out) {
@@ -372,6 +385,21 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
 
     _for_each_class_token(*cls, webcc::function<void(const char*, int)>([&](const char* tok, int len) {
         std::string t(tok, (size_t)len);
+        if (t == "text-left") {
+            st.has_text_align = true;
+            st.text_align = CLAY_TEXT_ALIGN_LEFT;
+            return;
+        }
+        if (t == "text-center") {
+            st.has_text_align = true;
+            st.text_align = CLAY_TEXT_ALIGN_CENTER;
+            return;
+        }
+        if (t == "text-right") {
+            st.has_text_align = true;
+            st.text_align = CLAY_TEXT_ALIGN_RIGHT;
+            return;
+        }
         if (t == "row") {
             st.has_dir = true;
             st.dir = CLAY_LEFT_TO_RIGHT;
@@ -479,6 +507,12 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
             flag = true;
             return true;
         };
+        auto parse_i32_from_u16_suffix = [&](const char* prefix, int32_t& out, bool& flag) {
+            uint16_t v = 0;
+            if (!parse_u16_suffix(prefix, v, flag)) return false;
+            out = (int32_t)v;
+            return true;
+        };
         auto parse_f32_suffix = [&](const char* prefix, float& out, bool& flag) {
             size_t plen = std::strlen(prefix);
             if (t.size() <= plen) return false;
@@ -494,6 +528,9 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
         if (parse_u16_suffix("p-", st.pad, st.has_pad)) return;
         if (parse_u16_suffix("gap-", st.gap, st.has_gap)) return;
         if (parse_u16_suffix("g-", st.gap, st.has_gap)) return;
+        if (parse_i32_from_u16_suffix("fs-", st.font_size, st.has_font_size)) return;
+        if (parse_i32_from_u16_suffix("ls-", st.letter_spacing, st.has_letter_spacing)) return;
+        if (parse_i32_from_u16_suffix("lh-", st.line_height, st.has_line_height)) return;
         if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
         if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
         if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
@@ -693,10 +730,18 @@ struct ClayEngine {
         CLAY(eid, (ClayEngine::declaration_for_node(n, is_root, id))) {
             if (!n.text.empty()) {
                 Clay_String t = clay_string(n.text);
-                void* prev = text_cfg ? text_cfg->userData : nullptr;
-                if (text_cfg) text_cfg->userData = (void*)(intptr_t)id;
-                CLAY_TEXT(t, text_cfg);
-                if (text_cfg) text_cfg->userData = prev;
+                if (text_cfg) {
+                    Clay_TextElementConfig cfg = *text_cfg;
+                    DesktopClassStyle st = parse_desktop_class_style(n, is_root);
+                    if (st.has_font_size) cfg.fontSize = st.font_size;
+                    if (st.has_letter_spacing) cfg.letterSpacing = st.letter_spacing;
+                    if (st.has_line_height) cfg.lineHeight = st.line_height;
+                    if (st.has_text_align) cfg.textAlignment = st.text_align;
+                    cfg.userData = (void*)(intptr_t)id;
+                    CLAY_TEXT(t, &cfg);
+                } else {
+                    CLAY_TEXT(t, nullptr);
+                }
             }
             for (int32_t c : n.children) build_node(c, false);
         }
