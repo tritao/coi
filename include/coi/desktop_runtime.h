@@ -1633,10 +1633,10 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	        const bool ok = (ClayEngine::ctx != nullptr);
 	        if (ok) {
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
-	            // Ensure a full-target scissor before rendering. Clay emits its own scissor
-	            // commands, but some scenes may not use them, and scissor state can persist
-	            // across passes/frames (especially when mixing overlay/debug rendering).
-	            sgl_scissor_rect(0, 0, capture_w, capture_h, true /* origin_top_left */);
+	            // Important: sg scissor state persists across passes. Ensure a full-target
+	            // scissor before rendering (Clay emits its own scissor commands only when
+	            // clip elements are present).
+	            sg_apply_scissor_rect(0, 0, capture_w, capture_h, true /* origin_top_left */);
 	            sgl_matrix_mode_projection();
 	            sgl_load_identity();
 	            sgl_matrix_mode_modelview();
@@ -2007,8 +2007,8 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	        if (clay_ok) {
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
 	            // Clay's reference sokol renderer expects an identity projection matrix.
-	            // Also reset scissor so we don't inherit state from earlier passes.
-	            sgl_scissor_rect(0, 0, sapp_width(), sapp_height(), true /* origin_top_left */);
+	            // Also reset sg scissor so we don't inherit state from earlier passes.
+	            sg_apply_scissor_rect(0, 0, sapp_width(), sapp_height(), true /* origin_top_left */);
 	            sgl_matrix_mode_projection();
 	            sgl_load_identity();
 	            sgl_matrix_mode_modelview();
