@@ -845,6 +845,17 @@ struct SokolRunner {
     static inline std::unordered_map<int32_t, Rect> layout;
     static inline std::vector<int32_t> draw_list;
 
+    static void sg_log(const char* tag, uint32_t log_level, uint32_t log_item_id, const char* message_or_null, uint32_t line_nr,
+                       const char* filename_or_null, void*) {
+        const char* e = std::getenv("COI_DESKTOP_SG_LOG");
+        const bool verbose = (e && *e && std::string(e) != "0");
+        if (!verbose && log_level > 1) return; // default: only panic+error
+        std::cerr << "[sokol_gfx] " << (tag ? tag : "sg") << " lvl=" << log_level << " item=" << log_item_id;
+        if (filename_or_null) std::cerr << " at " << filename_or_null << ":" << line_nr;
+        if (message_or_null) std::cerr << " " << message_or_null;
+        std::cerr << "\n";
+    }
+
     static bool overlay_enabled() {
         const char* e = std::getenv("COI_DESKTOP_OVERLAY");
         if (e && *e) {
@@ -906,11 +917,12 @@ struct SokolRunner {
         layout_node(0, 0.0f, 0.0f, w, h);
     }
 
-	    static void init(void) {
-	        stm_setup();
-	        sg_desc desc{};
-	        desc.environment = sglue_environment();
-	        sg_setup(&desc);
+    static void init(void) {
+        stm_setup();
+        sg_desc desc{};
+        desc.logger.func = sg_log;
+        desc.environment = sglue_environment();
+        sg_setup(&desc);
 	        const sg_swapchain sc = sglue_swapchain();
 	        sgl_desc_t gld{};
 	        gld.color_format = sc.color_format;
@@ -1001,7 +1013,9 @@ struct SokolRunner {
     static inline int capture_w = 0;
     static inline int capture_h = 0;
     static inline sg_image capture_img{};
+    static inline sg_image capture_ds_img{};
     static inline sg_view capture_view{};
+    static inline sg_view capture_ds_view{};
     static inline std::vector<uint8_t> capture_pixels;
     static inline std::vector<uint8_t> capture_pixels_flipped;
     static inline int exit_code = 0;
@@ -1134,7 +1148,9 @@ struct SokolRunner {
         std::filesystem::create_directories(capture_dir, ec);
 
         capture_img = sg_image{};
+        capture_ds_img = sg_image{};
         capture_view = sg_view{};
+        capture_ds_view = sg_view{};
         capture_pixels.clear();
         capture_pixels_flipped.clear();
         capture_index = 0;
@@ -1154,6 +1170,14 @@ struct SokolRunner {
     }
 
     static void capture_shutdown() {
+        if (capture_ds_view.id != SG_INVALID_ID) {
+            sg_destroy_view(capture_ds_view);
+            capture_ds_view.id = SG_INVALID_ID;
+        }
+        if (capture_ds_img.id != SG_INVALID_ID) {
+            sg_destroy_image(capture_ds_img);
+            capture_ds_img.id = SG_INVALID_ID;
+        }
         if (capture_view.id != SG_INVALID_ID) {
             sg_destroy_view(capture_view);
             capture_view.id = SG_INVALID_ID;
@@ -1182,18 +1206,17 @@ struct SokolRunner {
             std::cerr << "[capture] ensure_target " << capture_w << "x" << capture_h << std::endl;
         }
 
-	        sg_image_desc img_desc{};
-	        img_desc.type = SG_IMAGETYPE_2D;
-	        img_desc.width = capture_w;
-	        img_desc.height = capture_h;
-	        img_desc.num_mipmaps = 1;
-	        {
-	            const sg_swapchain sc = sglue_swapchain();
-	            img_desc.sample_count = (sc.sample_count > 0) ? sc.sample_count : 1;
-	            img_desc.pixel_format = (sc.color_format != SG_PIXELFORMAT_NONE) ? sc.color_format : SG_PIXELFORMAT_RGBA8;
-	        }
-	        img_desc.usage.color_attachment = true;
-	        img_desc.label = "coi-capture-color";
+        const sg_swapchain sc = sglue_swapchain();
+
+        sg_image_desc img_desc{};
+        img_desc.type = SG_IMAGETYPE_2D;
+        img_desc.width = capture_w;
+        img_desc.height = capture_h;
+        img_desc.num_mipmaps = 1;
+        img_desc.sample_count = (sc.sample_count > 0) ? sc.sample_count : 1;
+        img_desc.pixel_format = (sc.color_format != SG_PIXELFORMAT_NONE) ? sc.color_format : SG_PIXELFORMAT_RGBA8;
+        img_desc.usage.color_attachment = true;
+        img_desc.label = "coi-capture-color";
         if (capture_debug) {
             std::cerr << "[capture] sg_make_image..." << std::endl;
         }
@@ -1223,6 +1246,45 @@ struct SokolRunner {
             return;
         }
 
+        if (sc.depth_format != SG_PIXELFORMAT_NONE) {
+            sg_image_desc ds_desc{};
+            ds_desc.type = SG_IMAGETYPE_2D;
+            ds_desc.width = capture_w;
+            ds_desc.height = capture_h;
+            ds_desc.num_mipmaps = 1;
+            ds_desc.sample_count = (sc.sample_count > 0) ? sc.sample_count : 1;
+            ds_desc.pixel_format = sc.depth_format;
+            ds_desc.usage.depth_stencil_attachment = true;
+            ds_desc.label = "coi-capture-depth";
+            if (capture_debug) {
+                std::cerr << "[capture] sg_make_depth_image..." << std::endl;
+            }
+            capture_ds_img = sg_make_image(&ds_desc);
+            if (capture_debug) {
+                std::cerr << "[capture] sg_make_depth_image id=" << capture_ds_img.id << std::endl;
+            }
+            if (capture_ds_img.id == SG_INVALID_ID) {
+                std::cerr << "[capture] failed to create depth image; disabling capture\n";
+                capture_enabled = false;
+                return;
+            }
+            sg_view_desc ds_view_desc{};
+            ds_view_desc.depth_stencil_attachment.image = capture_ds_img;
+            ds_view_desc.label = "coi-capture-depth-view";
+            if (capture_debug) {
+                std::cerr << "[capture] sg_make_depth_view..." << std::endl;
+            }
+            capture_ds_view = sg_make_view(&ds_view_desc);
+            if (capture_debug) {
+                std::cerr << "[capture] sg_make_depth_view id=" << capture_ds_view.id << std::endl;
+            }
+            if (capture_ds_view.id == SG_INVALID_ID) {
+                std::cerr << "[capture] failed to create depth view; disabling capture\n";
+                capture_enabled = false;
+                return;
+            }
+        }
+
         capture_pixels.resize((size_t)capture_w * (size_t)capture_h * 4u);
         capture_pixels_flipped.resize(capture_pixels.size());
     }
@@ -1245,6 +1307,9 @@ struct SokolRunner {
         sg_pass cp{};
         cp.action = action;
         cp.attachments.colors[0] = capture_view;
+        if (capture_ds_view.id != SG_INVALID_ID) {
+            cp.attachments.depth_stencil = capture_ds_view;
+        }
         if (capture_debug) {
             std::cerr << "[capture] sg_begin_pass..." << std::endl;
         }
