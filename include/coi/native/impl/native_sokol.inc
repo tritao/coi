@@ -44,10 +44,10 @@
 // - Provides a retained-tree "UI" in namespace coi::ui (used by codegen).
 // - Optionally provides a Sokol window renderer under COI_NATIVE_SOKOL.
 
-#include "coi/native/detail/ui_tree.inc"
+#include "coi/native/impl/ui_tree.inc"
 
 #if defined(COI_NATIVE_SOKOL)
-#include "coi/native/detail/sokol_impl.inc"
+#include "coi/native/impl/sokol_impl.inc"
 
 namespace coi::native {
 struct Rect {

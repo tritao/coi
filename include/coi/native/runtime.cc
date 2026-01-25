@@ -1,1 +1,1 @@
-#include "coi/native/detail/native_sokol.inc"
+#include "coi/native/impl/native_sokol.inc"
