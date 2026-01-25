@@ -334,6 +334,9 @@ struct DesktopClassStyle {
     bool has_border = false;
     Clay_BorderWidth border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
 
+    bool has_corner_radius = false;
+    Clay_CornerRadius corner_radius = Clay_CornerRadius{0, 0, 0, 0};
+
     bool has_align_x = false;
     Clay_LayoutAlignmentX align_x = CLAY_ALIGN_X_LEFT;
 
@@ -461,6 +464,11 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
             st.border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
             return;
         }
+        if (t == "rounded") {
+            st.has_corner_radius = true;
+            st.corner_radius = CLAY_CORNER_RADIUS(8);
+            return;
+        }
         if (t == "grow") {
             st.w_grow = true;
             return;
@@ -540,6 +548,29 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
         if (parse_i32_from_u16_suffix("fs-", st.font_size, st.has_font_size)) return;
         if (parse_i32_from_u16_suffix("ls-", st.letter_spacing, st.has_letter_spacing)) return;
         if (parse_i32_from_u16_suffix("lh-", st.line_height, st.has_line_height)) return;
+        {
+            uint16_t rv = 0;
+            if (parse_u16_suffix("r-", rv, st.has_corner_radius)) {
+                st.corner_radius = CLAY_CORNER_RADIUS((float)rv);
+                return;
+            }
+            if (parse_u16_suffix("r-tl-", rv, st.has_corner_radius)) {
+                st.corner_radius.topLeft = (float)rv;
+                return;
+            }
+            if (parse_u16_suffix("r-tr-", rv, st.has_corner_radius)) {
+                st.corner_radius.topRight = (float)rv;
+                return;
+            }
+            if (parse_u16_suffix("r-bl-", rv, st.has_corner_radius)) {
+                st.corner_radius.bottomLeft = (float)rv;
+                return;
+            }
+            if (parse_u16_suffix("r-br-", rv, st.has_corner_radius)) {
+                st.corner_radius.bottomRight = (float)rv;
+                return;
+            }
+        }
         if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
         if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
         if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
@@ -720,6 +751,9 @@ struct ClayEngine {
             color_from_hash(h, cr, cg, cb);
             decl.backgroundColor = Clay_Color{cr * 255.0f, cg * 255.0f, cb * 255.0f, 46.0f};
         }
+        if (st.has_corner_radius) {
+            decl.cornerRadius = st.corner_radius;
+        }
         return decl;
     }
 
@@ -837,19 +871,25 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
     return lines * char_h;
 }
 
-template <typename AppT>
-struct SokolRunner {
-    static inline AppT* app = nullptr;
-    static inline int frames_limit = -1;
-    static inline int frames = 0;
-    static inline std::unordered_map<int32_t, Rect> layout;
-    static inline std::vector<int32_t> draw_list;
+	template <typename AppT>
+	struct SokolRunner {
+	    static inline AppT* app = nullptr;
+	    static inline int frames_limit = -1;
+	    static inline int frames = 0;
+	    static inline std::unordered_map<int32_t, Rect> layout;
+	    static inline std::vector<int32_t> draw_list;
 
-    static void sg_log(const char* tag, uint32_t log_level, uint32_t log_item_id, const char* message_or_null, uint32_t line_nr,
-                       const char* filename_or_null, void*) {
-        const char* e = std::getenv("COI_DESKTOP_SG_LOG");
-        const bool verbose = (e && *e && std::string(e) != "0");
-        if (!verbose && log_level > 1) return; // default: only panic+error
+	    static bool window_requested() {
+	        const char* e = std::getenv("COI_DESKTOP_WINDOW");
+	        if (!e || !*e) return false;
+	        return !(e[0] == '0' && e[1] == '\0');
+	    }
+
+	    static void sg_log(const char* tag, uint32_t log_level, uint32_t log_item_id, const char* message_or_null, uint32_t line_nr,
+	                       const char* filename_or_null, void*) {
+	        const char* e = std::getenv("COI_DESKTOP_SG_LOG");
+	        const bool verbose = (e && *e && std::string(e) != "0");
+	        if (!verbose && log_level > 1) return; // default: only panic+error
         std::cerr << "[sokol_gfx] " << (tag ? tag : "sg") << " lvl=" << log_level << " item=" << log_item_id;
         if (filename_or_null) std::cerr << " at " << filename_or_null << ":" << line_nr;
         if (message_or_null) std::cerr << " " << message_or_null;
@@ -1092,27 +1132,29 @@ struct SokolRunner {
         }
     }
 
-    static void capture_init() {
-        const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR");
-        if (!dir || !*dir) return;
-        capture_enabled = true;
-        capture_dir = std::filesystem::path(dir);
+	    static void capture_init() {
+	        const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR");
+	        if (!dir || !*dir) return;
+	        capture_enabled = true;
+	        capture_dir = std::filesystem::path(dir);
 
         if (const char* e = std::getenv("COI_DESKTOP_CAPTURE_DEBUG")) {
             capture_debug = (std::string(e) != "0");
         }
 
-        // Default to X11 window capture on Linux, since it's more robust across
-        // GL driver setups (including headless/Xvfb). Offscreen capture can be
-        // forced via COI_DESKTOP_CAPTURE_MODE=offscreen.
+	        // Default capture mode:
+	        // - windowed runs: prefer X11 on Linux (robust across drivers)
+	        // - capture-only (no COI_DESKTOP_WINDOW): prefer offscreen
+	        // Offscreen/X11 can be forced via COI_DESKTOP_CAPTURE_MODE.
+	        const bool want_window = window_requested();
 #if defined(__linux__) || defined(__unix__)
-        capture_mode = CaptureMode::X11;
+	        capture_mode = want_window ? CaptureMode::X11 : CaptureMode::Offscreen;
 #else
-        capture_mode = CaptureMode::Offscreen;
+	        capture_mode = CaptureMode::Offscreen;
 #endif
-        if (const char* m = std::getenv("COI_DESKTOP_CAPTURE_MODE")) {
-            if (m && *m) {
-                const std::string mm(m);
+	        if (const char* m = std::getenv("COI_DESKTOP_CAPTURE_MODE")) {
+	            if (m && *m) {
+	                const std::string mm(m);
                 if (mm == "x11") capture_mode = CaptureMode::X11;
                 if (mm == "offscreen") capture_mode = CaptureMode::Offscreen;
             }
@@ -2109,34 +2151,60 @@ struct SokolRunner {
 #endif
     }
 
-    static int run(AppT* app_in, int frames_limit_in) {
-        app = app_in;
-        frames_limit = frames_limit_in;
-        frames = 0;
+	    static int run(AppT* app_in, int frames_limit_in) {
+	        app = app_in;
+	        frames_limit = frames_limit_in;
+	        frames = 0;
 
-        sapp_desc desc{};
-        int win_w = 960;
-        int win_h = 540;
+	        const bool want_window = window_requested();
+
+	        sapp_desc desc{};
+	        int win_w = 960;
+	        int win_h = 540;
+	        desc.window_title = "COI (Desktop)";
+
 #if defined(COI_DESKTOP_CAPTURE)
-        // If capture is enabled and a size is provided, prefer that as the window size
-        // so that X11-based capture is deterministic.
-        if (const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR"); dir && *dir) {
-            const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
-            int cw = 0, ch = 0;
-            if (parse_wh(size, cw, ch)) {
-                win_w = cw;
-                win_h = ch;
-            }
-        }
+	        const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR");
+	        const bool capture_requested = (dir && *dir);
+	        if (!want_window && capture_requested) {
+	            // "Headless" capture still needs a GL context, so we create a tiny window.
+	            // The offscreen render target is controlled by COI_DESKTOP_CAPTURE_SIZE.
+	            win_w = 64;
+	            win_h = 64;
+	            desc.window_title = "COI (Desktop, headless capture)";
+	        }
+
+	        // If X11 capture is selected and a size is provided, prefer it as the window size
+	        // so that X11-based capture is deterministic.
+	        if (capture_requested) {
+	            CaptureMode mode = CaptureMode::Offscreen;
+#if defined(__linux__) || defined(__unix__)
+	            mode = want_window ? CaptureMode::X11 : CaptureMode::Offscreen;
 #endif
-        desc.width = win_w;
-        desc.height = win_h;
-        desc.window_title = "COI (Desktop)";
-        desc.init_cb = init;
-        desc.frame_cb = frame_cb;
-        desc.event_cb = event_cb;
-        desc.cleanup_cb = cleanup;
-        sapp_run(&desc);
+	            if (const char* m = std::getenv("COI_DESKTOP_CAPTURE_MODE")) {
+	                if (m && *m) {
+	                    const std::string mm(m);
+	                    if (mm == "x11") mode = CaptureMode::X11;
+	                    if (mm == "offscreen") mode = CaptureMode::Offscreen;
+	                }
+	            }
+	            if (mode == CaptureMode::X11) {
+	                const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
+	                int cw = 0, ch = 0;
+	                if (parse_wh(size, cw, ch)) {
+	                    win_w = cw;
+	                    win_h = ch;
+	                }
+	            }
+	        }
+#endif
+	        desc.width = win_w;
+	        desc.height = win_h;
+	        desc.init_cb = init;
+	        desc.frame_cb = frame_cb;
+	        desc.event_cb = event_cb;
+	        desc.cleanup_cb = cleanup;
+	        sapp_run(&desc);
 #if defined(COI_DESKTOP_CAPTURE)
         return exit_code;
 #else
