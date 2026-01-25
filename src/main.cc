@@ -1669,6 +1669,13 @@ int main(int argc, char **argv)
 			                                        "Expected: " + desktop_runtime_h.string());
 			                return 1;
 			            }
+			            fs::path desktop_runtime_cc = coi_include_dir / "coi" / "desktop" / "runtime.cc";
+			            if (!fs::exists(desktop_runtime_cc))
+			            {
+			                ErrorHandler::cli_error("Could not find COI desktop runtime source",
+			                                        "Expected: " + desktop_runtime_cc.string());
+			                return 1;
+			            }
 
 			            fs::path sokol_dir = exe_dir / "deps" / "sokol";
 			            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
@@ -1706,6 +1713,7 @@ int main(int argc, char **argv)
 		                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
 #endif
 		            }
+		            cmd += " " + desktop_runtime_cc.string();
 		            cmd += " " + abs_output_cc.string();
 		            cmd += " -o " + out_bin.string();
 
