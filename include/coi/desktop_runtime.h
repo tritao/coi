@@ -757,6 +757,17 @@ struct SokolRunner {
     static inline std::unordered_map<int32_t, Rect> layout;
     static inline std::vector<int32_t> draw_list;
 
+    static bool overlay_enabled() {
+        const char* e = std::getenv("COI_DESKTOP_OVERLAY");
+        if (e && *e) {
+            return std::string(e) != std::string("0");
+        }
+#if defined(COI_DESKTOP_CAPTURE)
+        if (capture_enabled) return false;
+#endif
+        return true;
+    }
+
     static float layout_node(int32_t id, float x, float y, float w, float max_h) {
         auto it = coi::ui::g_nodes.find(id);
         if (it == coi::ui::g_nodes.end()) return 0.0f;
@@ -1649,15 +1660,17 @@ struct SokolRunner {
         }
 #endif
 
-        sdtx_canvas((float)sapp_width(), (float)sapp_height());
-        sdtx_font(0);
-        sdtx_origin(1.0f, 1.0f);
-        sdtx_home();
-        sdtx_color3f(1.0f, 1.0f, 1.0f);
-        sdtx_puts("COI desktop runtime (sokol)\n");
-        sdtx_printf("dt: %.3f\n\n", dt);
+        const bool draw_overlay = overlay_enabled();
+        if (draw_overlay) {
+            sdtx_canvas((float)sapp_width(), (float)sapp_height());
+            sdtx_font(0);
+            sdtx_origin(1.0f, 1.0f);
+            sdtx_home();
+            sdtx_color3f(1.0f, 1.0f, 1.0f);
+            sdtx_puts("COI desktop runtime (sokol)\n");
+            sdtx_printf("dt: %.3f\n\n", dt);
 #if defined(COI_DESKTOP_FONTSTASH)
-        sdtx_printf("fontstash: %s\n\n", (fons_ctx && fons_font != FONS_INVALID) ? "on" : "off");
+            sdtx_printf("fontstash: %s\n\n", (fons_ctx && fons_font != FONS_INVALID) ? "on" : "off");
 #endif
 
 #if defined(COI_DESKTOP_CLAY)
@@ -1849,15 +1862,16 @@ struct SokolRunner {
         }
 #endif
 
-        const char* show_dump = std::getenv("COI_DESKTOP_SHOW_DUMP");
-        if (show_dump && *show_dump && std::string(show_dump) != std::string("0")) {
-            sdtx_origin(1.0f, 6.0f);
-            sdtx_home();
-            sdtx_color3f(1.0f, 1.0f, 1.0f);
-            sdtx_puts("\nUI tree (dump):\n");
-            sdtx_dump_node(0, 0);
+            const char* show_dump = std::getenv("COI_DESKTOP_SHOW_DUMP");
+            if (show_dump && *show_dump && std::string(show_dump) != std::string("0")) {
+                sdtx_origin(1.0f, 6.0f);
+                sdtx_home();
+                sdtx_color3f(1.0f, 1.0f, 1.0f);
+                sdtx_puts("\nUI tree (dump):\n");
+                sdtx_dump_node(0, 0);
+            }
+            sdtx_draw();
         }
-        sdtx_draw();
 
 #if defined(COI_DESKTOP_CAPTURE)
         // In X11 capture mode, read back the swapchain framebuffer before ending the pass.
