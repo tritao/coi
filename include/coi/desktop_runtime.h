@@ -1580,17 +1580,21 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
         sgl_load_identity();
 
 #if defined(COI_DESKTOP_CLAY)
-        // Re-layout for capture size (uses the existing Clay context).
-        Clay_RenderCommandArray cmds = ClayEngine::layout((float)capture_w, (float)capture_h, 1.0f);
-        const bool ok = (ClayEngine::ctx != nullptr);
-        if (ok) {
+	        // Re-layout for capture size (uses the existing Clay context).
+	        Clay_RenderCommandArray cmds = ClayEngine::layout((float)capture_w, (float)capture_h, 1.0f);
+	        const bool ok = (ClayEngine::ctx != nullptr);
+	        if (ok) {
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
-            sgl_matrix_mode_projection();
-            sgl_load_identity();
-            sgl_matrix_mode_modelview();
-            sgl_load_identity();
-            sclay_render(cmds, clay_fonts);
-            sgl_draw();
+	            // Important: in capture-only mode we create a tiny window to get a GL context.
+	            // Scissor state may remain set to that tiny size. Reset scissor to the full
+	            // capture target before rendering.
+	            sgl_scissor_rect(0, 0, capture_w, capture_h, true /* origin_top_left */);
+	            sgl_matrix_mode_projection();
+	            sgl_load_identity();
+	            sgl_matrix_mode_modelview();
+	            sgl_load_identity();
+	            sclay_render(cmds, clay_fonts);
+	            sgl_draw();
 #else
             auto iround = [](float v) -> int { return (int)std::lround((double)v); };
             struct IRect {
@@ -1951,15 +1955,16 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
         sgl_load_identity();
 
 #if defined(COI_DESKTOP_CLAY)
-        if (clay_ok) {
+	        if (clay_ok) {
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
-            // Clay's reference sokol renderer expects an identity projection matrix.
-            sgl_matrix_mode_projection();
-            sgl_load_identity();
-            sgl_matrix_mode_modelview();
-            sgl_load_identity();
-            sclay_render(render_commands, clay_fonts);
-            sgl_draw();
+	            // Clay's reference sokol renderer expects an identity projection matrix.
+	            sgl_scissor_rect(0, 0, sapp_width(), sapp_height(), true /* origin_top_left */);
+	            sgl_matrix_mode_projection();
+	            sgl_load_identity();
+	            sgl_matrix_mode_modelview();
+	            sgl_load_identity();
+	            sclay_render(render_commands, clay_fonts);
+	            sgl_draw();
 #else
             auto iround = [](float v) -> int { return (int)std::lround((double)v); };
             struct IRect {
@@ -2386,10 +2391,15 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	        const char* dir = std::getenv("COI_DESKTOP_CAPTURE_DIR");
 	        const bool capture_requested = (dir && *dir);
 	        if (!want_window && capture_requested) {
-	            // "Headless" capture still needs a GL context, so we create a tiny window.
-	            // The offscreen render target is controlled by COI_DESKTOP_CAPTURE_SIZE.
-	            win_w = 64;
-	            win_h = 64;
+	            // "Headless" capture still needs a GL context. For offscreen capture we prefer
+	            // using the capture size as the GL backbuffer size to avoid backend bugs where
+	            // origin_top_left viewport/scissor conversions use the swapchain height.
+	            const char* size = std::getenv("COI_DESKTOP_CAPTURE_SIZE");
+	            if (!parse_wh(size, win_w, win_h)) {
+	                // Default to a deterministic size matching the visual tests.
+	                win_w = 960;
+	                win_h = 540;
+	            }
 	            desc.window_title = "COI (Desktop, headless capture)";
 	        }
 
