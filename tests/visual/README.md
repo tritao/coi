@@ -80,4 +80,5 @@ that shows native/web images side-by-side:
 ./tests/visual/gallery.sh --scene paint_rects
 ./tests/visual/gallery.sh --scene layout_* --out /tmp/coi-gallery
 ./tests/visual/gallery.sh --set golden --out /tmp/coi-golden
+./tests/visual/gallery.sh --set golden --out /tmp/coi-golden --open
 ```

@@ -7,11 +7,12 @@ OUT_DIR="${TMPDIR:-/tmp}/coi-side-by-side"
 declare -a SCENE_PATTERNS=()
 SET_NAME=""
 RUN=1
+OPEN_AFTER=0
 
 usage() {
   cat <<EOF
 Usage:
-  $0 (--scene <name|glob> | --set <name>) [--out <dir>] [--no-run]
+  $0 (--scene <name|glob> | --set <name>) [--out <dir>] [--no-run] [--open]
 
 Examples:
   $0 --scene paint_rects
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --set) SET_NAME="${2:-}"; shift 2;;
     --out) OUT_DIR="${2:-}"; shift 2;;
     --no-run) RUN=0; shift;;
+    --open) OPEN_AFTER=1; shift;;
     *) echo "error: unknown arg: $1"; usage; exit 1;;
   esac
 done
@@ -73,3 +75,15 @@ fi
 python3 "$ROOT_DIR/tests/visual/make_gallery.py" --desktop "$DESKTOP_BASE" --web "$WEB_BASE" --out "$OUT_DIR/index.html" --title "COI Desktop vs Web"
 
 echo "wrote: $OUT_DIR/index.html"
+
+if [[ "$OPEN_AFTER" -eq 1 ]]; then
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$OUT_DIR/index.html" >/dev/null 2>&1 &
+    disown || true
+  elif command -v open >/dev/null 2>&1; then
+    open "$OUT_DIR/index.html" >/dev/null 2>&1 &
+    disown || true
+  else
+    echo "warn: couldn't open HTML (missing xdg-open/open): $OUT_DIR/index.html" >&2
+  fi
+fi
