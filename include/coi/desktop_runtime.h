@@ -304,6 +304,16 @@ struct DesktopClassStyle {
     bool w_grow = false;
     bool h_grow = false;
 
+    bool w_has_min = false;
+    float w_min = 0.0f;
+    bool w_has_max = false;
+    float w_max = 0.0f;
+
+    bool h_has_min = false;
+    float h_min = 0.0f;
+    bool h_has_max = false;
+    float h_max = 0.0f;
+
     bool bg_none = false;
 
     bool has_clip = false;
@@ -486,6 +496,10 @@ inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool 
         if (parse_u16_suffix("g-", st.gap, st.has_gap)) return;
         if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
         if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
+        if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
+        if (parse_f32_suffix("max-w-", st.w_max, st.w_has_max)) return;
+        if (parse_f32_suffix("min-h-", st.h_min, st.h_has_min)) return;
+        if (parse_f32_suffix("max-h-", st.h_max, st.h_has_max)) return;
 
         uint16_t bw = 0;
         if (parse_u16_suffix("border-", bw, st.has_border)) {
@@ -615,6 +629,16 @@ struct ClayEngine {
         if (st.h_fixed) sy = CLAY_SIZING_FIXED(st.h);
         if (st.w_grow) sx = CLAY_SIZING_GROW(0);
         if (st.h_grow) sy = CLAY_SIZING_GROW(0);
+
+        // Apply optional min/max constraints (Clay uses minMax even for FIT/GROW/FIXED).
+        if (sx.type != CLAY__SIZING_TYPE_PERCENT) {
+            if (st.w_has_min) sx.size.minMax.min = std::max(0.0f, st.w_min);
+            if (st.w_has_max) sx.size.minMax.max = std::max(0.0f, st.w_max);
+        }
+        if (sy.type != CLAY__SIZING_TYPE_PERCENT) {
+            if (st.h_has_min) sy.size.minMax.min = std::max(0.0f, st.h_min);
+            if (st.h_has_max) sy.size.minMax.max = std::max(0.0f, st.h_max);
+        }
 
         Clay_ElementDeclaration decl{};
         decl.layout = Clay_LayoutConfig{
