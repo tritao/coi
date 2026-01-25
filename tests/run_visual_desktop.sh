@@ -96,9 +96,11 @@ fi
 
 scenes=(
   "font_window_demo:$ROOT_DIR/tests/desktop/visual/scenes/font_window_demo.coi"
-  "paint_rects:$ROOT_DIR/tests/desktop/visual/scenes/paint_rects_visual.coi"
-  "paint_border_widths:$ROOT_DIR/tests/desktop/visual/scenes/paint_border_widths_visual.coi"
-  "paint_bg_none:$ROOT_DIR/tests/desktop/visual/scenes/paint_bg_none_visual.coi"
+  "paint_rects:$ROOT_DIR/tests/desktop/visual/scenes/paint/rects.coi"
+  "paint_border_widths:$ROOT_DIR/tests/desktop/visual/scenes/paint/border_widths.coi"
+  "paint_bg_none:$ROOT_DIR/tests/desktop/visual/scenes/paint/bg_none.coi"
+  "paint_corner_radius_basic:$ROOT_DIR/tests/desktop/visual/scenes/paint/corner_radius_basic.coi"
+  "paint_corner_radius_per_corner:$ROOT_DIR/tests/desktop/visual/scenes/paint/corner_radius_per_corner.coi"
   "layout_row_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/row_fixed_and_grow.coi"
   "layout_col_fixed_and_grow:$ROOT_DIR/tests/desktop/visual/scenes/layout/col_fixed_and_grow.coi"
   "layout_nested_flex:$ROOT_DIR/tests/desktop/visual/scenes/layout/nested_flex.coi"

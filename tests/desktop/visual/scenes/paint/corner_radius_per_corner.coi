@@ -1,0 +1,19 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="a w-440 h-220 pad-16 border-6 r-tl-48 r-tr-12 r-bl-0 r-br-32">r-tl-48 r-tr-12 r-bl-0 r-br-32</div>
+                <div class="b w-440 h-220 pad-16 border-6 r-tl-0 r-tr-48 r-bl-32 r-br-12">r-tl-0 r-tr-48 r-bl-32 r-br-12</div>
+            </div>
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="c w-440 h-160 pad-16 border-2 r-tl-64 r-tr-64 r-bl-0 r-br-0">top pill</div>
+                <div class="d w-440 h-160 pad-16 border-2 r-tl-0 r-tr-0 r-bl-64 r-br-64">bottom pill</div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
