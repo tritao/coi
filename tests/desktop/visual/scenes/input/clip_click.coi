@@ -1,0 +1,64 @@
+component App {
+  mut int clipped_hits = 0;
+  mut int unclipped_hits = 0;
+
+  def hitClipped() : void {
+    clipped_hits += 1;
+  }
+
+  def hitUnclipped() : void {
+    unclipped_hits += 1;
+  }
+
+  view {
+    <div class="root col pad-40 gap-24 fill bg-none">
+      <div class="status pad-12 border-4 r-12 bg-none">
+        clip click test: clipped={clipped_hits} unclipped={unclipped_hits}
+      </div>
+
+      <div class="row row gap-60 bg-none">
+        <div class="panelA col w-420 h-220 pad-16 border-8 r-24 clip bg-none">
+          <div class="pad-0 h-24 bg-none">clipped (overflow hidden)</div>
+          <div class="spacer h-8 bg-none"></div>
+          <div class="targetA w-388 h-320 pad-0 border-10 r-32" onclick={hitClipped}>
+            <div class="pad-12">clickable child (taller than container)</div>
+          </div>
+          <if clipped_hits != 0>
+            <div class="row row gap-0 w-388 h-64 pad-0">
+              <div class="mk1 grow h-64"></div>
+              <div class="mk2 grow h-64 bg-none"></div>
+              <div class="mk3 grow h-64"></div>
+              <div class="mk4 grow h-64 bg-none"></div>
+              <div class="mk5 grow h-64"></div>
+              <div class="mk6 grow h-64 bg-none"></div>
+            </div>
+          </if>
+        </div>
+
+        <div class="panelB col w-420 h-220 pad-16 border-8 r-24 bg-none">
+          <div class="pad-0 h-24 bg-none">unclipped (overflow visible)</div>
+          <div class="spacer h-8 bg-none"></div>
+          <div class="targetB w-388 h-320 pad-0 border-10 r-32" onclick={hitUnclipped}>
+            <div class="pad-12">clickable child (taller than container)</div>
+          </div>
+          <if unclipped_hits != 0>
+            <div class="row row gap-0 w-388 h-64 pad-0">
+              <div class="mk7 grow h-64"></div>
+              <div class="mk8 grow h-64 bg-none"></div>
+              <div class="mk9 grow h-64"></div>
+              <div class="mk10 grow h-64 bg-none"></div>
+              <div class="mk11 grow h-64"></div>
+              <div class="mk12 grow h-64 bg-none"></div>
+            </div>
+          </if>
+        </div>
+      </div>
+
+      <div class="grow bg-none"></div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}
