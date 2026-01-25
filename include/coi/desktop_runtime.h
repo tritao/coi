@@ -1327,25 +1327,14 @@ struct SokolRunner {
                     if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
                     const auto& bb = cmd->boundingBox;
                     const auto& t = cmd->renderData.text;
-                    int align = FONS_ALIGN_TOP;
-                    float x = bb.x;
-                    if (t.textAlignment == CLAY_TEXT_ALIGN_CENTER) {
-                        align |= FONS_ALIGN_CENTER;
-                        x = bb.x + bb.width * 0.5f;
-                    } else if (t.textAlignment == CLAY_TEXT_ALIGN_RIGHT) {
-                        align |= FONS_ALIGN_RIGHT;
-                        x = bb.x + bb.width;
-                    } else {
-                        align |= FONS_ALIGN_LEFT;
-                    }
-                    fonsSetAlign(fons_ctx, align);
+                    fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
                     fonsSetSize(fons_ctx, (float)t.fontSize);
                     fonsSetSpacing(fons_ctx, (float)t.letterSpacing);
                     fonsSetColor(fons_ctx, sfons_rgba(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a));
                     const char* start = t.stringContents.chars;
                     const char* end = start ? (start + t.stringContents.length) : nullptr;
                     if (start && end && t.stringContents.length > 0) {
-                        (void)fonsDrawText(fons_ctx, x, bb.y, start, end);
+                        (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
                     }
                 }
                 sfons_flush(fons_ctx);
@@ -1738,25 +1727,14 @@ struct SokolRunner {
                 if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
                 const auto& bb = cmd->boundingBox;
                 const auto& t = cmd->renderData.text;
-                int align = FONS_ALIGN_TOP;
-                float x = bb.x;
-                if (t.textAlignment == CLAY_TEXT_ALIGN_CENTER) {
-                    align |= FONS_ALIGN_CENTER;
-                    x = bb.x + bb.width * 0.5f;
-                } else if (t.textAlignment == CLAY_TEXT_ALIGN_RIGHT) {
-                    align |= FONS_ALIGN_RIGHT;
-                    x = bb.x + bb.width;
-                } else {
-                    align |= FONS_ALIGN_LEFT;
-                }
-                fonsSetAlign(fons_ctx, align);
+                fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
                 fonsSetSize(fons_ctx, (float)t.fontSize);
                 fonsSetSpacing(fons_ctx, (float)t.letterSpacing);
                 fonsSetColor(fons_ctx, sfons_rgba(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a));
                 const char* start = t.stringContents.chars;
                 const char* end = start ? (start + t.stringContents.length) : nullptr;
                 if (start && end && t.stringContents.length > 0) {
-                    (void)fonsDrawText(fons_ctx, x, bb.y, start, end);
+                    (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
                 }
             }
             const char* ttf_test = std::getenv("COI_DESKTOP_TTF_TEST");
