@@ -113,6 +113,7 @@ scenes=(
   "layout_align_main_cross:$ROOT_DIR/tests/desktop/visual/scenes/layout/align_main_cross.coi"
   "clip_overflow_hidden:$ROOT_DIR/tests/desktop/visual/scenes/clip/overflow_hidden.coi"
   "scroll_y_basic:$ROOT_DIR/tests/desktop/visual/scenes/scroll/scroll_y_basic.coi"
+  "scroll_nested_clip:$ROOT_DIR/tests/desktop/visual/scenes/scroll/nested_clip.coi"
   "text_glyphs_basic:$ROOT_DIR/tests/desktop/visual/scenes/text/glyphs_basic.coi"
   "text_wrap_measure:$ROOT_DIR/tests/desktop/visual/scenes/text/wrap_measure.coi"
   "text_alignment:$ROOT_DIR/tests/desktop/visual/scenes/text/alignment.coi"
