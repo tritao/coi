@@ -72,4 +72,5 @@ that shows native/web images side-by-side:
 ```bash
 ./tests/visual/gallery.sh --scene paint_rects
 ./tests/visual/gallery.sh --scene layout_* --out /tmp/coi-gallery
+./tests/visual/gallery.sh --set golden --out /tmp/coi-golden
 ```

@@ -4,17 +4,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 OUT_DIR="${TMPDIR:-/tmp}/coi-side-by-side"
-SCENE_PATTERN=""
+declare -a SCENE_PATTERNS=()
+SET_NAME=""
 RUN=1
 
 usage() {
   cat <<EOF
 Usage:
-  $0 --scene <name|glob> [--out <dir>] [--no-run]
+  $0 (--scene <name|glob> | --set <name>) [--out <dir>] [--no-run]
 
 Examples:
   $0 --scene paint_rects
   $0 --scene layout_* --out /tmp/coi-gallery
+  $0 --set golden
 
 Outputs:
   <out>/desktop/<scene>/frame_*.png
@@ -26,15 +28,33 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h) usage; exit 0;;
-    --scene) SCENE_PATTERN="${2:-}"; shift 2;;
+    --scene) SCENE_PATTERNS+=("${2:-}"); shift 2;;
+    --set) SET_NAME="${2:-}"; shift 2;;
     --out) OUT_DIR="${2:-}"; shift 2;;
     --no-run) RUN=0; shift;;
     *) echo "error: unknown arg: $1"; usage; exit 1;;
   esac
 done
 
-if [[ -z "$SCENE_PATTERN" ]]; then
-  echo "error: --scene is required (use a glob like layout_*)"
+if [[ -n "$SET_NAME" ]]; then
+  set_file="$ROOT_DIR/tests/visual/scene_sets/$SET_NAME.txt"
+  if [[ ! -f "$set_file" ]]; then
+    echo "error: unknown --set '$SET_NAME' (missing $set_file)"
+    exit 1
+  fi
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    line="${raw%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    if [[ -z "$line" ]]; then
+      continue
+    fi
+    SCENE_PATTERNS+=("$line")
+  done <"$set_file"
+fi
+
+if [[ "${#SCENE_PATTERNS[@]}" -eq 0 ]]; then
+  echo "error: provide at least one --scene (or use --set golden)"
   exit 1
 fi
 
@@ -44,11 +64,12 @@ DESKTOP_BASE="$OUT_DIR/desktop"
 WEB_BASE="$OUT_DIR/web"
 
 if [[ "$RUN" -eq 1 ]]; then
-  "$ROOT_DIR/tests/run_visual.sh" --backend desktop --update --scene "$SCENE_PATTERN" --baseline-dir "$DESKTOP_BASE" --out-dir "$OUT_DIR/.out/desktop"
-  "$ROOT_DIR/tests/run_visual.sh" --backend web --update --scene "$SCENE_PATTERN" --baseline-dir "$WEB_BASE" --out-dir "$OUT_DIR/.out/web"
+  for pat in "${SCENE_PATTERNS[@]}"; do
+    "$ROOT_DIR/tests/run_visual.sh" --backend desktop --update --scene "$pat" --baseline-dir "$DESKTOP_BASE" --out-dir "$OUT_DIR/.out/desktop"
+    "$ROOT_DIR/tests/run_visual.sh" --backend web --update --scene "$pat" --baseline-dir "$WEB_BASE" --out-dir "$OUT_DIR/.out/web"
+  done
 fi
 
 python3 "$ROOT_DIR/tests/visual/make_gallery.py" --desktop "$DESKTOP_BASE" --web "$WEB_BASE" --out "$OUT_DIR/index.html" --title "COI Desktop vs Web"
 
 echo "wrote: $OUT_DIR/index.html"
-
