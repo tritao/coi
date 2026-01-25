@@ -209,6 +209,12 @@ inline void scroll_to_top() {}
 	        #include "fontstash.h"
 	        #include "sokol_fontstash.h"
 	    #endif
+	    #ifndef COI_DESKTOP_RUNTIME_STB_IMAGE_INCLUDED
+	    #define COI_DESKTOP_RUNTIME_STB_IMAGE_INCLUDED
+	        #define STB_IMAGE_STATIC
+	        #define STB_IMAGE_IMPLEMENTATION
+	        #include "stb_image.h"
+	    #endif
 	    #if defined(COI_DESKTOP_CAPTURE)
 	        #include "stb_image_write.h"
 	    #endif
@@ -251,65 +257,6 @@ struct Rect {
 	}
 
 #if defined(COI_DESKTOP_RUNTIME_SOKOL_CLAY_INCLUDED)
-	inline bool load_tga_rgba8(const char* path, std::vector<uint8_t>& out_rgba, int& out_w, int& out_h) {
-	    out_rgba.clear();
-	    out_w = 0;
-	    out_h = 0;
-	    if (!path || !*path) return false;
-
-	    std::ifstream f(path, std::ios::binary);
-	    if (!f) return false;
-	    uint8_t hdr[18]{};
-	    f.read((char*)hdr, 18);
-	    if (!f) return false;
-
-	    const uint8_t id_len = hdr[0];
-	    const uint8_t cmap_type = hdr[1];
-	    const uint8_t image_type = hdr[2];
-	    if (cmap_type != 0) return false;
-	    if (image_type != 2) return false; // uncompressed truecolor
-
-	    const uint16_t w = (uint16_t)(hdr[12] | (hdr[13] << 8));
-	    const uint16_t h = (uint16_t)(hdr[14] | (hdr[15] << 8));
-	    const uint8_t bpp = hdr[16];
-	    const uint8_t desc = hdr[17];
-	    const bool origin_top = (desc & 0x20) != 0;
-	    if (w == 0 || h == 0) return false;
-	    if (bpp != 24 && bpp != 32) return false;
-
-	    if (id_len > 0) {
-	        f.seekg(id_len, std::ios::cur);
-	        if (!f) return false;
-	    }
-
-	    const size_t src_bpp = (size_t)bpp / 8u;
-	    const size_t src_size = (size_t)w * (size_t)h * src_bpp;
-	    std::vector<uint8_t> src;
-	    src.resize(src_size);
-	    f.read((char*)src.data(), (std::streamsize)src.size());
-	    if (!f) return false;
-
-	    out_rgba.resize((size_t)w * (size_t)h * 4u);
-	    for (uint16_t y = 0; y < h; y++) {
-	        const uint16_t sy = origin_top ? y : (uint16_t)(h - 1 - y);
-	        const uint8_t* row = src.data() + (size_t)sy * (size_t)w * src_bpp;
-	        uint8_t* dst = out_rgba.data() + (size_t)y * (size_t)w * 4u;
-	        for (uint16_t x = 0; x < w; x++) {
-	            const uint8_t b = row[x * src_bpp + 0];
-	            const uint8_t g = row[x * src_bpp + 1];
-	            const uint8_t r = row[x * src_bpp + 2];
-	            const uint8_t a = (bpp == 32) ? row[x * src_bpp + 3] : 255;
-	            dst[x * 4u + 0] = r;
-	            dst[x * 4u + 1] = g;
-	            dst[x * 4u + 2] = b;
-	            dst[x * 4u + 3] = a;
-	        }
-	    }
-	    out_w = (int)w;
-	    out_h = (int)h;
-	    return true;
-	}
-
 	struct DesktopImage {
 	    int w = 0;
 	    int h = 0;
@@ -332,10 +279,11 @@ struct Rect {
 	        auto it = images.find(key);
 	        if (it != images.end()) return it->second.get();
 
-	        std::vector<uint8_t> rgba;
-	        int w = 0, h = 0;
-	        if (!load_tga_rgba8(key.c_str(), rgba, w, h)) {
-	            std::cerr << "[img] failed to load (tga) " << key << "\n";
+	        int w = 0, h = 0, n = 0;
+	        unsigned char* rgba = stbi_load(key.c_str(), &w, &h, &n, 4);
+	        if (!rgba || w <= 0 || h <= 0) {
+	            std::cerr << "[img] failed to load " << key << "\n";
+	            if (rgba) stbi_image_free(rgba);
 	            images.emplace(key, nullptr);
 	            return nullptr;
 	        }
@@ -348,10 +296,11 @@ struct Rect {
 	        img_desc.width = w;
 	        img_desc.height = h;
 	        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-	        img_desc.data.mip_levels[0].ptr = rgba.data();
-	        img_desc.data.mip_levels[0].size = rgba.size();
+	        img_desc.data.mip_levels[0].ptr = rgba;
+	        img_desc.data.mip_levels[0].size = (size_t)w * (size_t)h * 4u;
 	        img_desc.label = "coi-image";
 	        img->img = sg_make_image(&img_desc);
+	        stbi_image_free(rgba);
 
 	        if (img->img.id == SG_INVALID_ID) {
 	            std::cerr << "[img] sg_make_image failed for " << key << "\n";
