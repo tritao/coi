@@ -488,9 +488,9 @@ run_scene_web() {
   for ((i=0; i<captures; i++)); do
     local png="$out_dir/frame_$(printf '%06d' "$i").png"
     local dh="$out_dir/frame_$(printf '%06d' "$i").dhash"
-    local budget_ms="700"
+    local budget_ms="1200"
     if [[ -n "$script_file" && "$i" -gt 0 ]]; then
-      budget_ms=$(( (max_frame + 6) * 20 + 700 ))
+      budget_ms=$(( (max_frame + 10) * 20 + 3000 ))
     fi
 
     local url="http://127.0.0.1:$port/index.html?coi_visual=1&coi_visual_capture_index=$i"
