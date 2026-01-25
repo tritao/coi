@@ -7,28 +7,28 @@ On Linux the default capture mode is `COI_DESKTOP_CAPTURE_MODE=x11` (read back p
 ## Create a baseline
 
 ```bash
-./coi run tests/desktop/font_window_demo.coi --target desktop --window --frames 120 \
-  --capture tests/desktop/_baseline/font_window_demo \
+./coi run tests/desktop/visual/scenes/font_window_demo.coi --target desktop --window --frames 120 \
+  --capture tests/desktop/visual/baseline/font_window_demo \
   --capture-size 960x540 \
   --capture-every 60 \
   --capture-max 2
 ```
 
 This writes:
-- `tests/desktop/_baseline/font_window_demo/frame_000000.png`
-- `tests/desktop/_baseline/font_window_demo/frame_000000.dhash`
-- `tests/desktop/_baseline/font_window_demo/frame_000001.png`
-- `tests/desktop/_baseline/font_window_demo/frame_000001.dhash`
+- `tests/desktop/visual/baseline/font_window_demo/frame_000000.png`
+- `tests/desktop/visual/baseline/font_window_demo/frame_000000.dhash`
+- `tests/desktop/visual/baseline/font_window_demo/frame_000001.png`
+- `tests/desktop/visual/baseline/font_window_demo/frame_000001.dhash`
 
 ## Compare against a baseline
 
 ```bash
-./coi run tests/desktop/font_window_demo.coi --target desktop --window --frames 120 \
+./coi run tests/desktop/visual/scenes/font_window_demo.coi --target desktop --window --frames 120 \
   --capture /tmp/coi-captures/font_window_demo \
   --capture-size 960x540 \
   --capture-every 60 \
   --capture-max 2 \
-  --capture-baseline tests/desktop/_baseline/font_window_demo \
+  --capture-baseline tests/desktop/visual/baseline/font_window_demo \
   --capture-tolerance 8 \
   --capture-fail
 ```

@@ -10,10 +10,16 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 COMPILER="$PROJECT_ROOT/coi"
-TEST_ROOT="$PROJECT_ROOT/tests/desktop"
+TEST_ROOTS=("$PROJECT_ROOT/tests/desktop/runtime" "$PROJECT_ROOT/tests/desktop/compile")
 
-if [ ! -d "$TEST_ROOT" ]; then
-  echo -e "${RED}No desktop tests found at $TEST_ROOT${NC}"
+missing=0
+for root in "${TEST_ROOTS[@]}"; do
+  if [ ! -d "$root" ]; then
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  echo -e "${RED}No desktop tests found (expected runtime/ and compile/ under tests/desktop)${NC}"
   exit 1
 fi
 
@@ -23,9 +29,9 @@ if [ ! -f "$COMPILER" ]; then
   (cd "$PROJECT_ROOT" && ./build.sh)
 fi
 
-TOTAL=$(find "$TEST_ROOT" -name "*_pass.coi" -o -name "*_fail.coi" | wc -l | tr -d ' ')
+TOTAL=$(find "${TEST_ROOTS[@]}" -name "*_pass.coi" -o -name "*_fail.coi" | wc -l | tr -d ' ')
 if [ "$TOTAL" -eq 0 ]; then
-  echo -e "${RED}No desktop tests found in $TEST_ROOT${NC}"
+  echo -e "${RED}No desktop tests found in tests/desktop/runtime or tests/desktop/compile${NC}"
   exit 1
 fi
 
@@ -220,7 +226,7 @@ while IFS= read -r -d '' test_file; do
 
   rm -rf "$tmp_dir"
   draw_progress_bar $((PASSED + FAILURES)) "$TOTAL"
-done < <(find "$TEST_ROOT" -name "*_pass.coi" -o -name "*_fail.coi" -type f -print0 | sort -z)
+done < <(find "${TEST_ROOTS[@]}" -name "*_pass.coi" -o -name "*_fail.coi" -type f -print0 | sort -z)
 
 echo ""
 if [ $FAILURES -eq 0 ]; then

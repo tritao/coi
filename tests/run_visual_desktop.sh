@@ -28,7 +28,7 @@ fi
 MODE="compare" # compare | update
 SCENE_FILTER=""
 
-BASELINE_DIR="$ROOT_DIR/tests/desktop/_baseline"
+BASELINE_DIR="$ROOT_DIR/tests/desktop/visual/baseline"
 OUT_DIR="${TMPDIR:-/tmp}/coi-visual-desktop"
 
 CAPTURE_SIZE="960x540"
@@ -45,7 +45,7 @@ Usage:
   $0 [--update] [--scene <name>] [options]
 
 Options:
-  --update                    Write baselines into tests/desktop/_baseline/<scene>/
+  --update                    Write baselines into tests/desktop/visual/baseline/<scene>/
   --scene <name>              Run only one scene
   --baseline-dir <dir>        Baseline directory (default: $BASELINE_DIR)
   --out-dir <dir>             Capture output directory (default: $OUT_DIR)
@@ -77,15 +77,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 scenes=(
-  "font_window_demo:$ROOT_DIR/tests/desktop/font_window_demo.coi"
-  "paint_rects:$ROOT_DIR/tests/desktop/paint_rects_visual.coi"
-  "paint_border_widths:$ROOT_DIR/tests/desktop/paint_border_widths_visual.coi"
-  "paint_bg_none:$ROOT_DIR/tests/desktop/paint_bg_none_visual.coi"
-  "border_render_dump_pass:$ROOT_DIR/tests/desktop/border_render_dump_pass.coi"
-  "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/border_between_render_dump_pass.coi"
-  "clip_render_dump_pass:$ROOT_DIR/tests/desktop/clip_render_dump_pass.coi"
-  "scroll_render_dump_pass:$ROOT_DIR/tests/desktop/scroll_render_dump_pass.coi"
-  "text_render_dump_pass:$ROOT_DIR/tests/desktop/text_render_dump_pass.coi"
+  "font_window_demo:$ROOT_DIR/tests/desktop/visual/scenes/font_window_demo.coi"
+  "paint_rects:$ROOT_DIR/tests/desktop/visual/scenes/paint_rects_visual.coi"
+  "paint_border_widths:$ROOT_DIR/tests/desktop/visual/scenes/paint_border_widths_visual.coi"
+  "paint_bg_none:$ROOT_DIR/tests/desktop/visual/scenes/paint_bg_none_visual.coi"
+  "border_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_render_dump_pass.coi"
+  "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_between_render_dump_pass.coi"
+  "clip_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/clip_render_dump_pass.coi"
+  "scroll_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/scroll_render_dump_pass.coi"
+  "text_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/text_render_dump_pass.coi"
 )
 
 need_xvfb=0
