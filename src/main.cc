@@ -1062,13 +1062,16 @@ int main(int argc, char **argv)
             out << "        if (has_lh) { st += \"line-height:\"; st += (int)lh; st += \"px;\"; }\n";
             out << "        if (has_ls) { st += \"letter-spacing:\"; st += (int)ls; st += \"px;\"; }\n";
             out << "\n";
+            // Match desktop runtime alpha defaults:
+            // - fill alpha = 46/255 ~= 0.18
+            // - border alpha = 180/255 ~= 0.71
             out << "        // Visual defaults for token-driven scenes: assign deterministic colors if not bg-none.\n";
             out << "        const _coi_rgb col = _coi_pick_color(cls);\n";
             out << "        if (!bg_none) {\n";
-            out << "            st += \"background-color:rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.88);\";\n";
+            out << "            st += \"background-color:rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.18);\";\n";
             out << "        }\n";
             out << "        if (has_border && border > 0) {\n";
-            out << "            st += \"border:\"; st += (int)border; st += \"px solid rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.95);\";\n";
+            out << "            st += \"border:\"; st += (int)border; st += \"px solid rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.71);\";\n";
             out << "        }\n";
             out << "        if (has_radius) {\n";
             out << "            uint16_t tl = r_tl ? r_tl : r_all;\n";
@@ -1381,7 +1384,8 @@ int main(int argc, char **argv)
                 css_out << "}\n\n";
                 css_out << "body {\n";
                 css_out << "    margin: 0;\n";
-                css_out << "    background: #0b0d10;\n";
+                // Match desktop clear color (0.08, 0.08, 0.10) ~= #14141a
+                css_out << "    background: #14141a;\n";
                 css_out << "    color: #f2f2f2;\n";
                 css_out << "    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;\n";
                 css_out << "    line-height: 1.5;\n";
