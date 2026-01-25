@@ -1012,7 +1012,10 @@ int main(int argc, char **argv)
             out << "            st += \"flex-direction:\";\n";
             out << "            st += (dir == 2 ? \"column;\" : \"row;\");\n";
             out << "        }\n";
+            out << "        // Web flexbox shrinks items by default (flex-shrink:1), which differs from Clay's behavior.\n";
+            out << "        // For COI's token-driven scenes, prefer fixed-size overflow unless explicitly grow.\n";
             out << "        if (has_grow) { st += \"flex:1 1 0px;min-width:0;min-height:0;\"; }\n";
+            out << "        else { st += \"flex-shrink:0;\"; }\n";
             out << "        if (has_fill) { st += \"width:100%;height:100%;min-width:100vw;min-height:100vh;\"; }\n";
             out << "        if (has_w) { st += \"width:\"; st += (int)w; st += \"px;\"; }\n";
             out << "        if (has_h) { st += \"height:\"; st += (int)h; st += \"px;\"; }\n";
