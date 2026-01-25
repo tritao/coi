@@ -27,7 +27,7 @@ component App {
         <div class="pad-16">B (z-20) should win</div>
         <div class="w-420 h-160 pad-0">
           <if state == 2>
-            <img src="tests/desktop/visual/assets/solid_green_128.tga" class="w-420 h-160" />
+            <div class="hit w-420 h-160 pad-0 border-12 r-0"></div>
           <else>
             <div class="w-420 h-160 pad-0 bg-none"></div>
           </else>
