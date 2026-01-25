@@ -1308,23 +1308,44 @@ struct SokolRunner {
 
 #if defined(COI_DESKTOP_FONTSTASH)
             if (fons_ctx && fons_font != FONS_INVALID) {
+                // sgl_draw() rewinds the recorded command stream. Ensure viewport/matrices
+                // are set again before recording fontstash draw calls.
+                sgl_defaults();
+                sgl_viewport(0, 0, capture_w, capture_h, true);
+                sgl_matrix_mode_projection();
+                sgl_load_identity();
+                sgl_ortho(0.0f, (float)capture_w, (float)capture_h, 0.0f, -1.0f, 1.0f);
+                sgl_matrix_mode_modelview();
+                sgl_load_identity();
+
                 sg_apply_scissor_rect(0, 0, capture_w, capture_h, true /* origin_top_left */);
                 fonsClearState(fons_ctx);
                 fonsSetFont(fons_ctx, fons_font);
-                fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
                 for (int32_t i = 0; i < cmds.length; i++) {
                     Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&cmds, i);
                     if (!cmd) continue;
                     if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
                     const auto& bb = cmd->boundingBox;
                     const auto& t = cmd->renderData.text;
+                    int align = FONS_ALIGN_TOP;
+                    float x = bb.x;
+                    if (t.textAlignment == CLAY_TEXT_ALIGN_CENTER) {
+                        align |= FONS_ALIGN_CENTER;
+                        x = bb.x + bb.width * 0.5f;
+                    } else if (t.textAlignment == CLAY_TEXT_ALIGN_RIGHT) {
+                        align |= FONS_ALIGN_RIGHT;
+                        x = bb.x + bb.width;
+                    } else {
+                        align |= FONS_ALIGN_LEFT;
+                    }
+                    fonsSetAlign(fons_ctx, align);
                     fonsSetSize(fons_ctx, (float)t.fontSize);
                     fonsSetSpacing(fons_ctx, (float)t.letterSpacing);
                     fonsSetColor(fons_ctx, sfons_rgba(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a));
                     const char* start = t.stringContents.chars;
                     const char* end = start ? (start + t.stringContents.length) : nullptr;
                     if (start && end && t.stringContents.length > 0) {
-                        (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
+                        (void)fonsDrawText(fons_ctx, x, bb.y, start, end);
                     }
                 }
                 sfons_flush(fons_ctx);
@@ -1698,23 +1719,44 @@ struct SokolRunner {
 #if defined(COI_DESKTOP_CLAY) && defined(COI_DESKTOP_FONTSTASH)
         if (clay_ok && fons_ctx && fons_font != FONS_INVALID) {
             // Ensure font rendering isn't accidentally clipped by a stale scissor rect.
+            // Also re-emit viewport/matrices because we may have already called sgl_draw()
+            // while rendering rectangles/borders.
+            sgl_defaults();
+            sgl_viewport(0, 0, sapp_width(), sapp_height(), true);
+            sgl_matrix_mode_projection();
+            sgl_load_identity();
+            sgl_ortho(0.0f, (float)sapp_width(), (float)sapp_height(), 0.0f, -1.0f, 1.0f);
+            sgl_matrix_mode_modelview();
+            sgl_load_identity();
+
             sg_apply_scissor_rect(0, 0, sapp_width(), sapp_height(), true /* origin_top_left */);
             fonsClearState(fons_ctx);
             fonsSetFont(fons_ctx, fons_font);
-            fonsSetAlign(fons_ctx, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
             for (int32_t i = 0; i < render_commands.length; i++) {
                 Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
                 if (!cmd) continue;
                 if (cmd->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
                 const auto& bb = cmd->boundingBox;
                 const auto& t = cmd->renderData.text;
+                int align = FONS_ALIGN_TOP;
+                float x = bb.x;
+                if (t.textAlignment == CLAY_TEXT_ALIGN_CENTER) {
+                    align |= FONS_ALIGN_CENTER;
+                    x = bb.x + bb.width * 0.5f;
+                } else if (t.textAlignment == CLAY_TEXT_ALIGN_RIGHT) {
+                    align |= FONS_ALIGN_RIGHT;
+                    x = bb.x + bb.width;
+                } else {
+                    align |= FONS_ALIGN_LEFT;
+                }
+                fonsSetAlign(fons_ctx, align);
                 fonsSetSize(fons_ctx, (float)t.fontSize);
                 fonsSetSpacing(fons_ctx, (float)t.letterSpacing);
                 fonsSetColor(fons_ctx, sfons_rgba(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a));
                 const char* start = t.stringContents.chars;
                 const char* end = start ? (start + t.stringContents.length) : nullptr;
                 if (start && end && t.stringContents.length > 0) {
-                    (void)fonsDrawText(fons_ctx, bb.x, bb.y, start, end);
+                    (void)fonsDrawText(fons_ctx, x, bb.y, start, end);
                 }
             }
             const char* ttf_test = std::getenv("COI_DESKTOP_TTF_TEST");
