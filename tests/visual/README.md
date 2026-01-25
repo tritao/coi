@@ -63,3 +63,13 @@ Web (headless Chrome):
 ./tests/run_visual.sh --backend web --scene paint_rects --update
 ./tests/run_visual.sh --backend web --scene paint_rects
 ```
+
+## Native vs web gallery (manual inspection)
+
+Generate per-scene outputs for both backends into a scratch folder and write an `index.html`
+that shows native/web images side-by-side:
+
+```bash
+./tests/visual/gallery.sh --scene paint_rects
+./tests/visual/gallery.sh --scene layout_* --out /tmp/coi-gallery
+```
