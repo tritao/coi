@@ -1,0 +1,23 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="boxA col w-450 h-240 pad-20 gap-12 bg-none border-8">
+                    <div class="t1 fs-28 lh-32">Hello COI 0123456789</div>
+                    <div class="t2 fs-16 ls-2 lh-22">Letter spacing +2</div>
+                    <div class="t3 fs-12 lh-16">abcdef XYZ !@#</div>
+                </div>
+                <div class="boxB col w-450 h-240 pad-20 gap-12 bg-none border-8">
+                    <div class="t4 fs-10 lh-12">Small text baseline</div>
+                    <div class="t5 fs-32 lh-36">BIG</div>
+                    <div class="t6 fs-18 lh-22">Mixed: AaBbCc 123</div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

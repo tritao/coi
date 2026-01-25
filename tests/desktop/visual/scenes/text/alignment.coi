@@ -1,0 +1,23 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="a col w-920 h-140 pad-20 gap-10 bg-none border-8">
+                <div class="label fs-14 lh-18">text-left</div>
+                <div class="txt fs-28 lh-32 text-left">Align me</div>
+            </div>
+            <div class="b col w-920 h-140 pad-20 gap-10 bg-none border-8">
+                <div class="label fs-14 lh-18">text-center</div>
+                <div class="txt fs-28 lh-32 text-center">Align me</div>
+            </div>
+            <div class="c col w-920 h-140 pad-20 gap-10 bg-none border-8">
+                <div class="label fs-14 lh-18">text-right</div>
+                <div class="txt fs-28 lh-32 text-right">Align me</div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
