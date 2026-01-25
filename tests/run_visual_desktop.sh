@@ -27,6 +27,7 @@ fi
 
 MODE="compare" # compare | update
 SCENE_FILTER=""
+LIST_ONLY=0
 
 BASELINE_DIR="$ROOT_DIR/tests/desktop/visual/baseline"
 OUT_DIR="${TMPDIR:-/tmp}/coi-visual-desktop"
@@ -46,7 +47,8 @@ Usage:
 
 Options:
   --update                    Write baselines into tests/desktop/visual/baseline/<scene>/
-  --scene <name>              Run only one scene
+  --scene <name>              Run only one scene (exact), or use prefix/glob (e.g. layout_*, layout_)
+  --list                      List available scenes (honors --scene filter)
   --baseline-dir <dir>        Baseline directory (default: $BASELINE_DIR)
   --out-dir <dir>             Capture output directory (default: $OUT_DIR)
   --size <WxH>                Capture size (default: $CAPTURE_SIZE)
@@ -63,6 +65,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h) usage; exit 0;;
     --update) MODE="update"; shift;;
     --scene) SCENE_FILTER="${2:-}"; shift 2;;
+    --list) LIST_ONLY=1; shift;;
     --baseline-dir) BASELINE_DIR="${2:-}"; shift 2;;
     --out-dir) OUT_DIR="${2:-}"; shift 2;;
     --size) CAPTURE_SIZE="${2:-}"; shift 2;;
@@ -86,12 +89,48 @@ scenes=(
   "layout_nested_flex:$ROOT_DIR/tests/desktop/visual/scenes/layout/nested_flex.coi"
   "layout_min_max_constraints:$ROOT_DIR/tests/desktop/visual/scenes/layout/min_max_constraints.coi"
   "layout_align_main_cross:$ROOT_DIR/tests/desktop/visual/scenes/layout/align_main_cross.coi"
+  "clip_overflow_hidden:$ROOT_DIR/tests/desktop/visual/scenes/clip/overflow_hidden.coi"
+  "scroll_y_basic:$ROOT_DIR/tests/desktop/visual/scenes/scroll/scroll_y_basic.coi"
   "border_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_render_dump_pass.coi"
   "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/border_between_render_dump_pass.coi"
   "clip_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/clip_render_dump_pass.coi"
   "scroll_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/scroll_render_dump_pass.coi"
   "text_render_dump_pass:$ROOT_DIR/tests/desktop/runtime/text_render_dump_pass.coi"
 )
+
+SCENE_PATTERN="$SCENE_FILTER"
+if [[ -n "$SCENE_PATTERN" ]]; then
+  # If the filter doesn't contain glob metacharacters and doesn't exactly match any scene,
+  # treat it as a prefix.
+  has_glob=0
+  case "$SCENE_PATTERN" in
+    *"*"*|*"?"*|*"["*) has_glob=1;;
+  esac
+  if [[ "$has_glob" -eq 0 ]]; then
+    exact=0
+    for entry in "${scenes[@]}"; do
+      name="${entry%%:*}"
+      if [[ "$name" == "$SCENE_PATTERN" ]]; then
+        exact=1
+        break
+      fi
+    done
+    if [[ "$exact" -eq 0 ]]; then
+      SCENE_PATTERN="${SCENE_PATTERN}*"
+    fi
+  fi
+fi
+
+if [[ "$LIST_ONLY" -eq 1 ]]; then
+  for entry in "${scenes[@]}"; do
+    name="${entry%%:*}"
+    if [[ -n "$SCENE_PATTERN" && "$name" != $SCENE_PATTERN ]]; then
+      continue
+    fi
+    echo "$name"
+  done
+  exit 0
+fi
 
 need_xvfb=0
 if [[ "$USE_XVFB" == "1" ]]; then
@@ -124,11 +163,18 @@ mkdir -p "$BASELINE_DIR"
 
 fail=0
 
+trim_ws() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
 for entry in "${scenes[@]}"; do
   name="${entry%%:*}"
   path="${entry#*:}"
 
-  if [[ -n "$SCENE_FILTER" && "$name" != "$SCENE_FILTER" ]]; then
+  if [[ -n "$SCENE_PATTERN" && "$name" != $SCENE_PATTERN ]]; then
     continue
   fi
 
@@ -136,12 +182,48 @@ for entry in "${scenes[@]}"; do
   scene_out="$OUT_DIR/$name"
   scene_base="$BASELINE_DIR/$name"
 
+  extra_env=()
+
+  env_file="${path%.coi}.desktop_env"
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+      line="${raw%%#*}"
+      line="$(trim_ws "$line")"
+      if [[ -z "$line" ]]; then
+        continue
+      fi
+      if [[ "$line" != *=* ]]; then
+        echo "error: invalid env line in $env_file: $raw" >&2
+        exit 1
+      fi
+      k="$(trim_ws "${line%%=*}")"
+      v="$(trim_ws "${line#*=}")"
+      v="${v//\$ROOT_DIR/$ROOT_DIR}"
+      extra_env+=("$k=$v")
+    done <"$env_file"
+  fi
+
+  script_file="${path%.coi}.desktop_script"
+  if [[ -f "$script_file" ]]; then
+    extra_env+=("COI_DESKTOP_SCRIPT=$script_file")
+    has_dumps=0
+    for kv in "${extra_env[@]}"; do
+      if [[ "$kv" == COI_DESKTOP_SCRIPT_DUMPS=* ]]; then
+        has_dumps=1
+        break
+      fi
+    done
+    if [[ "$has_dumps" -eq 0 ]]; then
+      extra_env+=("COI_DESKTOP_SCRIPT_DUMPS=0")
+    fi
+  fi
+
   rm -rf "$scene_out"
   mkdir -p "$scene_out"
 
   if [[ "$MODE" == "update" ]]; then
     mkdir -p "$scene_base"
-    "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+    "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
       --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES"
 
     rm -rf "$scene_base"
@@ -161,7 +243,7 @@ for entry in "${scenes[@]}"; do
   fi
 
   set +e
-  "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+  "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
     --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES" \
     --capture-baseline "$scene_base" --capture-tolerance "$TOLERANCE" --capture-fail
   rc=$?

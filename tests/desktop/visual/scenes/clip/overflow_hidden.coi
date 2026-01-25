@@ -1,0 +1,19 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row gap-20 bg-none">
+                <div class="clip col w-450 h-220 pad-20 bg-none border-8 clip">
+                    <div class="bigA w-720 h-320 pad-0 border-10"></div>
+                </div>
+                <div class="noclip col w-450 h-220 pad-20 bg-none border-8">
+                    <div class="bigB w-720 h-320 pad-0 border-10"></div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+
