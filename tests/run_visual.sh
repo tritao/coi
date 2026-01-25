@@ -46,7 +46,7 @@ Options:
   --scene <name>               Run only one scene (exact), or use prefix/glob (e.g. layout_*, layout_)
   --list                       List available scenes (honors --scene filter)
   --ci                         CI-friendly defaults (desktop: headless+auto, web: headless chrome)
-  --open                       Open output folder after run (xdg-open/open)
+  --open                       Serve and open an HTML view of captures
 
 Common capture:
   --baseline-dir <dir>         Baseline directory (default: tests/visual/baseline/<backend>)
@@ -196,22 +196,63 @@ fi
 mkdir -p "$OUT_DIR"
 mkdir -p "$BASELINE_DIR"
 
-open_path() {
-  local p="$1"
-  if [[ -z "$p" ]]; then
-    return 0
-  fi
+open_url() {
+  local url="$1"
   if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$p" >/dev/null 2>&1 &
+    xdg-open "$url" >/dev/null 2>&1 &
     disown || true
     return 0
   fi
   if command -v open >/dev/null 2>&1; then
-    open "$p" >/dev/null 2>&1 &
+    open "$url" >/dev/null 2>&1 &
     disown || true
     return 0
   fi
   return 1
+}
+
+pick_free_port() {
+  python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+serve_dir_and_open() {
+  local dir="$1"
+  local html_file="$2"
+  local pid_file="$dir/.coi_visual_server.pid"
+
+  if [[ ! -d "$dir" ]]; then
+    echo "warn: missing output dir: $dir" >&2
+    return 1
+  fi
+
+  if [[ -f "$pid_file" ]]; then
+    old_pid="$(cat "$pid_file" 2>/dev/null || true)"
+    if [[ -n "${old_pid:-}" ]] && kill -0 "$old_pid" >/dev/null 2>&1; then
+      kill "$old_pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$pid_file" >/dev/null 2>&1 || true
+  fi
+
+  local port
+  port="$(pick_free_port)"
+
+  python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >/dev/null 2>&1 &
+  local pid="$!"
+  echo "$pid" >"$pid_file"
+
+  local url="http://127.0.0.1:$port/${html_file}"
+  if ! open_url "$url"; then
+    echo "warn: couldn't open browser; url: $url" >&2
+  else
+    echo "opened: $url"
+  fi
+  echo "server: pid=$pid (stop: kill $pid)"
 }
 
 pick_env_file() {
@@ -670,9 +711,11 @@ done
 
 if [[ "$OPEN_AFTER" -eq 1 ]]; then
   if [[ "$ran_count" -le 1 ]]; then
-    open_path "$last_scene_out" || echo "warn: couldn't open output: $last_scene_out" >&2
+    python3 "$ROOT_DIR/tests/visual/make_run_output_index.py" --root "$last_scene_out" --out "$last_scene_out/index.html" --title "COI Visual Output" >/dev/null
+    serve_dir_and_open "$last_scene_out" "index.html"
   else
-    open_path "$OUT_DIR" || echo "warn: couldn't open output: $OUT_DIR" >&2
+    python3 "$ROOT_DIR/tests/visual/make_run_output_index.py" --root "$OUT_DIR" --out "$OUT_DIR/index.html" --title "COI Visual Output" >/dev/null
+    serve_dir_and_open "$OUT_DIR" "index.html"
   fi
 fi
 

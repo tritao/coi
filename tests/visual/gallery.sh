@@ -77,13 +77,38 @@ python3 "$ROOT_DIR/tests/visual/make_gallery.py" --desktop "$DESKTOP_BASE" --web
 echo "wrote: $OUT_DIR/index.html"
 
 if [[ "$OPEN_AFTER" -eq 1 ]]; then
+  port="$(python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+
+  pid_file="$OUT_DIR/.coi_visual_server.pid"
+  if [[ -f "$pid_file" ]]; then
+    old_pid="$(cat "$pid_file" 2>/dev/null || true)"
+    if [[ -n "${old_pid:-}" ]] && kill -0 "$old_pid" >/dev/null 2>&1; then
+      kill "$old_pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$pid_file" >/dev/null 2>&1 || true
+  fi
+
+  python3 -m http.server "$port" --bind 127.0.0.1 --directory "$OUT_DIR" >/dev/null 2>&1 &
+  pid="$!"
+  echo "$pid" >"$pid_file"
+
+  url="http://127.0.0.1:$port/index.html"
   if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$OUT_DIR/index.html" >/dev/null 2>&1 &
+    xdg-open "$url" >/dev/null 2>&1 &
     disown || true
   elif command -v open >/dev/null 2>&1; then
-    open "$OUT_DIR/index.html" >/dev/null 2>&1 &
+    open "$url" >/dev/null 2>&1 &
     disown || true
   else
-    echo "warn: couldn't open HTML (missing xdg-open/open): $OUT_DIR/index.html" >&2
+    echo "warn: couldn't open browser; url: $url" >&2
   fi
+  echo "opened: $url"
+  echo "server: pid=$pid (stop: kill $pid)"
 fi
