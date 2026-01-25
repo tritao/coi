@@ -78,9 +78,9 @@ done
 
 scenes=(
   "font_window_demo:$ROOT_DIR/tests/desktop/font_window_demo.coi"
-  "paint_rects_pass:$ROOT_DIR/tests/desktop/paint_rects_pass.coi"
-  "paint_border_widths_pass:$ROOT_DIR/tests/desktop/paint_border_widths_pass.coi"
-  "paint_bg_none_pass:$ROOT_DIR/tests/desktop/paint_bg_none_pass.coi"
+  "paint_rects:$ROOT_DIR/tests/desktop/paint_rects_visual.coi"
+  "paint_border_widths:$ROOT_DIR/tests/desktop/paint_border_widths_visual.coi"
+  "paint_bg_none:$ROOT_DIR/tests/desktop/paint_bg_none_visual.coi"
   "border_render_dump_pass:$ROOT_DIR/tests/desktop/border_render_dump_pass.coi"
   "border_between_render_dump_pass:$ROOT_DIR/tests/desktop/border_between_render_dump_pass.coi"
   "clip_render_dump_pass:$ROOT_DIR/tests/desktop/clip_render_dump_pass.coi"

@@ -1,16 +1,17 @@
 component App {
     view {
-        <div class="root col pad-0 gap-10 fill bg-none">
-            <div class="row row pad-0 gap-10 bg-none">
-                <div class="a w-120 h-80 pad-0"></div>
-                <div class="b w-120 h-80 pad-0"></div>
-                <div class="c w-120 h-80 pad-0"></div>
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="a w-260 h-160 pad-0 border-8"></div>
+                <div class="b w-260 h-160 pad-0 border-8"></div>
+                <div class="c grow h-160 pad-0 border-8"></div>
             </div>
-            <div class="row row pad-0 gap-10 bg-none">
-                <div class="d w-180 h-60 pad-0"></div>
-                <div class="e w-60 h-60 pad-0"></div>
-                <div class="f w-60 h-60 pad-0"></div>
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="d grow h-120 pad-0 border-8"></div>
+                <div class="e w-200 h-120 pad-0 border-8"></div>
+                <div class="f w-120 h-120 pad-0 border-8"></div>
             </div>
+            <div class="g grow h-160 pad-0 border-8"></div>
         </div>
     }
 }
@@ -18,4 +19,3 @@ component App {
 app {
     root = App;
 }
-
