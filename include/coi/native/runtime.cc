@@ -1236,6 +1236,7 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	    static inline tick_fn tick = nullptr;
 	    static inline int frames_limit = -1;
 	    static inline int frames = 0;
+	    static inline bool render_swapchain = true;
 	    static inline std::unordered_map<int32_t, Rect> layout;
 	    static inline std::vector<int32_t> draw_list;
 
@@ -1434,6 +1435,19 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 
 #if defined(COI_NATIVE_CAPTURE)
 	        capture_init();
+#endif
+
+#if defined(__linux__) || defined(__unix__)
+	        // Offscreen capture-only mode doesn't need a visible window; we only use sokol_app
+	        // to get a GL context. Hide the X11 window to avoid popups during visual runs.
+	        if (!render_swapchain) {
+	            Display* dpy = (Display*)sapp_x11_display();
+	            Window win = (Window)(uintptr_t)sapp_x11_window();
+	            if (dpy && win) {
+	                XUnmapWindow(dpy, win);
+	                XFlush(dpy);
+	            }
+	        }
 #endif
 	    }
 
@@ -2121,14 +2135,15 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
         }
 #endif
 
-        sg_pass_action pass{};
-        pass.colors[0].load_action = SG_LOADACTION_CLEAR;
-        pass.colors[0].clear_value = {0.08f, 0.08f, 0.10f, 1.0f};
+	        sg_pass_action pass{};
+	        pass.colors[0].load_action = SG_LOADACTION_CLEAR;
+	        pass.colors[0].clear_value = {0.08f, 0.08f, 0.10f, 1.0f};
 
-        sg_pass p{};
-        p.action = pass;
-        p.swapchain = sglue_swapchain();
-        sg_begin_pass(&p);
+	        if (render_swapchain) {
+	        sg_pass p{};
+	        p.action = pass;
+	        p.swapchain = sglue_swapchain();
+	        sg_begin_pass(&p);
 
         sgl_defaults();
         sgl_viewport(0, 0, sapp_width(), sapp_height(), true);
@@ -2512,15 +2527,16 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
         }
 
 #if defined(COI_NATIVE_CAPTURE)
-        // In X11 capture mode, read back the swapchain framebuffer before ending the pass.
-        capture_maybe_swapchain(dt);
+	        // In X11 capture mode, read back the swapchain framebuffer before ending the pass.
+	        capture_maybe_swapchain(dt);
 #endif
-        sg_end_pass();
+	        sg_end_pass();
+	        }
 #if defined(COI_NATIVE_CAPTURE)
-        // In offscreen capture mode, render to a separate target after ending the swapchain pass.
-        capture_maybe(pass, dt);
+	        // In offscreen capture mode, render to a separate target after ending the swapchain pass.
+	        capture_maybe(pass, dt);
 #endif
-        sg_commit();
+	        sg_commit();
 
         frames++;
         if (frames_limit > 0 && frames >= frames_limit) {
@@ -2576,23 +2592,8 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 #if defined(COI_NATIVE_CAPTURE)
 	        const char* dir = std::getenv("COI_NATIVE_CAPTURE_DIR");
 	        const bool capture_requested = (dir && *dir);
-	        if (!want_window && capture_requested) {
-	            // "Headless" capture still needs a GL context. For offscreen capture we prefer
-	            // using the capture size as the GL backbuffer size to avoid backend bugs where
-	            // origin_top_left viewport/scissor conversions use the swapchain height.
-	            const char* size = std::getenv("COI_NATIVE_CAPTURE_SIZE");
-	            if (!parse_wh(size, win_w, win_h)) {
-	                // Default to a deterministic size matching the visual tests.
-	                win_w = 960;
-	                win_h = 540;
-	            }
-	            desc.window_title = "COI (Desktop, headless capture)";
-	        }
-
-	        // If X11 capture is selected and a size is provided, prefer it as the window size
-	        // so that X11-based capture is deterministic.
+	        CaptureMode mode = CaptureMode::Offscreen;
 	        if (capture_requested) {
-	            CaptureMode mode = CaptureMode::Offscreen;
 #if defined(__linux__) || defined(__unix__)
 	            mode = want_window ? CaptureMode::X11 : CaptureMode::Offscreen;
 #endif
@@ -2603,13 +2604,27 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 	                    if (mm == "offscreen") mode = CaptureMode::Offscreen;
 	                }
 	            }
-	            if (mode == CaptureMode::X11) {
-	                const char* size = std::getenv("COI_NATIVE_CAPTURE_SIZE");
-	                int cw = 0, ch = 0;
-	                if (parse_wh(size, cw, ch)) {
-	                    win_w = cw;
-	                    win_h = ch;
-	                }
+	        }
+
+	        if (!want_window && capture_requested && mode == CaptureMode::Offscreen) {
+	            // Capture-only offscreen mode: no need to render the swapchain at all.
+	            // Keep the context window tiny and hide it in init().
+	            render_swapchain = false;
+	            win_w = 32;
+	            win_h = 32;
+	            desc.window_title = "COI (Native, capture)";
+	        } else {
+	            render_swapchain = true;
+	        }
+
+	        // If X11 capture is selected and a size is provided, prefer it as the window size
+	        // so that X11-based capture is deterministic.
+	        if (capture_requested && mode == CaptureMode::X11) {
+	            const char* size = std::getenv("COI_NATIVE_CAPTURE_SIZE");
+	            int cw = 0, ch = 0;
+	            if (parse_wh(size, cw, ch)) {
+	                win_w = cw;
+	                win_h = ch;
 	            }
 	        }
 #endif
