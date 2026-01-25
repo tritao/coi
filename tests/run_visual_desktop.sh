@@ -28,6 +28,8 @@ fi
 MODE="compare" # compare | update
 SCENE_FILTER=""
 LIST_ONLY=0
+UI_MODE="headless" # headless | window
+CAPTURE_MODE="offscreen" # offscreen | x11
 
 BASELINE_DIR="$ROOT_DIR/tests/desktop/visual/baseline"
 OUT_DIR="${TMPDIR:-/tmp}/coi-visual-desktop"
@@ -49,6 +51,9 @@ Options:
   --update                    Write baselines into tests/desktop/visual/baseline/<scene>/
   --scene <name>              Run only one scene (exact), or use prefix/glob (e.g. layout_*, layout_)
   --list                      List available scenes (honors --scene filter)
+  --window                    Run scenes with a visible window (default: headless)
+  --headless                  Run scenes headlessly (default)
+  --capture-mode <mode>       Capture mode: offscreen|x11 (default: offscreen)
   --baseline-dir <dir>        Baseline directory (default: $BASELINE_DIR)
   --out-dir <dir>             Capture output directory (default: $OUT_DIR)
   --size <WxH>                Capture size (default: $CAPTURE_SIZE)
@@ -66,6 +71,9 @@ while [[ $# -gt 0 ]]; do
     --update) MODE="update"; shift;;
     --scene) SCENE_FILTER="${2:-}"; shift 2;;
     --list) LIST_ONLY=1; shift;;
+    --window) UI_MODE="window"; shift;;
+    --headless) UI_MODE="headless"; shift;;
+    --capture-mode) CAPTURE_MODE="${2:-}"; shift 2;;
     --baseline-dir) BASELINE_DIR="${2:-}"; shift 2;;
     --out-dir) OUT_DIR="${2:-}"; shift 2;;
     --size) CAPTURE_SIZE="${2:-}"; shift 2;;
@@ -78,6 +86,11 @@ while [[ $# -gt 0 ]]; do
     *) echo "error: unknown arg: $1"; usage; exit 1;;
   esac
 done
+
+if [[ "$CAPTURE_MODE" != "offscreen" && "$CAPTURE_MODE" != "x11" ]]; then
+  echo "error: invalid --capture-mode: $CAPTURE_MODE (expected: offscreen|x11)"
+  exit 1
+fi
 
 scenes=(
   "font_window_demo:$ROOT_DIR/tests/desktop/visual/scenes/font_window_demo.coi"
@@ -156,9 +169,16 @@ if [[ "$need_xvfb" -eq 1 ]]; then
 fi
 
 capture_env_prefix=()
-if [[ "$need_xvfb" -eq 1 ]]; then
-  # Xvfb's GL stack often can't create offscreen render targets; use X11-based capture instead.
-  capture_env_prefix=(env COI_DESKTOP_CAPTURE_MODE=x11)
+capture_env_prefix=(env COI_DESKTOP_CAPTURE_MODE="$CAPTURE_MODE")
+
+ui_args=(--headless)
+if [[ "$UI_MODE" == "window" ]]; then
+  ui_args=(--window)
+fi
+# x11 capture requires a visible window/swapchain readback.
+if [[ "$UI_MODE" == "headless" && "$CAPTURE_MODE" == "x11" ]]; then
+  echo "warning: --capture-mode x11 requires --window; forcing capture-mode=offscreen"
+  capture_env_prefix=(env COI_DESKTOP_CAPTURE_MODE=offscreen)
 fi
 
 mkdir -p "$OUT_DIR"
@@ -226,7 +246,7 @@ for entry in "${scenes[@]}"; do
 
   if [[ "$MODE" == "update" ]]; then
     mkdir -p "$scene_base"
-    "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+    "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop "${ui_args[@]}" --frames "$FRAMES" \
       --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES"
 
     rm -rf "$scene_base"
@@ -246,7 +266,7 @@ for entry in "${scenes[@]}"; do
   fi
 
   set +e
-  "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop --window --frames "$FRAMES" \
+  "${run_cmd_prefix[@]}" "${capture_env_prefix[@]}" env "${extra_env[@]}" "$COI_BIN" run "$path" --target desktop "${ui_args[@]}" --frames "$FRAMES" \
     --capture "$scene_out" --capture-size "$CAPTURE_SIZE" --capture-every "$EVERY" --capture-max "$MAX_CAPTURES" \
     --capture-baseline "$scene_base" --capture-tolerance "$TOLERANCE" --capture-fail
   rc=$?
