@@ -926,16 +926,17 @@ struct ClayEngine {
         ctx = Clay_Initialize(arena, Clay_Dimensions{w, h}, Clay_ErrorHandler{error_handler, nullptr});
         Clay_SetCurrentContext(ctx);
         Clay_SetMeasureTextFunction(measure_text, nullptr);
-        text_cfg = CLAY_TEXT_CONFIG({
-            .textColor = {235, 235, 240, 255},
-            .fontId = 0,
-            .fontSize = 8,
-            .letterSpacing = 0,
-            .lineHeight = 8,
-            .wrapMode = CLAY_TEXT_WRAP_WORDS,
-            .textAlignment = CLAY_TEXT_ALIGN_LEFT,
-        });
-    }
+	        text_cfg = CLAY_TEXT_CONFIG({
+	            .textColor = {235, 235, 240, 255},
+	            .fontId = 0,
+	            // Match typical browser defaults: 16px text with ~1.125 line-height.
+	            .fontSize = 16,
+	            .letterSpacing = 0,
+	            .lineHeight = 18,
+	            .wrapMode = CLAY_TEXT_WRAP_WORDS,
+	            .textAlignment = CLAY_TEXT_ALIGN_LEFT,
+	        });
+	    }
 
     static void set_input(float x, float y, bool down, float scroll_x, float scroll_y, float dt) {
         pointer_pos = Clay_Vector2{x, y};
