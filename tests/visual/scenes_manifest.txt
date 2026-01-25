@@ -21,7 +21,7 @@ layout_min_max_constraints|tests/native/visual/scenes/layout/min_max_constraints
 layout_align_main_cross|tests/native/visual/scenes/layout/align_main_cross.coi|native,web
 
 clip_overflow_hidden|tests/native/visual/scenes/clip/overflow_hidden.coi|native,web
-clip_overflow_axes|tests/native/visual/scenes/clip/overflow_axes.coi|native
+clip_overflow_axes|tests/native/visual/scenes/clip/overflow_axes.coi|native,web
 
 scroll_y_basic|tests/native/visual/scenes/scroll/scroll_y_basic.coi|native,web
 scroll_nested_clip|tests/native/visual/scenes/scroll/nested_clip.coi|native,web

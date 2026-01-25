@@ -713,6 +713,12 @@ for i in "${!names[@]}"; do
   fi
 done
 
+if [[ "$ran_count" -eq 0 ]]; then
+  echo "error: no scenes matched (backend=$BACKEND scene_filter='${SCENE_FILTER:-}')" >&2
+  echo "hint: list scenes with: $0 --backend $BACKEND --list" >&2
+  exit 1
+fi
+
 if [[ "$OPEN_AFTER" -eq 1 ]]; then
   if [[ "$ran_count" -le 1 ]]; then
     python3 "$ROOT_DIR/tests/visual/make_run_output_index.py" --root "$last_scene_out" --out "$last_scene_out/index.html" --title "COI Visual Output" >/dev/null
