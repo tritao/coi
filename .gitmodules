@@ -1,3 +1,9 @@
 [submodule "deps/webcc"]
 	path = deps/webcc
 	url = https://github.com/io-eric/webcc
+[submodule "deps/sokol"]
+	path = deps/sokol
+	url = https://github.com/floooh/sokol
+[submodule "deps/rmlui"]
+	path = deps/rmlui
+	url = https://github.com/mikke89/RmlUi
