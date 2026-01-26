@@ -1,145 +1,3 @@
-struct InputState {
-    float mouse_x = 0.0f;
-    float mouse_y = 0.0f;
-    bool mouse_down = false;
-    float scroll_x = 0.0f;
-    float scroll_y = 0.0f;
-};
-
-// Shared geometry helper for the tree backend's retained layout map.
-// (Kept here because TreeBackend stores rectangles and this type is used
-// in method bodies defined in this header.)
-struct Rect {
-    float x = 0.0f;
-    float y = 0.0f;
-    float w = 0.0f;
-    float h = 0.0f;
-};
-
-class UiBackend {
-  public:
-    virtual ~UiBackend() = default;
-    virtual const char* name() const = 0;
-
-    virtual void init_gfx() {}
-    virtual void shutdown_gfx() {}
-
-    virtual void set_input(const InputState& input, float dt, float dpi) = 0;
-    virtual void layout(float w, float h, float dpi) = 0;
-    virtual void render(float w, float h, float dpi) = 0;
-    virtual bool hit_test(float x, float y, float dpi, webcc::handle& out) = 0;
-    virtual void scroll_by(float pointer_x, float pointer_y, float dx, float dy, float w, float h) = 0;
-
-    // Backend health / optional capabilities.
-    virtual bool is_ok() const { return true; }
-    virtual bool font_ok() const { return true; }
-    virtual void* measure_userdata() { return nullptr; }
-};
-
-class TreeBackend final : public UiBackend {
-  public:
-    const char* name() const override { return "tree"; }
-
-    void set_input(const InputState&, float, float) override {}
-
-    void layout(float w, float h, float) override {
-        layout_map.clear();
-        draw_list.clear();
-        (void)layout_node(0, 0.0f, 0.0f, w, h);
-    }
-
-    void render(float, float, float) override {
-        sgl_begin_quads();
-        for (int32_t id : draw_list) {
-            if (id == 0) continue;
-            auto itn = coi::ui::g_nodes.find(id);
-            if (itn == coi::ui::g_nodes.end()) continue;
-            const auto& n = itn->second;
-            if (n.tag == "comment") continue;
-            auto itr = layout_map.find(id);
-            if (itr == layout_map.end()) continue;
-            const Rect& r = itr->second;
-            const webcc::string* cls = attr(n, "class");
-            uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
-            float cr, cg, cb;
-            color_from_hash(h, cr, cg, cb);
-            sgl_c4f(cr, cg, cb, 0.18f);
-            float x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
-            sgl_v2f(x0, y0);
-            sgl_v2f(x1, y0);
-            sgl_v2f(x1, y1);
-            sgl_v2f(x0, y1);
-        }
-        sgl_end();
-        sgl_draw();
-    }
-
-    bool hit_test(float x, float y, float, webcc::handle& out) override {
-        out = webcc::handle();
-        for (auto it = draw_list.rbegin(); it != draw_list.rend(); ++it) {
-            int32_t id = *it;
-            auto itr = layout_map.find(id);
-            if (itr == layout_map.end()) continue;
-            const Rect& r = itr->second;
-            if (x >= r.x && x <= (r.x + r.w) && y >= r.y && y <= (r.y + r.h)) {
-                out = webcc::handle(id);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    void scroll_by(float, float, float, float, float, float) override {}
-
-  private:
-    std::unordered_map<int32_t, Rect> layout_map;
-    std::vector<int32_t> draw_list;
-
-    float layout_node(int32_t id, float x, float y, float w, float max_h) {
-        auto it = coi::ui::g_nodes.find(id);
-        if (it == coi::ui::g_nodes.end()) return 0.0f;
-        const auto& n = it->second;
-        const bool is_root = (id == 0);
-        const float pad = is_root ? 16.0f : 12.0f;
-        const float gap = 10.0f;
-        float content_x = x + pad;
-        float content_y = y + pad;
-        float content_w = std::max(1.0f, w - 2.0f * pad);
-        float used_h = pad * 2.0f;
-
-        if (!n.text.empty() && !n.children.empty()) {
-            float th = measure_text_h(n, content_w);
-            used_h += th + gap;
-            content_y += th + gap;
-        }
-
-        float cur_y = content_y;
-        for (int32_t c : n.children) {
-            float child_h = layout_node(c, content_x, cur_y, content_w, max_h);
-            if (child_h <= 0.0f) continue;
-            cur_y += child_h + gap;
-            used_h += child_h + gap;
-        }
-        if (!n.children.empty()) used_h -= gap;
-
-        if (n.children.empty()) {
-            float th = measure_text_h(n, content_w);
-            used_h = std::max(used_h, pad * 2.0f + th);
-        }
-
-        if (is_root) {
-            used_h = max_h;
-        } else {
-            used_h = std::min(used_h, max_h);
-            used_h = std::max(used_h, 32.0f);
-        }
-
-        layout_map[id] = Rect{x, y, w, used_h};
-        draw_list.push_back(id);
-        return used_h;
-    }
-};
-
 #if defined(COI_NATIVE_CLAY)
 class ClayBackend final : public UiBackend {
   public:
@@ -258,82 +116,45 @@ class ClayBackend final : public UiBackend {
         sgl_draw();
 #else
         auto iround = [](float v) -> int { return (int)std::lround((double)v); };
-        struct IRect {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-        };
-        auto intersect = [](const IRect& a, const IRect& b) -> IRect {
-            int x0 = std::max(a.x, b.x);
-            int y0 = std::max(a.y, b.y);
-            int x1 = std::min(a.x + a.w, b.x + b.w);
-            int y1 = std::min(a.y + a.h, b.y + b.h);
-            IRect out;
-            out.x = x0;
-            out.y = y0;
-            out.w = std::max(0, x1 - x0);
-            out.h = std::max(0, y1 - y0);
-            return out;
-        };
-        auto apply_scissor = [&](const IRect& r) { sgl_scissor_rect(r.x, r.y, r.w, r.h, true /* origin_top_left */); };
-
-        const IRect full{0, 0, iround(w), iround(h)};
-        std::vector<IRect> scissor_stack;
-        apply_scissor(full);
-
-        bool quads_open = false;
-        auto begin_quads = [&]() {
-            if (!quads_open) {
-                sgl_begin_quads();
-                quads_open = true;
-            }
-        };
-        auto flush_quads = [&]() {
-            if (quads_open) {
-                sgl_end();
-                sgl_draw();
-                quads_open = false;
-            }
-        };
-        auto quad = [&](float x, float y, float ww, float hh) {
-            float x0 = x, y0 = y, x1 = x + ww, y1 = y + hh;
+        auto quad = [&](float x, float y, float w, float h) {
+            float x0 = x;
+            float y0 = y;
+            float x1 = x + w;
+            float y1 = y + h;
             sgl_v2f(x0, y0);
             sgl_v2f(x1, y0);
             sgl_v2f(x1, y1);
             sgl_v2f(x0, y1);
         };
 
-        begin_quads();
+        sgl_scissor_rect(0, 0, (int)w, (int)h, true /* origin_top_left */);
+        sgl_begin_quads();
+
+        auto flush_quads = [&]() {
+            sgl_end();
+            sgl_draw();
+            sgl_begin_quads();
+        };
+
         for (int32_t i = 0; i < render_commands.length; i++) {
             Clay_RenderCommand* cmd = Clay_RenderCommandArray_Get(&render_commands, i);
             if (!cmd) continue;
-            if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) {
-                flush_quads();
-                const auto& bb = cmd->boundingBox;
-                IRect r{iround(bb.x), iround(bb.y), std::max(0, iround(bb.width)), std::max(0, iround(bb.height))};
-                if (!scissor_stack.empty()) r = intersect(scissor_stack.back(), r);
-                scissor_stack.push_back(r);
-                apply_scissor(r);
-                begin_quads();
-                continue;
-            }
-            if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) {
-                flush_quads();
-                if (!scissor_stack.empty()) scissor_stack.pop_back();
-                apply_scissor(scissor_stack.empty() ? full : scissor_stack.back());
-                begin_quads();
-                continue;
-            }
             const auto& bb = cmd->boundingBox;
+            const auto clip = cmd->clip;
+            const bool clipped = (cmd->clip.width > 0.0f && cmd->clip.height > 0.0f);
+            if (clipped) {
+                flush_quads();
+                sgl_scissor_rect(iround(clip.x), iround(clip.y), iround(clip.width), iround(clip.height), true /* origin_top_left */);
+            }
+
             if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) {
-                const auto& c = cmd->renderData.rectangle.backgroundColor;
+                const auto& r = cmd->renderData.rectangle;
+                const Clay_Color c = r.backgroundColor;
                 sgl_c4f(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
                 quad(bb.x, bb.y, bb.width, bb.height);
             } else if (cmd->commandType == CLAY_RENDER_COMMAND_TYPE_BORDER) {
                 const auto& b = cmd->renderData.border;
-                const auto& c = b.color;
-                if (c.a <= 0) continue;
+                const Clay_Color c = b.color;
                 float ww = std::max(0.0f, bb.width);
                 float hh = std::max(0.0f, bb.height);
                 float l = std::min<float>((float)b.width.left, ww);
@@ -456,16 +277,10 @@ class ClayBackend final : public UiBackend {
 #endif
 #endif
 };
-#endif // COI_NATIVE_CLAY
 
-inline TreeBackend& tree_backend() {
-    static TreeBackend b;
-    return b;
-}
-
-#if defined(COI_NATIVE_CLAY)
 inline ClayBackend& clay_backend() {
     static ClayBackend b;
     return b;
 }
-#endif
+#endif // COI_NATIVE_CLAY
+

@@ -73,8 +73,10 @@ bool g_sokol_frame_started = false;
 #include "runtime/style_class_parser.h"
 #include "runtime/clay_engine.h"
 #include "runtime/debug_text.h"
-#include "runtime/ui_backend.h"
-#include "runtime/rmlui_backend.h"
+#include "runtime/backends/backend.h"
+#include "runtime/backends/tree_backend.h"
+#include "runtime/backends/clay_backend.h"
+#include "runtime/backends/rmlui_backend.h"
 #include "runtime/sokol_runner.h"
 #include "runtime/debug_tools.h"
 
