@@ -38,6 +38,15 @@ using tick_fn = void (*)(void*, double);
 
 void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb);
 
+// Inject input events into the native runtime (used by scripts/tests).
+// Only has an effect when compiled with `COI_NATIVE_SOKOL`.
+void inject_mouse_move(float x, float y);
+void inject_mouse_down(float x, float y);
+void inject_mouse_up(float x, float y);
+void inject_key_down(int key_code, uint32_t modifiers = 0, bool repeat = false);
+void inject_key_up(int key_code, uint32_t modifiers = 0);
+void inject_char(uint32_t char_code, uint32_t modifiers = 0, bool repeat = false);
+
 // Native-only flush (scripts, dumps, etc). Generated code calls this in the native main loop.
 void flush();
 

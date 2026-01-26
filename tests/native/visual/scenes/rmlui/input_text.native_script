@@ -1,0 +1,15 @@
+# Focus the input field and type. Delay so frame 0 capture isn't empty.
+wait 1
+mousedown 80 160
+wait 1
+mouseup 80 160
+wait 1
+text Hello COI!
+
+# Also ensure textarea accepts newlines.
+wait 1
+mousedown 80 260
+wait 1
+mouseup 80 260
+wait 1
+text line1\\nline2

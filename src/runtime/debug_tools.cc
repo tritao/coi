@@ -23,6 +23,7 @@
 
 #include "runtime/clay/engine.h"
 #include "runtime/clay/style_map.h"
+#include "runtime/deps_sokol.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -370,6 +371,57 @@ inline std::vector<std::string> split_ws(const std::string& s) {
     return out;
 }
 
+inline std::string unescape_script_text(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); i++) {
+        char c = s[i];
+        if (c != '\\' || i + 1 >= s.size()) {
+            out.push_back(c);
+            continue;
+        }
+        char n = s[i + 1];
+        i++;
+        switch (n) {
+        case 'n':
+            out.push_back('\n');
+            break;
+        case 't':
+            out.push_back('\t');
+            break;
+        case 'r':
+            out.push_back('\r');
+            break;
+        case '\\':
+            out.push_back('\\');
+            break;
+        default:
+            out.push_back(n);
+            break;
+        }
+    }
+    return out;
+}
+
+inline int keycode_for_name(std::string s) {
+    for (char& c : s) c = (char)std::tolower((unsigned char)c);
+    if (s == "enter" || s == "return") return SAPP_KEYCODE_ENTER;
+    if (s == "tab") return SAPP_KEYCODE_TAB;
+    if (s == "backspace" || s == "bs") return SAPP_KEYCODE_BACKSPACE;
+    if (s == "delete" || s == "del") return SAPP_KEYCODE_DELETE;
+    if (s == "escape" || s == "esc") return SAPP_KEYCODE_ESCAPE;
+    if (s == "left") return SAPP_KEYCODE_LEFT;
+    if (s == "right") return SAPP_KEYCODE_RIGHT;
+    if (s == "up") return SAPP_KEYCODE_UP;
+    if (s == "down") return SAPP_KEYCODE_DOWN;
+    if (s == "home") return SAPP_KEYCODE_HOME;
+    if (s == "end") return SAPP_KEYCODE_END;
+    if (s == "pageup" || s == "pgup") return SAPP_KEYCODE_PAGE_UP;
+    if (s == "pagedown" || s == "pgdn") return SAPP_KEYCODE_PAGE_DOWN;
+    if (s == "space") return SAPP_KEYCODE_SPACE;
+    return 0;
+}
+
 struct DesktopScriptRunner {
     bool loaded = false;
     bool ran = false;
@@ -521,6 +573,47 @@ inline void run_script_if_any() {
                 ok = parse_xy((toks[1] + " " + toks[2]).c_str(), x, y);
             }
             if (ok) simulate_click_at(x, y, g_script.viewport_w, g_script.viewport_h);
+        } else if (cmd == "mousedown") {
+            float x = g_script.pointer_x;
+            float y = g_script.pointer_y;
+            if (toks.size() >= 3) ok = parse_xy((toks[1] + " " + toks[2]).c_str(), x, y);
+            if (ok) inject_mouse_down(x, y);
+        } else if (cmd == "mouseup") {
+            float x = g_script.pointer_x;
+            float y = g_script.pointer_y;
+            if (toks.size() >= 3) ok = parse_xy((toks[1] + " " + toks[2]).c_str(), x, y);
+            if (ok) inject_mouse_up(x, y);
+        } else if (cmd == "text" || cmd == "type") {
+            size_t pos = line.find_first_of(" \t");
+            if (pos == std::string::npos) {
+                ok = false;
+            } else {
+                std::string rest = trim_copy(line.substr(pos + 1));
+                rest = unescape_script_text(rest);
+                for (unsigned char ch : rest) {
+                    inject_char((uint32_t)ch);
+                }
+            }
+        } else if (cmd == "key") {
+            if (toks.size() < 2) {
+                ok = false;
+            } else {
+                const int kc = keycode_for_name(toks[1]);
+                if (kc == 0) {
+                    ok = false;
+                } else {
+                    std::string mode = (toks.size() >= 3) ? toks[2] : "press";
+                    for (char& c : mode) c = (char)std::tolower((unsigned char)c);
+                    if (mode == "down") {
+                        inject_key_down(kc);
+                    } else if (mode == "up") {
+                        inject_key_up(kc);
+                    } else {
+                        inject_key_down(kc);
+                        inject_key_up(kc);
+                    }
+                }
+            }
         } else if (cmd == "scroll") {
             if (toks.size() < 3) {
                 ok = false;

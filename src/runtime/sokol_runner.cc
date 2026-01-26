@@ -28,6 +28,47 @@ bool g_sokol_frame_started = false;
 webcc::function<bool(webcc::handle)> g_click_dispatcher;
 void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) { g_click_dispatcher = std::move(cb); }
 
+static inline std::array<InputEvent, 64> g_injected_events{};
+static inline uint32_t g_injected_event_count = 0;
+
+static inline bool g_injected_mouse_pos_valid = false;
+static inline float g_injected_mouse_x = 0.0f;
+static inline float g_injected_mouse_y = 0.0f;
+static inline bool g_injected_mouse_down_valid = false;
+static inline bool g_injected_mouse_down = false;
+
+static inline void inject_event(InputEventType type, int key_code, uint32_t char_code, uint32_t modifiers, bool repeat) {
+    if (g_injected_event_count >= g_injected_events.size()) return;
+    InputEvent& e = g_injected_events[g_injected_event_count++];
+    e.type = type;
+    e.key_code = key_code;
+    e.char_code = char_code;
+    e.modifiers = modifiers;
+    e.repeat = repeat;
+}
+
+void inject_key_down(int key_code, uint32_t modifiers, bool repeat) { inject_event(InputEventType::KeyDown, key_code, 0, modifiers, repeat); }
+void inject_key_up(int key_code, uint32_t modifiers) { inject_event(InputEventType::KeyUp, key_code, 0, modifiers, false); }
+void inject_char(uint32_t char_code, uint32_t modifiers, bool repeat) { inject_event(InputEventType::Char, 0, char_code, modifiers, repeat); }
+
+void inject_mouse_move(float x, float y) {
+    g_injected_mouse_pos_valid = true;
+    g_injected_mouse_x = x;
+    g_injected_mouse_y = y;
+}
+
+void inject_mouse_down(float x, float y) {
+    inject_mouse_move(x, y);
+    g_injected_mouse_down_valid = true;
+    g_injected_mouse_down = true;
+}
+
+void inject_mouse_up(float x, float y) {
+    inject_mouse_move(x, y);
+    g_injected_mouse_down_valid = true;
+    g_injected_mouse_down = false;
+}
+
 struct SokolRunnerImpl {
     static inline void* app = nullptr;
     static inline tick_fn tick = nullptr;
@@ -180,6 +221,15 @@ struct SokolRunnerImpl {
 
         const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
         InputState input;
+        if (g_injected_mouse_pos_valid) {
+            mouse_x = g_injected_mouse_x;
+            mouse_y = g_injected_mouse_y;
+            g_injected_mouse_pos_valid = false;
+        }
+        if (g_injected_mouse_down_valid) {
+            mouse_down = g_injected_mouse_down;
+            g_injected_mouse_down_valid = false;
+        }
         input.mouse_x = mouse_x;
         input.mouse_y = mouse_y;
         input.mouse_down = mouse_down;
@@ -187,9 +237,13 @@ struct SokolRunnerImpl {
         input.scroll_y = scroll_y;
         scroll_x = 0.0f;
         scroll_y = 0.0f;
-        input.event_count = pending_event_count;
-        for (uint32_t i = 0; i < pending_event_count; i++) input.events[i] = pending_events[i];
+
+        uint32_t out_event_count = 0;
+        for (uint32_t i = 0; i < pending_event_count && out_event_count < input.events.size(); i++) input.events[out_event_count++] = pending_events[i];
+        for (uint32_t i = 0; i < g_injected_event_count && out_event_count < input.events.size(); i++) input.events[out_event_count++] = g_injected_events[i];
+        input.event_count = out_event_count;
         pending_event_count = 0;
+        g_injected_event_count = 0;
 
         const float fbw = (float)sapp_width();
         const float fbh = (float)sapp_height();
@@ -315,6 +369,15 @@ struct SokolRunnerImpl {
 #endif
     }
 };
+
+#else // defined(COI_NATIVE_SOKOL)
+
+void inject_mouse_move(float, float) {}
+void inject_mouse_down(float, float) {}
+void inject_mouse_up(float, float) {}
+void inject_key_down(int, uint32_t, bool) {}
+void inject_key_up(int, uint32_t) {}
+void inject_char(uint32_t, uint32_t, bool) {}
 
 #endif // defined(COI_NATIVE_SOKOL)
 

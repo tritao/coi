@@ -779,12 +779,20 @@ class RmlUiBackend final : public UiBackend {
         if (n.tag == "comment") return;
 
         const char* tag = "div";
+        auto allow_tag = [&](const char* t) -> bool {
+            return n.tag == t;
+        };
+        if (allow_tag("div") || allow_tag("span") || allow_tag("p") || allow_tag("img") || allow_tag("input") || allow_tag("textarea") ||
+            allow_tag("button") || allow_tag("label")) {
+            tag = n.tag.c_str();
+        }
         bool self_close = false;
         const webcc::string* src = attr(n, "src");
-        if (n.tag == "img" && src && n.children.empty() && n.text.empty()) {
-            tag = "img";
+        if (std::string(tag) == "img" && src && n.children.empty() && n.text.empty()) {
             self_close = true;
         }
+        const bool is_input = (std::string(tag) == "input");
+        if (is_input) self_close = true;
 
 	        const webcc::string* cls = attr(n, "class");
 	        const webcc::string_view cls_sv = cls ? webcc::string_view(cls->c_str(), cls->length()) : webcc::string_view();
@@ -803,7 +811,7 @@ class RmlUiBackend final : public UiBackend {
 	            out += "\"";
 	        }
 
-        if (tag == std::string("img") && src) {
+        if (std::string(tag) == "img" && src) {
             out += " src=\"";
             out += escape_attr(std::string(src->c_str()));
             out += "\"";
@@ -811,12 +819,21 @@ class RmlUiBackend final : public UiBackend {
 
         for (const auto& a : n.attrs) {
             if (a.key == "class") continue;
-            if (tag == std::string("img") && a.key == "src") continue;
+            if (std::string(tag) == "img" && a.key == "src") continue;
             out += " ";
             out += a.key.c_str();
             out += "=\"";
             out += escape_attr(std::string(a.value.c_str()));
             out += "\"";
+        }
+
+        if (is_input) {
+            const webcc::string* v = attr(n, "value");
+            if (!v && !n.text.empty()) {
+                out += " value=\"";
+                out += escape_attr(std::string(n.text.c_str()));
+                out += "\"";
+            }
         }
 
         if (self_close) {
@@ -825,7 +842,7 @@ class RmlUiBackend final : public UiBackend {
         }
 
         out += ">";
-        if (!n.text.empty()) out += escape_text(std::string(n.text.c_str()));
+        if (!n.text.empty() && !is_input) out += escape_text(std::string(n.text.c_str()));
         for (int32_t c : n.children) append_node_rml(out, c, false);
         out += "</";
         out += tag;
