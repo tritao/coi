@@ -7,8 +7,8 @@ component App {
           Script focuses the field and types. You should see caret + text.
         </div>
 
-        <div data-coi-edit="1" class="field float-parent fx-60 fy-140 z-1 w-820 h-56 pad-14 border-4 r-12 bg-none"></div>
-        <div data-coi-edit="1" data-coi-multiline="1" class="area float-parent fx-60 fy-220 z-1 w-820 h-120 pad-14 border-4 r-12 bg-none"></div>
+        <input type="text" value="" class="field float-parent fx-60 fy-140 z-1 w-820 h-56 pad-14 border-4 r-12" />
+        <textarea class="area float-parent fx-60 fy-220 z-1 w-820 h-120 pad-14 border-4 r-12"></textarea>
       </div>
     </div>
   }

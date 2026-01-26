@@ -23,6 +23,7 @@
 
 #if defined(COI_NATIVE_RMLUI)
 #include <RmlUi/Core.h>
+#include <RmlUi/Core/ComputedValues.h>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
@@ -421,6 +422,16 @@ class RmlUiBackend final : public UiBackend {
         // Feed input.
         ctx->ProcessMouseMove((int)std::lround(pending_input.mouse_x), (int)std::lround(pending_input.mouse_y), 0);
         if (pending_input.mouse_down && !prev_mouse_down) {
+            if (input_dbg) {
+                Rml::Element* at = ctx->GetElementAtPoint(Rml::Vector2f{pending_input.mouse_x, pending_input.mouse_y});
+                if (at) {
+                    const auto& cv = at->GetComputedValues();
+                    std::cerr << "[rmlui-input] down at <" << at->GetTagName().c_str() << "> focus=" << (int)cv.focus()
+                              << " tab_index=" << (int)cv.tab_index() << "\n";
+                } else {
+                    std::cerr << "[rmlui-input] down at (none)\n";
+                }
+            }
             ctx->ProcessMouseButtonDown(0, 0);
         } else if (!pending_input.mouse_down && prev_mouse_down) {
             ctx->ProcessMouseButtonUp(0, 0);
@@ -473,7 +484,8 @@ class RmlUiBackend final : public UiBackend {
         if (input_dbg) {
             Rml::Element* f = ctx->GetFocusElement();
             if (f != last_focus_debug) {
-                std::cerr << "[rmlui-input] focus=";
+                std::cerr << "[rmlui-input] dp=" << ctx->GetDensityIndependentPixelRatio() << " mouse=" << (int)std::lround(pending_input.mouse_x)
+                          << "," << (int)std::lround(pending_input.mouse_y) << " focus=";
                 if (f) std::cerr << "<" << f->GetTagName().c_str() << ">";
                 else std::cerr << "(none)";
                 std::cerr << "\n";
@@ -994,6 +1006,23 @@ class RmlUiBackend final : public UiBackend {
             return;
         }
         doc->Show();
+
+        const char* input_dbg = std::getenv("COI_NATIVE_RMLUI_INPUT_DEBUG");
+        if (input_dbg && *input_dbg && std::string(input_dbg) != "0") {
+            auto dump_controls = [&](auto&& self, Rml::Element* e, int depth) -> void {
+                if (!e) return;
+                const Rml::String tn = e->GetTagName();
+                if (tn == "input" || tn == "textarea") {
+                    const auto& cv = e->GetComputedValues();
+                    std::cerr << "[rmlui-input] dom <" << tn.c_str() << "> focus=" << (int)cv.focus() << " tab_index=" << (int)cv.tab_index()
+                              << " size=" << e->GetOffsetWidth() << "x" << e->GetOffsetHeight() << " pos=" << e->GetAbsoluteLeft() << ","
+                              << e->GetAbsoluteTop() << "\n";
+                }
+                const int n = e->GetNumChildren(true);
+                for (int i = 0; i < n; i++) self(self, e->GetChild(i), depth + 1);
+            };
+            dump_controls(dump_controls, doc, 0);
+        }
 
         if (dbg && *dbg && std::string(dbg) != "0") {
             std::cerr << "[rmlui] documents: " << ctx->GetNumDocuments() << "\n";
