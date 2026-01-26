@@ -883,11 +883,12 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        if (is_web_target) {
-            for (const auto& header : required_headers) {
-                out << "#include \"webcc/" << header << ".h\"\n";
-            }
-        } else {
+	        if (is_web_target) {
+	            for (const auto& header : required_headers) {
+	                out << "#include \"webcc/" << header << ".h\"\n";
+	            }
+	            out << "#include \"coi/style/css.h\"\n";
+	        } else {
             // Native target: use only WebCC core containers/types (no webcc/webcc.h, no web platform headers).
             out << "#include <algorithm>\n";
             out << "#include <chrono>\n";
@@ -927,10 +928,12 @@ int main(int argc, char **argv)
             out << "        uint32_t bl = 0; while (b[bl]) bl++;\n";
             out << "        if (a.length() != bl) return false;\n";
             out << "        const char* ap = a.data();\n";
-            out << "        for (uint32_t i = 0; i < bl; i++) if (ap[i] != b[i]) return false;\n";
-            out << "        return true;\n";
-            out << "    }\n";
-            out << "    static inline bool _coi_is_ws(char c) { return c == ' ' || c == '\\t' || c == '\\n' || c == '\\r'; }\n";
+	            out << "        for (uint32_t i = 0; i < bl; i++) if (ap[i] != b[i]) return false;\n";
+	            out << "        return true;\n";
+	            out << "    }\n";
+	            out << "    static inline webcc::string _coi_style_from_class(webcc::string_view cls) { return coi::style::css_style_attr_from_class_web(cls); }\n";
+	            out << "#if 0\n";
+	            out << "    static inline bool _coi_is_ws(char c) { return c == ' ' || c == '\\t' || c == '\\n' || c == '\\r'; }\n";
             out << "    static inline bool _coi_parse_u16(webcc::string_view s, uint16_t& out) {\n";
             out << "        if (s.length() == 0) return false;\n";
             out << "        uint32_t v = 0;\n";
@@ -1179,8 +1182,9 @@ int main(int argc, char **argv)
             out << "        if (has_opacity) { st += \"opacity:\"; st += ((int)op_u8) / 255.0f; st += \";\"; }\n";
             out << "\n";
             out << "        return st;\n";
-            out << "    }\n";
-            out << "    inline void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) {\n";
+	            out << "    }\n";
+	            out << "#endif\n";
+	            out << "    inline void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) {\n";
             out << "        webcc::dom::set_attribute(webcc::DOMElement(h), name, value);\n";
             out << "        if (_coi_sv_eq(name, \"class\")) {\n";
             out << "            webcc::string st = _coi_style_from_class(value);\n";
@@ -1728,6 +1732,8 @@ int main(int argc, char **argv)
             }
 
             std::string cmd = webcc_path.string() + " " + abs_output_cc.string();
+            // Ensure WebCC can find COI headers included by generated code (e.g. coi/style/css.h).
+            cmd += " --include-dir " + fs::absolute(exe_dir / "include").string();
             cmd += " --out " + abs_output_dir.string();
             cmd += " --cache-dir " + webcc_cache_dir.string();
             cmd += " --template " + abs_template.string();

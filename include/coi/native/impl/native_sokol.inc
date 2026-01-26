@@ -40,6 +40,9 @@
 #include "webcc/core/vector.h"
 #include "webcc/core/random.h"
 
+// Shared class-token parsing + CSS emitters used by multiple native UI backends.
+#include "coi/style/css.h"
+
 // Desktop backend runtime for Coi.
 // - Provides a retained-tree "UI" in namespace coi::ui (used by codegen).
 // - Optionally provides a Sokol window renderer under COI_NATIVE_SOKOL.

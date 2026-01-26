@@ -1,4 +1,5 @@
 #if defined(COI_NATIVE_CLAY)
+
 	struct DesktopClassStyle {
 	    bool has_dir = false;
 	    Clay_LayoutDirection dir = CLAY_TOP_TO_BOTTOM;
@@ -80,298 +81,150 @@
     Clay_TextAlignment text_align = CLAY_TEXT_ALIGN_LEFT;
 };
 
-inline bool _parse_u16(const char* s, uint16_t& out) {
-    if (!s || !*s) return false;
-    int v = 0;
-    for (const char* p = s; *p; ++p) {
-        if (*p < '0' || *p > '9') return false;
-        v = v * 10 + (*p - '0');
-        if (v > 65535) return false;
-    }
-    out = (uint16_t)v;
-    return true;
-}
-
-inline bool _parse_f32(const char* s, float& out) {
-    if (!s || !*s) return false;
-    char* end = nullptr;
-    out = std::strtof(s, &end);
-    return end && end != s;
-}
-
-inline void _for_each_class_token(const webcc::string& s, const webcc::function<void(const char* tok, int len)>& fn) {
-    const char* p = s.c_str();
-    int n = (int)std::strlen(p);
-    int i = 0;
-    while (i < n) {
-        while (i < n && (p[i] == ' ' || p[i] == '\t' || p[i] == '\n' || p[i] == '\r')) i++;
-        if (i >= n) break;
-        int j = i;
-        while (j < n && p[j] != ' ' && p[j] != '\t' && p[j] != '\n' && p[j] != '\r') j++;
-        fn(p + i, j - i);
-        i = j;
-    }
-}
-
-inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root) {
+	inline DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root) {
 	    DesktopClassStyle st{};
 	    const webcc::string* cls = attr(n, "class");
 	    if (!cls) return st;
 
-	    _for_each_class_token(*cls, webcc::function<void(const char*, int)>([&](const char* tok, int len) {
-	        std::string t(tok, (size_t)len);
-	        {
-	            uint16_t ov = 0;
-	            if (t.rfind("op-", 0) == 0 && _parse_u16(t.c_str() + 3, ov)) {
-	                st.has_opacity = true;
-	                st.opacity = std::clamp((float)ov / 255.0f, 0.0f, 1.0f);
-	                return;
-	            }
-	            if (t.rfind("opacity-", 0) == 0 && _parse_u16(t.c_str() + 8, ov)) {
-	                st.has_opacity = true;
-	                st.opacity = std::clamp((float)ov / 100.0f, 0.0f, 1.0f);
-	                return;
-	            }
-	        }
-	        if (t == "float" || t == "floating") {
-	            st.has_floating = true;
-	            st.floating_attach_to = CLAY_ATTACH_TO_ROOT;
-	            return;
-	        }
-	        if (t == "float-parent") {
-	            st.has_floating = true;
-	            st.floating_attach_to = CLAY_ATTACH_TO_PARENT;
-	            return;
-	        }
-	        if (t == "float-pass") {
-	            st.has_floating = true;
-	            st.floating_pointer_mode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH;
-	            return;
-	        }
-	        if (t == "float-clip") {
-	            st.has_floating = true;
-	            st.floating_clip_to = CLAY_CLIP_TO_ATTACHED_PARENT;
-	            return;
-	        }
-	        if (t == "text-left") {
-	            st.has_text_align = true;
-	            st.text_align = CLAY_TEXT_ALIGN_LEFT;
-	            return;
-	        }
-        if (t == "text-center") {
-            st.has_text_align = true;
-            st.text_align = CLAY_TEXT_ALIGN_CENTER;
-            return;
-        }
-        if (t == "text-right") {
-            st.has_text_align = true;
-            st.text_align = CLAY_TEXT_ALIGN_RIGHT;
-            return;
-        }
-        if (t == "row") {
-            st.has_dir = true;
-            st.dir = CLAY_LEFT_TO_RIGHT;
-            return;
-        }
-        if (t == "col") {
-            st.has_dir = true;
-            st.dir = CLAY_TOP_TO_BOTTOM;
-            return;
-        }
-        if (t == "bg-none") {
-            st.bg_none = true;
-            return;
-        }
-        if (t == "clip") {
-            st.has_clip = true;
-            st.clip_x = true;
-            st.clip_y = true;
-            return;
-        }
-        if (t == "clip-x") {
-            st.has_clip = true;
-            st.clip_x = true;
-            return;
-        }
-        if (t == "clip-y") {
-            st.has_clip = true;
-            st.clip_y = true;
-            return;
-        }
-        if (t == "scroll") {
-            st.has_clip = true;
-            st.scroll_x = true;
-            st.scroll_y = true;
-            st.clip_x = true;
-            st.clip_y = true;
-            return;
-        }
-        if (t == "scroll-x") {
-            st.has_clip = true;
-            st.scroll_x = true;
-            // Scroll-x implies the other axis is clipped (overflow hidden).
-            st.clip_x = true;
-            st.clip_y = true;
-            return;
-        }
-        if (t == "scroll-y") {
-            st.has_clip = true;
-            st.scroll_y = true;
-            // Scroll-y implies the other axis is clipped (overflow hidden).
-            st.clip_x = true;
-            st.clip_y = true;
-            return;
-        }
-        if (t == "border") {
-            st.has_border = true;
-            st.border_width = Clay_BorderWidth{1, 1, 1, 1, st.border_width.betweenChildren};
-            return;
-        }
-        if (t == "border-none") {
-            st.has_border = false;
-            st.border_width = Clay_BorderWidth{0, 0, 0, 0, 0};
-            return;
-        }
-        if (t == "rounded") {
-            st.has_corner_radius = true;
-            st.corner_radius = CLAY_CORNER_RADIUS(8);
-            return;
-        }
-        if (t == "grow") {
-            st.w_grow = true;
-            return;
-        }
-        if (t == "grow-x") {
-            st.w_grow = true;
-            return;
-        }
-        if (t == "grow-y") {
-            st.h_grow = true;
-            return;
-        }
-        if (t == "fill") {
-            st.w_grow = true;
-            st.h_grow = true;
-            return;
-        }
-        if (t == "center") {
-            st.has_align_x = true;
-            st.has_align_y = true;
-            st.align_x = CLAY_ALIGN_X_CENTER;
-            st.align_y = CLAY_ALIGN_Y_CENTER;
-            return;
-        }
-        if (t == "x-center") {
-            st.has_align_x = true;
-            st.align_x = CLAY_ALIGN_X_CENTER;
-            return;
-        }
-        if (t == "x-right") {
-            st.has_align_x = true;
-            st.align_x = CLAY_ALIGN_X_RIGHT;
-            return;
-        }
-        if (t == "y-center") {
-            st.has_align_y = true;
-            st.align_y = CLAY_ALIGN_Y_CENTER;
-            return;
-        }
-        if (t == "y-bottom") {
-            st.has_align_y = true;
-            st.align_y = CLAY_ALIGN_Y_BOTTOM;
-            return;
-        }
+	    const webcc::string_view cls_sv(cls->c_str(), cls->length());
+	    const coi::style::ClassStyle cs = coi::style::parse_class_style(cls_sv);
 
-        auto parse_u16_suffix = [&](const char* prefix, uint16_t& out, bool& flag) {
-            size_t plen = std::strlen(prefix);
-            if (t.size() <= plen) return false;
-            if (t.compare(0, plen, prefix) != 0) return false;
-            uint16_t v = 0;
-            if (!_parse_u16(t.c_str() + plen, v)) return false;
-            out = v;
-            flag = true;
-            return true;
-        };
-	        auto parse_i32_from_u16_suffix = [&](const char* prefix, int32_t& out, bool& flag) {
-	            uint16_t v = 0;
-	            if (!parse_u16_suffix(prefix, v, flag)) return false;
-	            out = (int32_t)v;
-	            return true;
-	        };
-	        auto parse_i16_from_u16_suffix = [&](const char* prefix, int16_t& out, bool& flag) {
-	            uint16_t v = 0;
-	            if (!parse_u16_suffix(prefix, v, flag)) return false;
-	            out = (int16_t)std::min<uint16_t>(v, 32767);
-	            flag = true;
-	            return true;
-	        };
-	        auto parse_f32_suffix = [&](const char* prefix, float& out, bool& flag) {
-	            size_t plen = std::strlen(prefix);
-	            if (t.size() <= plen) return false;
-	            if (t.compare(0, plen, prefix) != 0) return false;
-            float v = 0.0f;
-            if (!_parse_f32(t.c_str() + plen, v)) return false;
-            out = v;
-            flag = true;
-            return true;
-        };
+	    if (cs.dir != coi::style::Direction::NoneDir) {
+	        st.has_dir = true;
+	        st.dir = (cs.dir == coi::style::Direction::Row) ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM;
+	    }
 
-        if (parse_u16_suffix("pad-", st.pad, st.has_pad)) return;
-        if (parse_u16_suffix("p-", st.pad, st.has_pad)) return;
-        if (parse_u16_suffix("gap-", st.gap, st.has_gap)) return;
-        if (parse_u16_suffix("g-", st.gap, st.has_gap)) return;
-        if (parse_i32_from_u16_suffix("fs-", st.font_size, st.has_font_size)) return;
-        if (parse_i32_from_u16_suffix("ls-", st.letter_spacing, st.has_letter_spacing)) return;
-        if (parse_i32_from_u16_suffix("lh-", st.line_height, st.has_line_height)) return;
-        {
-            uint16_t rv = 0;
-            if (parse_u16_suffix("r-", rv, st.has_corner_radius)) {
-                st.corner_radius = CLAY_CORNER_RADIUS((float)rv);
-                return;
-            }
-            if (parse_u16_suffix("r-tl-", rv, st.has_corner_radius)) {
-                st.corner_radius.topLeft = (float)rv;
-                return;
-            }
-            if (parse_u16_suffix("r-tr-", rv, st.has_corner_radius)) {
-                st.corner_radius.topRight = (float)rv;
-                return;
-            }
-            if (parse_u16_suffix("r-bl-", rv, st.has_corner_radius)) {
-                st.corner_radius.bottomLeft = (float)rv;
-                return;
-            }
-            if (parse_u16_suffix("r-br-", rv, st.has_corner_radius)) {
-                st.corner_radius.bottomRight = (float)rv;
-                return;
-            }
-        }
-	        if (parse_f32_suffix("w-", st.w, st.w_fixed)) return;
-	        if (parse_f32_suffix("h-", st.h, st.h_fixed)) return;
-	        if (parse_f32_suffix("min-w-", st.w_min, st.w_has_min)) return;
-	        if (parse_f32_suffix("max-w-", st.w_max, st.w_has_max)) return;
-	        if (parse_f32_suffix("min-h-", st.h_min, st.h_has_min)) return;
-	        if (parse_f32_suffix("max-h-", st.h_max, st.h_has_max)) return;
-	        if (parse_f32_suffix("fx-", st.float_x, st.has_float_x)) return;
-	        if (parse_f32_suffix("fy-", st.float_y, st.has_float_y)) return;
-	        if (parse_i16_from_u16_suffix("z-", st.z_index, st.has_z_index)) return;
+	    st.w_grow = cs.grow_x;
+	    st.h_grow = cs.grow_y;
 
-	        uint16_t bw = 0;
-	        if (parse_u16_suffix("border-", bw, st.has_border)) {
-	            st.border_width.left = bw;
-            st.border_width.right = bw;
-            st.border_width.top = bw;
-            st.border_width.bottom = bw;
-            return;
-        }
-        if (parse_u16_suffix("border-between-", st.border_width.betweenChildren, st.has_border)) return;
-    }));
+	    if (cs.has_opacity) {
+	        st.has_opacity = true;
+	        st.opacity = cs.opacity;
+	    }
 
-    if (is_root) {
-        // If root asked for grow, treat it as fill.
-        if (st.w_grow) st.h_grow = true;
-    }
-    return st;
-}
+	    if (cs.float_root || cs.float_parent || cs.float_pass || cs.float_clip) {
+	        st.has_floating = true;
+	        if (cs.float_root) st.floating_attach_to = CLAY_ATTACH_TO_ROOT;
+	        if (cs.float_parent) st.floating_attach_to = CLAY_ATTACH_TO_PARENT;
+	        if (cs.float_pass) st.floating_pointer_mode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH;
+	        if (cs.float_clip) st.floating_clip_to = CLAY_CLIP_TO_ATTACHED_PARENT;
+	    }
+
+	    if (cs.has_fx) {
+	        st.has_float_x = true;
+	        st.float_x = cs.fx;
+	    }
+	    if (cs.has_fy) {
+	        st.has_float_y = true;
+	        st.float_y = cs.fy;
+	    }
+	    if (cs.has_z) {
+	        st.has_z_index = true;
+	        st.z_index = (int16_t)std::clamp<int32_t>(cs.z, 0, 32767);
+	    }
+
+	    st.bg_none = cs.bg_none;
+
+	    if (cs.clip_x || cs.clip_y || cs.scroll_x || cs.scroll_y) {
+	        st.has_clip = true;
+	        st.clip_x = cs.clip_x;
+	        st.clip_y = cs.clip_y;
+	        st.scroll_x = cs.scroll_x;
+	        st.scroll_y = cs.scroll_y;
+	    }
+
+	    if (cs.has_border || cs.has_border_between) {
+	        st.has_border = true;
+	        const uint16_t bw = cs.has_border ? cs.border : 0;
+	        st.border_width.left = bw;
+	        st.border_width.right = bw;
+	        st.border_width.top = bw;
+	        st.border_width.bottom = bw;
+	        if (cs.has_border_between) st.border_width.betweenChildren = cs.border_between;
+	    }
+
+	    if (cs.has_radius) {
+	        st.has_corner_radius = true;
+	        const float all = (float)cs.r_all;
+	        st.corner_radius = CLAY_CORNER_RADIUS(all);
+	        if (cs.r_tl) st.corner_radius.topLeft = (float)cs.r_tl;
+	        if (cs.r_tr) st.corner_radius.topRight = (float)cs.r_tr;
+	        if (cs.r_bl) st.corner_radius.bottomLeft = (float)cs.r_bl;
+	        if (cs.r_br) st.corner_radius.bottomRight = (float)cs.r_br;
+	    }
+
+	    if (cs.has_w) {
+	        st.w_fixed = true;
+	        st.w = cs.w;
+	    }
+	    if (cs.has_h) {
+	        st.h_fixed = true;
+	        st.h = cs.h;
+	    }
+	    if (cs.has_min_w) {
+	        st.w_has_min = true;
+	        st.w_min = cs.min_w;
+	    }
+	    if (cs.has_max_w) {
+	        st.w_has_max = true;
+	        st.w_max = cs.max_w;
+	    }
+	    if (cs.has_min_h) {
+	        st.h_has_min = true;
+	        st.h_min = cs.min_h;
+	    }
+	    if (cs.has_max_h) {
+	        st.h_has_max = true;
+	        st.h_max = cs.max_h;
+	    }
+
+	    if (cs.has_pad) {
+	        st.has_pad = true;
+	        st.pad = (uint16_t)std::clamp<int>( (int)std::lround(cs.pad), 0, 65535);
+	    }
+	    if (cs.has_gap) {
+	        st.has_gap = true;
+	        st.gap = (uint16_t)std::clamp<int>( (int)std::lround(cs.gap), 0, 65535);
+	    }
+
+	    if (cs.text_left) {
+	        st.has_text_align = true;
+	        st.text_align = CLAY_TEXT_ALIGN_LEFT;
+	    } else if (cs.text_center) {
+	        st.has_text_align = true;
+	        st.text_align = CLAY_TEXT_ALIGN_CENTER;
+	    } else if (cs.text_right) {
+	        st.has_text_align = true;
+	        st.text_align = CLAY_TEXT_ALIGN_RIGHT;
+	    }
+
+	    if (cs.has_fs) {
+	        st.has_font_size = true;
+	        st.font_size = (int32_t)std::lround(cs.fs);
+	    }
+	    if (cs.has_ls) {
+	        st.has_letter_spacing = true;
+	        st.letter_spacing = (int32_t)std::lround(cs.ls);
+	    }
+	    if (cs.has_lh) {
+	        st.has_line_height = true;
+	        st.line_height = (int32_t)std::lround(cs.lh);
+	    }
+
+	    if (cs.has_align_x) {
+	        st.has_align_x = true;
+	        st.align_x = (cs.align_x == 1) ? CLAY_ALIGN_X_CENTER : (cs.align_x == 2 ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT);
+	    }
+	    if (cs.has_align_y) {
+	        st.has_align_y = true;
+	        st.align_y = (cs.align_y == 1) ? CLAY_ALIGN_Y_CENTER : (cs.align_y == 2 ? CLAY_ALIGN_Y_BOTTOM : CLAY_ALIGN_Y_TOP);
+	    }
+
+	    if (is_root) {
+	        // If root asked for grow, treat it as fill.
+	        if (st.w_grow) st.h_grow = true;
+	    }
+	    return st;
+	}
 
 #endif // COI_NATIVE_CLAY
