@@ -528,8 +528,6 @@ int main(int argc, char **argv)
         std::string native_script;
         bool native_script_set = false;
         std::string native_ui_backend;
-        std::string native_script_dumps;
-        bool native_rmlui_input_debug = false;
         std::string capture_dir;
         std::string capture_size;
         int capture_every = -1;
@@ -570,15 +568,6 @@ int main(int argc, char **argv)
                     ErrorHandler::cli_error("--ui-backend requires an argument (auto|clay|rmlui|tree)");
                     return 1;
                 }
-            } else if (arg == "--script-dumps") {
-                if (i + 1 < argc) {
-                    native_script_dumps = argv[++i];
-                } else {
-                    ErrorHandler::cli_error("--script-dumps requires an argument (0|tree|layout|render|all)");
-                    return 1;
-                }
-            } else if (arg == "--rmlui-input-debug") {
-                native_rmlui_input_debug = true;
             } else if (arg == "--window") {
                 window = true;
                 window_set = true;
@@ -673,8 +662,6 @@ int main(int argc, char **argv)
 #endif
 
             if (!native_ui_backend.empty()) putenv_kv("COI_NATIVE_UI_BACKEND", native_ui_backend);
-            if (!native_script_dumps.empty()) putenv_kv("COI_NATIVE_SCRIPT_DUMPS", native_script_dumps);
-            if (native_rmlui_input_debug) putenv_kv("COI_NATIVE_RMLUI_INPUT_DEBUG", "1");
             if (native_script_set && !native_script.empty()) putenv_kv("COI_NATIVE_SCRIPT", native_script);
 
             if (test_sidecars && !run_input.empty()) {
