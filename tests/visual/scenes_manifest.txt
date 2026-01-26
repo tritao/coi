@@ -1,7 +1,46 @@
 # name|path|backends
-# backends: web (comma-separated)
+# backends: native,web (comma-separated)
 
-paint_rects|tests/visual/scenes/paint_rects.coi|web
-input_zindex_click|tests/visual/scenes/input_zindex_click.coi|web
-input_clip_click|tests/visual/scenes/input_clip_click.coi|web
+# Keep the default web scene set intentionally small (used by web gallery + integration tests).
+paint_rects|tests/native/visual/scenes/paint/rects.coi|native,web
+input_zindex_click|tests/native/visual/scenes/input/zindex_click.coi|native,web
+input_clip_click|tests/native/visual/scenes/input/clip_click.coi|native,web
+
+# Native visual scenes
+font_window_demo|tests/native/visual/scenes/font_window_demo.coi|native
+
+paint_border_widths|tests/native/visual/scenes/paint/border_widths.coi|native
+paint_bg_none|tests/native/visual/scenes/paint/bg_none.coi|native
+paint_corner_radius_basic|tests/native/visual/scenes/paint/corner_radius_basic.coi|native
+paint_corner_radius_per_corner|tests/native/visual/scenes/paint/corner_radius_per_corner.coi|native
+paint_opacity_overlap|tests/native/visual/scenes/paint/opacity_overlap.coi|native
+paint_border_radius_combo|tests/native/visual/scenes/paint/border_radius_combo.coi|native
+paint_floating_zindex|tests/native/visual/scenes/paint/floating_zindex.coi|native
+paint_image_basic|tests/native/visual/scenes/paint/image_basic.coi|native
+paint_image_clip_radius_edges|tests/native/visual/scenes/paint/image_clip_radius_edges.coi|native
+
+layout_row_fixed_and_grow|tests/native/visual/scenes/layout/row_fixed_and_grow.coi|native
+layout_col_fixed_and_grow|tests/native/visual/scenes/layout/col_fixed_and_grow.coi|native
+layout_nested_flex|tests/native/visual/scenes/layout/nested_flex.coi|native
+layout_min_max_constraints|tests/native/visual/scenes/layout/min_max_constraints.coi|native
+layout_align_main_cross|tests/native/visual/scenes/layout/align_main_cross.coi|native
+
+clip_overflow_hidden|tests/native/visual/scenes/clip/overflow_hidden.coi|native
+clip_overflow_axes|tests/native/visual/scenes/clip/overflow_axes.coi|native
+
+scroll_y_basic|tests/native/visual/scenes/scroll/scroll_y_basic.coi|native
+scroll_nested_clip|tests/native/visual/scenes/scroll/nested_clip.coi|native
+
+text_glyphs_basic|tests/native/visual/scenes/text/glyphs_basic.coi|native
+text_wrap_measure|tests/native/visual/scenes/text/wrap_measure.coi|native
+text_alignment|tests/native/visual/scenes/text/alignment.coi|native
+
+rmlui_smoke|tests/native/visual/scenes/rmlui/smoke.coi|native
+
+# Native-only “render dump pass” golden scenes
+border_render_dump_pass|tests/native/runtime/border_render_dump_pass.coi|native
+border_between_render_dump_pass|tests/native/runtime/border_between_render_dump_pass.coi|native
+clip_render_dump_pass|tests/native/runtime/clip_render_dump_pass.coi|native
+scroll_render_dump_pass|tests/native/runtime/scroll_render_dump_pass.coi|native
+text_render_dump_pass|tests/native/runtime/text_render_dump_pass.coi|native
 

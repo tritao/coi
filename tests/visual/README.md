@@ -1,11 +1,22 @@
-# Web visual + integration tests
+# Visual tests (native + web)
 
-This folder contains lightweight tooling to:
+This folder contains shared tooling for COI visual testing:
 
-- capture **web** scene screenshots for manual review (gallery)
-- run **web integration tests** with Playwright (scripted interactions + assertions)
+- **Web visual gallery** (Playwright screenshot capture for manual review)
+- **Web integration tests** (Playwright scripted interactions + assertions)
+- **Cross-backend visual regression** (native + web PNG capture + dHash compare)
 
-## Setup
+## Layout
+
+- `scenes_manifest.txt`: list of named scenes and which backends they run on.
+- `baseline/native/`: native PNG + `.dhash` baselines.
+- `baseline/web/`: web PNG + `.dhash` baselines.
+- `dhash_png.py`: helper to compute / compare dHash from a PNG.
+- `gen_web_visual_js.py`: generates `coi_visual.js` to replay `.native_script` input on the web backend.
+
+## Setup (web-only)
+
+Only required for Playwright-based web runners (`run_web_visual.sh`, `run_web_integration.sh`, and `run_visual.sh --backend web`):
 
 ```bash
 cd tests/visual
@@ -37,3 +48,36 @@ Run:
 ./tests/run_web_integration.sh --list
 ```
 
+## Native vs web gallery (manual inspection)
+
+Generate per-scene outputs for both backends into a scratch folder and write an `index.html`
+that shows native/web images side-by-side:
+
+```bash
+./tests/visual/gallery.sh --scene paint_rects
+./tests/visual/gallery.sh --scene layout_* --out /tmp/coi-gallery
+./tests/visual/gallery.sh --set golden --out /tmp/coi-golden
+./tests/visual/gallery.sh --set golden --out /tmp/coi-golden --open
+```
+
+## Cross-backend visual regression (native + web)
+
+Native:
+
+```bash
+./tests/run_visual.sh --backend native
+./tests/run_visual.sh --backend native --update
+```
+
+Web (headless Chrome):
+
+```bash
+./tests/run_visual.sh --backend web --scene paint_rects --update
+./tests/run_visual.sh --backend web --scene paint_rects
+```
+
+Notes:
+- Web tests default to `--web-driver playwright` (using `playwright-core` + the system `google-chrome`).
+- Override browser path with `--browser /path/to/chrome` or `WEB_BROWSER=/path/to/chrome`.
+- Fallback driver (legacy): `./tests/run_visual.sh --backend web --web-driver chrome ...`
+- Add `--open` to serve and open an HTML view of the capture output.
