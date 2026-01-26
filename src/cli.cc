@@ -585,6 +585,11 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--headless" << RESET << "        (run) Native headless mode" << std::endl;
     std::cout << "    " << DIM << "--frames <n>" << RESET << "       (run) Limit native frames" << std::endl;
     std::cout << "    " << DIM << "--dump <0|1|always>" << RESET << " (run) Native tree dump mode" << std::endl;
+    std::cout << "    " << DIM << "--test" << RESET << "            (run) Load <file>.native_env + <file>.native_script" << std::endl;
+    std::cout << "    " << DIM << "--script <path>" << RESET << "    (run) Set COI_NATIVE_SCRIPT" << std::endl;
+    std::cout << "    " << DIM << "--script-dumps <v>" << RESET << " (run) Set COI_NATIVE_SCRIPT_DUMPS" << std::endl;
+    std::cout << "    " << DIM << "--ui-backend <v>" << RESET << "  (run) Set COI_NATIVE_UI_BACKEND (auto|clay|rmlui|tree)" << std::endl;
+    std::cout << "    " << DIM << "--rmlui-input-debug" << RESET << " (run) Enable RmlUI input debug logs" << std::endl;
     std::cout << "    " << DIM << "--capture <dir>" << RESET << "    (run) Save PNG screenshots (native)" << std::endl;
     std::cout << "    " << DIM << "--capture-every <n>" << RESET << " (run) Capture every N frames (default: 60)" << std::endl;
     std::cout << "    " << DIM << "--capture-max <n>" << RESET << "   (run) Stop after N captures" << std::endl;

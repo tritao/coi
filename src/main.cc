@@ -524,6 +524,12 @@ int main(int argc, char **argv)
         bool window_set = false;
         int frames = -1;
         std::string dump;
+        bool test_sidecars = false;
+        std::string native_script;
+        bool native_script_set = false;
+        std::string native_ui_backend;
+        std::string native_script_dumps;
+        bool native_rmlui_input_debug = false;
         std::string capture_dir;
         std::string capture_size;
         int capture_every = -1;
@@ -547,6 +553,32 @@ int main(int argc, char **argv)
                     ErrorHandler::cli_error("--target requires an argument (web|native)");
                     return 1;
                 }
+            } else if (arg == "--test") {
+                test_sidecars = true;
+            } else if (arg == "--script") {
+                if (i + 1 < argc) {
+                    native_script = argv[++i];
+                    native_script_set = true;
+                } else {
+                    ErrorHandler::cli_error("--script requires a path");
+                    return 1;
+                }
+            } else if (arg == "--ui-backend") {
+                if (i + 1 < argc) {
+                    native_ui_backend = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--ui-backend requires an argument (auto|clay|rmlui|tree)");
+                    return 1;
+                }
+            } else if (arg == "--script-dumps") {
+                if (i + 1 < argc) {
+                    native_script_dumps = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--script-dumps requires an argument (0|tree|layout|render|all)");
+                    return 1;
+                }
+            } else if (arg == "--rmlui-input-debug") {
+                native_rmlui_input_debug = true;
             } else if (arg == "--window") {
                 window = true;
                 window_set = true;
@@ -627,6 +659,67 @@ int main(int argc, char **argv)
         }
         if (target == "native" && !window_set) {
             window = true; // run defaults to windowed for native
+        }
+
+        if (target == "native") {
+#if defined(_WIN32)
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                _putenv_s(k.c_str(), v.c_str());
+            };
+#else
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                setenv(k.c_str(), v.c_str(), 1);
+            };
+#endif
+
+            if (!native_ui_backend.empty()) putenv_kv("COI_NATIVE_UI_BACKEND", native_ui_backend);
+            if (!native_script_dumps.empty()) putenv_kv("COI_NATIVE_SCRIPT_DUMPS", native_script_dumps);
+            if (native_rmlui_input_debug) putenv_kv("COI_NATIVE_RMLUI_INPUT_DEBUG", "1");
+            if (native_script_set && !native_script.empty()) putenv_kv("COI_NATIVE_SCRIPT", native_script);
+
+            if (test_sidecars && !run_input.empty()) {
+                try {
+                    fs::path in = fs::path(run_input);
+                    fs::path base = in;
+                    base.replace_extension();
+                    fs::path env_path = base;
+                    env_path += ".native_env";
+                    fs::path script_path = base;
+                    script_path += ".native_script";
+
+                    if (fs::exists(env_path)) {
+                        std::ifstream f(env_path);
+                        std::string line;
+                        while (std::getline(f, line)) {
+                            // trim
+                            auto ltrim = [&](std::string& s) {
+                                size_t i = 0;
+                                while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')) i++;
+                                s.erase(0, i);
+                            };
+                            auto rtrim = [&](std::string& s) {
+                                size_t j = s.size();
+                                while (j > 0 && (s[j - 1] == ' ' || s[j - 1] == '\t' || s[j - 1] == '\r' || s[j - 1] == '\n')) j--;
+                                s.erase(j);
+                            };
+                            ltrim(line);
+                            rtrim(line);
+                            if (line.empty() || line[0] == '#') continue;
+                            size_t eq = line.find('=');
+                            if (eq == std::string::npos || eq == 0) continue;
+                            const std::string k = line.substr(0, eq);
+                            const std::string v = line.substr(eq + 1);
+                            if (!k.empty()) putenv_kv(k, v);
+                        }
+                    }
+
+                    if (!native_script_set && std::getenv("COI_NATIVE_SCRIPT") == nullptr && fs::exists(script_path)) {
+                        putenv_kv("COI_NATIVE_SCRIPT", script_path.string());
+                    }
+                } catch (...) {
+                    // Best-effort only; test convenience shouldn't block running.
+                }
+            }
         }
 
         if (!capture_dir.empty() || !capture_size.empty() || capture_every >= 0 || capture_max >= 0 || !capture_baseline.empty() ||
