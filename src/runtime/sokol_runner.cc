@@ -9,6 +9,7 @@
 #include "runtime/backends/rmlui_backend.h"
 
 #include "runtime/clay_engine.h"
+#include "runtime/debug_text.h"
 #include "runtime/util.h"
 
 #if defined(__linux__) || defined(__unix__)
