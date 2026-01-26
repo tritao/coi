@@ -71,6 +71,13 @@ static inline void append_px(webcc::string& out, const char* prop, float v) {
     out += "px;";
 }
 
+static inline void append_dp(webcc::string& out, const char* prop, float v) {
+    out += prop;
+    out += ":";
+    out += (v >= 0.0f) ? (int)(v + 0.5f) : (int)(v - 0.5f);
+    out += "dp;";
+}
+
 static inline void append_clip_path_inset(webcc::string& out, const char* prop, int top, int right, int bottom, int left, uint16_t tl, uint16_t tr,
                                          uint16_t br, uint16_t bl) {
     out += prop;
@@ -270,14 +277,14 @@ inline webcc::string css_style_attr_for_node_rmlui(webcc::string_view cls, webcc
     else out += "flex-shrink:0;";
 
     if (st.has_fill) out += "width:100%;height:100%;";
-    if (st.has_w) append_px(out, "width", st.w);
-    if (st.has_h) append_px(out, "height", st.h);
-    if (st.has_min_w) append_px(out, "min-width", st.min_w);
-    if (st.has_max_w) append_px(out, "max-width", st.max_w);
-    if (st.has_min_h) append_px(out, "min-height", st.min_h);
-    if (st.has_max_h) append_px(out, "max-height", st.max_h);
-    if (st.has_pad) append_px(out, "padding", st.pad);
-    if (st.has_gap) append_px(out, "gap", st.gap);
+    if (st.has_w) append_dp(out, "width", st.w);
+    if (st.has_h) append_dp(out, "height", st.h);
+    if (st.has_min_w) append_dp(out, "min-width", st.min_w);
+    if (st.has_max_w) append_dp(out, "max-width", st.max_w);
+    if (st.has_min_h) append_dp(out, "min-height", st.min_h);
+    if (st.has_max_h) append_dp(out, "max-height", st.max_h);
+    if (st.has_pad) append_dp(out, "padding", st.pad);
+    if (st.has_gap) append_dp(out, "gap", st.gap);
 
     if (st.dir != Direction::NoneDir) {
         auto jc_for = [&](uint8_t v) -> const char* { return v == 1 ? "center" : (v == 2 ? "flex-end" : "flex-start"); };
@@ -309,8 +316,8 @@ inline webcc::string css_style_attr_for_node_rmlui(webcc::string_view cls, webcc
 
     if (st.float_root || st.float_parent || st.has_fx || st.has_fy || st.has_z) {
         out += (st.float_root ? "position:fixed;" : "position:absolute;");
-        if (st.has_fx) append_px(out, "left", st.fx);
-        if (st.has_fy) append_px(out, "top", st.fy);
+        if (st.has_fx) append_dp(out, "left", st.fx);
+        if (st.has_fy) append_dp(out, "top", st.fy);
         if (st.has_z) {
             out += "z-index:";
             out += (int)st.z;
@@ -335,16 +342,16 @@ inline webcc::string css_style_attr_for_node_rmlui(webcc::string_view cls, webcc
     if (st.text_left) out += "text-align:left;";
     else if (st.text_center) out += "text-align:center;";
     else if (st.text_right) out += "text-align:right;";
-    if (st.has_fs) append_px(out, "font-size", st.fs);
-    if (st.has_lh) append_px(out, "line-height", st.lh);
-    if (st.has_ls) append_px(out, "letter-spacing", st.ls);
+    if (st.has_fs) append_dp(out, "font-size", st.fs);
+    if (st.has_lh) append_dp(out, "line-height", st.lh);
+    if (st.has_ls) append_dp(out, "letter-spacing", st.ls);
 
     const Rgb8 col = pick_color(key);
     if (!st.bg_none && !is_root) {
         append_rgba_prop(out, CssDialect::RmlUi, "background-color", col, 0.18f);
     }
     if (st.has_border && st.border > 0) {
-        append_px(out, "border-width", (float)st.border);
+        append_dp(out, "border-width", (float)st.border);
         append_rgba_prop(out, CssDialect::RmlUi, "border-color", col, 0.71f);
     }
     if (st.has_radius) {
@@ -354,13 +361,13 @@ inline webcc::string css_style_attr_for_node_rmlui(webcc::string_view cls, webcc
         const uint16_t br = st.r_br ? st.r_br : st.r_all;
         out += "border-radius:";
         out += (int)tl;
-        out += "px ";
+        out += "dp ";
         out += (int)tr;
-        out += "px ";
+        out += "dp ";
         out += (int)br;
-        out += "px ";
+        out += "dp ";
         out += (int)bl;
-        out += "px;";
+        out += "dp;";
     }
     if (st.has_opacity) {
         out += "opacity:";

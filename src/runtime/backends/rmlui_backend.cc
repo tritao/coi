@@ -27,6 +27,7 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/ElementText.h>
+#include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/SystemInterface.h>
 #endif
@@ -425,6 +426,22 @@ class RmlUiBackend final : public UiBackend {
             ctx->ProcessMouseWheel(Rml::Vector2f{-pending_input.scroll_x, -pending_input.scroll_y}, 0);
         }
 
+        for (uint32_t i = 0; i < pending_input.event_count; i++) {
+            const InputEvent& ev = pending_input.events[i];
+            const int km = to_rml_modifiers(ev.modifiers);
+            switch (ev.type) {
+            case InputEventType::KeyDown:
+                ctx->ProcessKeyDown(to_rml_key((int)ev.key_code), km);
+                break;
+            case InputEventType::KeyUp:
+                ctx->ProcessKeyUp(to_rml_key((int)ev.key_code), km);
+                break;
+            case InputEventType::Char:
+                if (ev.char_code != 0) ctx->ProcessTextInput((Rml::Character)ev.char_code);
+                break;
+            }
+        }
+
         const uint64_t tree_rev = get_tree_rev();
         if (!doc || last_tree_rev != tree_rev) {
             rebuild_document();
@@ -503,13 +520,178 @@ class RmlUiBackend final : public UiBackend {
     bool is_ok() const override { return ctx != nullptr; }
 
   private:
+    static int to_rml_modifiers(uint32_t mods) {
+        int out = 0;
+        if (mods & SAPP_MODIFIER_CTRL) out |= Rml::Input::KM_CTRL;
+        if (mods & SAPP_MODIFIER_SHIFT) out |= Rml::Input::KM_SHIFT;
+        if (mods & SAPP_MODIFIER_ALT) out |= Rml::Input::KM_ALT;
+        if (mods & SAPP_MODIFIER_SUPER) out |= Rml::Input::KM_META;
+        return out;
+    }
+
+    static Rml::Input::KeyIdentifier to_rml_key(int key_code) {
+        switch (key_code) {
+        case SAPP_KEYCODE_SPACE:
+            return Rml::Input::KI_SPACE;
+        case SAPP_KEYCODE_APOSTROPHE:
+            return Rml::Input::KI_OEM_7;
+        case SAPP_KEYCODE_COMMA:
+            return Rml::Input::KI_OEM_COMMA;
+        case SAPP_KEYCODE_MINUS:
+            return Rml::Input::KI_OEM_MINUS;
+        case SAPP_KEYCODE_PERIOD:
+            return Rml::Input::KI_OEM_PERIOD;
+        case SAPP_KEYCODE_SLASH:
+            return Rml::Input::KI_OEM_2;
+        case SAPP_KEYCODE_0:
+            return Rml::Input::KI_0;
+        case SAPP_KEYCODE_1:
+            return Rml::Input::KI_1;
+        case SAPP_KEYCODE_2:
+            return Rml::Input::KI_2;
+        case SAPP_KEYCODE_3:
+            return Rml::Input::KI_3;
+        case SAPP_KEYCODE_4:
+            return Rml::Input::KI_4;
+        case SAPP_KEYCODE_5:
+            return Rml::Input::KI_5;
+        case SAPP_KEYCODE_6:
+            return Rml::Input::KI_6;
+        case SAPP_KEYCODE_7:
+            return Rml::Input::KI_7;
+        case SAPP_KEYCODE_8:
+            return Rml::Input::KI_8;
+        case SAPP_KEYCODE_9:
+            return Rml::Input::KI_9;
+        case SAPP_KEYCODE_SEMICOLON:
+            return Rml::Input::KI_OEM_1;
+        case SAPP_KEYCODE_EQUAL:
+            return Rml::Input::KI_OEM_PLUS;
+        case SAPP_KEYCODE_A:
+            return Rml::Input::KI_A;
+        case SAPP_KEYCODE_B:
+            return Rml::Input::KI_B;
+        case SAPP_KEYCODE_C:
+            return Rml::Input::KI_C;
+        case SAPP_KEYCODE_D:
+            return Rml::Input::KI_D;
+        case SAPP_KEYCODE_E:
+            return Rml::Input::KI_E;
+        case SAPP_KEYCODE_F:
+            return Rml::Input::KI_F;
+        case SAPP_KEYCODE_G:
+            return Rml::Input::KI_G;
+        case SAPP_KEYCODE_H:
+            return Rml::Input::KI_H;
+        case SAPP_KEYCODE_I:
+            return Rml::Input::KI_I;
+        case SAPP_KEYCODE_J:
+            return Rml::Input::KI_J;
+        case SAPP_KEYCODE_K:
+            return Rml::Input::KI_K;
+        case SAPP_KEYCODE_L:
+            return Rml::Input::KI_L;
+        case SAPP_KEYCODE_M:
+            return Rml::Input::KI_M;
+        case SAPP_KEYCODE_N:
+            return Rml::Input::KI_N;
+        case SAPP_KEYCODE_O:
+            return Rml::Input::KI_O;
+        case SAPP_KEYCODE_P:
+            return Rml::Input::KI_P;
+        case SAPP_KEYCODE_Q:
+            return Rml::Input::KI_Q;
+        case SAPP_KEYCODE_R:
+            return Rml::Input::KI_R;
+        case SAPP_KEYCODE_S:
+            return Rml::Input::KI_S;
+        case SAPP_KEYCODE_T:
+            return Rml::Input::KI_T;
+        case SAPP_KEYCODE_U:
+            return Rml::Input::KI_U;
+        case SAPP_KEYCODE_V:
+            return Rml::Input::KI_V;
+        case SAPP_KEYCODE_W:
+            return Rml::Input::KI_W;
+        case SAPP_KEYCODE_X:
+            return Rml::Input::KI_X;
+        case SAPP_KEYCODE_Y:
+            return Rml::Input::KI_Y;
+        case SAPP_KEYCODE_Z:
+            return Rml::Input::KI_Z;
+        case SAPP_KEYCODE_LEFT_BRACKET:
+            return Rml::Input::KI_OEM_4;
+        case SAPP_KEYCODE_BACKSLASH:
+            return Rml::Input::KI_OEM_5;
+        case SAPP_KEYCODE_RIGHT_BRACKET:
+            return Rml::Input::KI_OEM_6;
+        case SAPP_KEYCODE_GRAVE_ACCENT:
+            return Rml::Input::KI_OEM_3;
+        case SAPP_KEYCODE_ESCAPE:
+            return Rml::Input::KI_ESCAPE;
+        case SAPP_KEYCODE_ENTER:
+            return Rml::Input::KI_RETURN;
+        case SAPP_KEYCODE_TAB:
+            return Rml::Input::KI_TAB;
+        case SAPP_KEYCODE_BACKSPACE:
+            return Rml::Input::KI_BACK;
+        case SAPP_KEYCODE_INSERT:
+            return Rml::Input::KI_INSERT;
+        case SAPP_KEYCODE_DELETE:
+            return Rml::Input::KI_DELETE;
+        case SAPP_KEYCODE_RIGHT:
+            return Rml::Input::KI_RIGHT;
+        case SAPP_KEYCODE_LEFT:
+            return Rml::Input::KI_LEFT;
+        case SAPP_KEYCODE_DOWN:
+            return Rml::Input::KI_DOWN;
+        case SAPP_KEYCODE_UP:
+            return Rml::Input::KI_UP;
+        case SAPP_KEYCODE_PAGE_UP:
+            return Rml::Input::KI_PRIOR;
+        case SAPP_KEYCODE_PAGE_DOWN:
+            return Rml::Input::KI_NEXT;
+        case SAPP_KEYCODE_HOME:
+            return Rml::Input::KI_HOME;
+        case SAPP_KEYCODE_END:
+            return Rml::Input::KI_END;
+        case SAPP_KEYCODE_CAPS_LOCK:
+            return Rml::Input::KI_CAPITAL;
+        case SAPP_KEYCODE_F1:
+            return Rml::Input::KI_F1;
+        case SAPP_KEYCODE_F2:
+            return Rml::Input::KI_F2;
+        case SAPP_KEYCODE_F3:
+            return Rml::Input::KI_F3;
+        case SAPP_KEYCODE_F4:
+            return Rml::Input::KI_F4;
+        case SAPP_KEYCODE_F5:
+            return Rml::Input::KI_F5;
+        case SAPP_KEYCODE_F6:
+            return Rml::Input::KI_F6;
+        case SAPP_KEYCODE_F7:
+            return Rml::Input::KI_F7;
+        case SAPP_KEYCODE_F8:
+            return Rml::Input::KI_F8;
+        case SAPP_KEYCODE_F9:
+            return Rml::Input::KI_F9;
+        case SAPP_KEYCODE_F10:
+            return Rml::Input::KI_F10;
+        case SAPP_KEYCODE_F11:
+            return Rml::Input::KI_F11;
+        case SAPP_KEYCODE_F12:
+            return Rml::Input::KI_F12;
+        default:
+            return Rml::Input::KI_UNKNOWN;
+        }
+    }
+
     static uint64_t get_tree_rev() {
         // Conservative: rebuild on any structural or content changes signaled by the UI tree.
         return coi::ui::g_rev;
     }
 
     void ensure_context(int w, int h, float dpi) {
-        (void)dpi;
         if (!initialized) init_gfx();
         if (!initialized) return;
         if (!ctx) {
@@ -525,6 +707,11 @@ class RmlUiBackend final : public UiBackend {
             }
         }
         ctx->SetDimensions(Rml::Vector2i{w, h});
+        const float dp_ratio = (dpi > 0.0f) ? dpi : 1.0f;
+        if (last_dp_ratio != dp_ratio) {
+            ctx->SetDensityIndependentPixelRatio(dp_ratio);
+            last_dp_ratio = dp_ratio;
+        }
     }
 
     void destroy_context() {
@@ -666,7 +853,7 @@ class RmlUiBackend final : public UiBackend {
 	        const webcc::string css = coi::style::css_style_attr_for_node_rmlui(cls_sv, tag_sv, true);
 
 	        out += "<rml><head><style>"
-	               "body{margin:0; font-family: Roboto; font-size:16px; color: rgba(255,255,255,235);} "
+	               "body{margin:0; font-family: Roboto; font-size:16dp; color: rgba(255,255,255,235);} "
 	               "*,*:before,*:after{box-sizing:border-box;}"
 	               "</style></head><body data-coi-id=\"0\"";
 	        if (!css.empty()) {
@@ -719,6 +906,7 @@ class RmlUiBackend final : public UiBackend {
     double elapsed = 0.0;
 
     uint64_t last_tree_rev = 0;
+    float last_dp_ratio = 0.0f;
 };
 
 UiBackend& rmlui_backend() {

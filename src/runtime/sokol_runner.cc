@@ -1,5 +1,6 @@
 #include "coi/native/runtime_api.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -115,6 +116,20 @@ struct SokolRunnerImpl {
     static inline float click_x = 0.0f;
     static inline float click_y = 0.0f;
 
+    static inline std::array<InputEvent, 64> pending_events{};
+    static inline uint32_t pending_event_count = 0;
+
+    static void push_event(InputEventType type, const sapp_event* ev) {
+        if (!ev) return;
+        if (pending_event_count >= pending_events.size()) return;
+        InputEvent& e = pending_events[pending_event_count++];
+        e.type = type;
+        e.key_code = (int)ev->key_code;
+        e.char_code = ev->char_code;
+        e.modifiers = ev->modifiers;
+        e.repeat = ev->key_repeat;
+    }
+
     static void event_cb(const sapp_event* ev) {
         if (!ev) return;
         switch (ev->type) {
@@ -141,6 +156,15 @@ struct SokolRunnerImpl {
             click_x = mouse_x;
             click_y = mouse_y;
             break;
+        case SAPP_EVENTTYPE_KEY_DOWN:
+            push_event(InputEventType::KeyDown, ev);
+            break;
+        case SAPP_EVENTTYPE_KEY_UP:
+            push_event(InputEventType::KeyUp, ev);
+            break;
+        case SAPP_EVENTTYPE_CHAR:
+            push_event(InputEventType::Char, ev);
+            break;
         default:
             break;
         }
@@ -163,6 +187,9 @@ struct SokolRunnerImpl {
         input.scroll_y = scroll_y;
         scroll_x = 0.0f;
         scroll_y = 0.0f;
+        input.event_count = pending_event_count;
+        for (uint32_t i = 0; i < pending_event_count; i++) input.events[i] = pending_events[i];
+        pending_event_count = 0;
 
         const float fbw = (float)sapp_width();
         const float fbh = (float)sapp_height();

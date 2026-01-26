@@ -1,8 +1,25 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+
 #include "webcc/core/handle.h"
 
 namespace coi::native {
+
+enum class InputEventType : uint8_t {
+    KeyDown = 0,
+    KeyUp = 1,
+    Char = 2,
+};
+
+struct InputEvent {
+    InputEventType type = InputEventType::KeyDown;
+    int key_code = 0;           // sapp_keycode
+    uint32_t char_code = 0;     // UTF-32 codepoint
+    uint32_t modifiers = 0;     // sapp_modifier bitmask
+    bool repeat = false;
+};
 
 struct InputState {
     float mouse_x = 0.0f;
@@ -10,6 +27,9 @@ struct InputState {
     bool mouse_down = false;
     float scroll_x = 0.0f;
     float scroll_y = 0.0f;
+
+    std::array<InputEvent, 64> events{};
+    uint32_t event_count = 0;
 };
 
 // Shared geometry helper for the retained layout map used by debug backends.
