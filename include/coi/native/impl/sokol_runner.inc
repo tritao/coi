@@ -23,7 +23,7 @@
         std::cerr << "\n";
     }
 
-    static bool overlay_enabled() {
+	    static bool overlay_enabled() {
         const char* e = std::getenv("COI_NATIVE_OVERLAY");
         if (e && *e) {
             return std::string(e) != std::string("0");
@@ -32,9 +32,20 @@
         if (capture_enabled) return false;
 #endif
         return true;
-    }
+	    }
 
-    static void init(void) {
+	    enum class BackendPref { Auto, Tree, Clay, RmlUi };
+	    static BackendPref backend_pref() {
+	        const char* e = std::getenv("COI_NATIVE_UI_BACKEND");
+	        if (!e || !*e) return BackendPref::Auto;
+	        std::string v(e);
+	        if (v == "tree") return BackendPref::Tree;
+	        if (v == "clay") return BackendPref::Clay;
+	        if (v == "rmlui") return BackendPref::RmlUi;
+	        return BackendPref::Auto;
+	    }
+
+	    static void init(void) {
         stm_setup();
         sg_desc desc{};
         desc.logger.func = sg_log;
@@ -562,7 +573,7 @@
         }
     }
 
-    static void frame_cb(void) {
+	    static void frame_cb(void) {
         g_sokol_frame_started = true;
         double dt = sapp_frame_duration();
         if (dt > 0.1) dt = 0.1;
@@ -580,18 +591,67 @@
         scroll_x = 0.0f;
         scroll_y = 0.0f;
 
-        detail::UiBackend* backend = &detail::tree_backend();
+	        detail::UiBackend* backend = &detail::tree_backend();
+	        const BackendPref pref = backend_pref();
 #if defined(COI_NATIVE_CLAY)
-        detail::clay_backend().set_input(input, (float)dt, dpi);
-        detail::clay_backend().layout((float)sapp_width(), (float)sapp_height(), dpi);
-        if (detail::clay_backend().is_ok()) {
-            backend = &detail::clay_backend();
-        } else {
-            detail::tree_backend().layout((float)sapp_width(), (float)sapp_height(), dpi);
-        }
+	        const float fbw = (float)sapp_width();
+	        const float fbh = (float)sapp_height();
+	        auto try_clay = [&]() -> bool {
+	            detail::clay_backend().set_input(input, (float)dt, dpi);
+	            detail::clay_backend().layout(fbw, fbh, dpi);
+	            if (detail::clay_backend().is_ok()) {
+	                backend = &detail::clay_backend();
+	                return true;
+	            }
+	            return false;
+	        };
 #else
-        detail::tree_backend().layout((float)sapp_width(), (float)sapp_height(), dpi);
+	        const float fbw = (float)sapp_width();
+	        const float fbh = (float)sapp_height();
 #endif
+
+#if defined(COI_NATIVE_RMLUI)
+	        auto try_rmlui = [&]() -> bool {
+	            detail::rmlui_backend().set_input(input, (float)dt, dpi);
+	            detail::rmlui_backend().layout(fbw, fbh, dpi);
+	            if (detail::rmlui_backend().is_ok()) {
+	                backend = &detail::rmlui_backend();
+	                return true;
+	            }
+	            return false;
+	        };
+#endif
+
+	        bool selected = false;
+	        if (pref == BackendPref::Tree) {
+	            detail::tree_backend().layout(fbw, fbh, dpi);
+	            selected = true;
+	        } else if (pref == BackendPref::Clay) {
+#if defined(COI_NATIVE_CLAY)
+	            selected = try_clay();
+#endif
+	        } else if (pref == BackendPref::RmlUi) {
+#if defined(COI_NATIVE_RMLUI)
+	            selected = try_rmlui();
+#endif
+	        } else {
+	            // Auto: prefer Clay, then RmlUI, then fallback tree.
+#if defined(COI_NATIVE_CLAY)
+	            selected = try_clay();
+#endif
+#if defined(COI_NATIVE_RMLUI)
+	            if (!selected) selected = try_rmlui();
+#endif
+	            if (!selected) {
+	                detail::tree_backend().layout(fbw, fbh, dpi);
+	                selected = true;
+	            }
+	        }
+
+	        if (!selected) {
+	            detail::tree_backend().layout(fbw, fbh, dpi);
+	            backend = &detail::tree_backend();
+	        }
 
         if (click_pending && g_click_dispatcher) {
             click_pending = false;
@@ -628,7 +688,7 @@
             sdtx_home();
             sdtx_color3f(1.0f, 1.0f, 1.0f);
             sdtx_puts("COI native runtime (sokol)\n");
-            sdtx_printf("dt: %.3f\n\n", dt);
+	        sdtx_printf("dt: %.3f\n\n", dt);
 #if defined(COI_NATIVE_FONTSTASH)
 #if defined(COI_NATIVE_CLAY)
 	            sdtx_printf("fontstash: %s\n\n", detail::clay_backend().font_ok() ? "on" : "off");
@@ -636,6 +696,7 @@
 	            sdtx_printf("fontstash: off\n\n");
 #endif
 #endif
+	            sdtx_printf("backend: %s\n\n", backend ? backend->name() : "unknown");
 
             const char* show_dump = std::getenv("COI_NATIVE_SHOW_DUMP");
             if (show_dump && *show_dump && std::string(show_dump) != std::string("0")) {
@@ -673,6 +734,9 @@
 #if defined(COI_NATIVE_CLAY)
 		        // Backend resources (textures, font atlases, etc) must be destroyed before sg_shutdown().
 		        detail::clay_backend().shutdown_gfx();
+#endif
+#if defined(COI_NATIVE_RMLUI)
+		        detail::rmlui_backend().shutdown_gfx();
 #endif
 		        sdtx_shutdown();
 		        sgl_shutdown();
@@ -761,4 +825,3 @@ int run_sokol(void* app, int frames, tick_fn tick) {
     return 1;
 #endif
 }
-

@@ -47,6 +47,16 @@
 #include "coi/native/impl/ui_tree.inc"
 
 #if defined(COI_NATIVE_SOKOL)
+#if defined(COI_NATIVE_RMLUI)
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementText.h>
+#include <RmlUi/Core/RenderInterface.h>
+#include <RmlUi/Core/SystemInterface.h>
+#endif
+
 #include "coi/native/impl/sokol_impl.inc"
 
 namespace coi::native {
@@ -63,6 +73,7 @@ inline bool g_sokol_frame_started = false;
     #include "coi/native/impl/clay_engine.inc"
     #include "coi/native/impl/debug_text.inc"
     #include "coi/native/impl/ui_backend.inc"
+    #include "coi/native/impl/rmlui_backend.inc"
     #include "coi/native/impl/sokol_runner.inc"
     #include "coi/native/impl/debug_tools.inc"
 

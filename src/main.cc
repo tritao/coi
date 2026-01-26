@@ -36,7 +36,7 @@ static bool build_rmlui_if_needed(const fs::path& exe_dir, fs::path& out_rmlui_b
         return false;
     }
 
-    const fs::path core_lib = out_rmlui_build_dir / "Source" / "Core" / "librmlui_core.a";
+    const fs::path core_lib = out_rmlui_build_dir / "librmlui.a";
     if (fs::exists(core_lib, ec))
     {
         return true;
@@ -1834,6 +1834,7 @@ int main(int argc, char **argv)
 		            fs::path out_bin = abs_output_dir / "app";
 
 			            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
+			            std::string link_tail;
 			            cmd += " -I" + include_dir.string();
 			            cmd += " -I" + coi_include_dir.string();
 			            if (has_clay) {
@@ -1846,9 +1847,8 @@ int main(int argc, char **argv)
 			                cmd += " -I" + (rmlui_dir / "Include").string();
 			                cmd += " -DCOI_NATIVE_RMLUI";
 				                cmd += " -DRMLUI_STATIC_LIB";
-				                cmd += " -L" + (rmlui_build_dir / "Source" / "Core").string();
-				                cmd += " -L" + (rmlui_build_dir / "Source" / "Debugger").string();
-				                cmd += " -lrmlui_core -lrmlui_debugger -lfreetype";
+				                link_tail += " -L" + rmlui_build_dir.string();
+				                link_tail += " -lrmlui -lrmlui_debugger -lfreetype";
 			                } else {
 			                    std::cerr << "warn: RmlUI detected but not built; continuing without COI_NATIVE_RMLUI\n";
 			                }
@@ -1872,6 +1872,7 @@ int main(int argc, char **argv)
 		            cmd += " " + native_runtime_cc.string();
 		            cmd += " " + abs_output_cc.string();
 		            cmd += " -o " + out_bin.string();
+		            cmd += link_tail;
 
 		            std::cerr << "Running: " << cmd << std::endl;
 		            int ret = system(cmd.c_str());

@@ -14,6 +14,7 @@ struct Node {
 std::unordered_map<int32_t, Node> g_nodes;
 int32_t g_next_handle = 0x100000;
 bool g_dumped = false;
+uint64_t g_rev = 0;
 
 static Node& ensure_node(webcc::handle h) {
     int32_t id = (int32_t)h;
@@ -66,11 +67,13 @@ void flush() {
 void create_element_deferred(webcc::handle h, webcc::string_view tag) {
     auto& n = ensure_node(h);
     n.tag = webcc::string(tag.data(), tag.length());
+    g_rev++;
 }
 void create_comment_deferred(webcc::handle h, webcc::string_view text) {
     auto& n = ensure_node(h);
     n.tag = "comment";
     n.text = webcc::string(text.data(), text.length());
+    g_rev++;
 }
 void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) {
     auto& n = ensure_node(h);
@@ -79,10 +82,12 @@ void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view 
     for (auto& a : n.attrs) {
         if (a.key == k) {
             a.value = v;
+            g_rev++;
             return;
         }
     }
     n.attrs.push_back(Attr{std::move(k), std::move(v)});
+    g_rev++;
 }
 void set_property(webcc::handle h, webcc::string_view name, webcc::string_view value) {
     set_attribute(h, name, value);
@@ -91,17 +96,20 @@ void set_inner_html(webcc::handle h, webcc::string_view html) {
     auto& n = ensure_node(h);
     n.children.clear();
     n.text = webcc::string(html.data(), html.length());
+    g_rev++;
 }
 void set_inner_text(webcc::handle h, webcc::string_view text) {
     auto& n = ensure_node(h);
     n.children.clear();
     n.text = webcc::string(text.data(), text.length());
+    g_rev++;
 }
 void append_child(webcc::handle parent, webcc::handle child) {
     auto& p = ensure_node(parent);
     auto& c = ensure_node(child);
     c.parent = parent;
     p.children.push_back((int32_t)child);
+    g_rev++;
 }
 void insert_before(webcc::handle parent, webcc::handle child, webcc::handle ref) {
     auto& p = ensure_node(parent);
@@ -110,14 +118,17 @@ void insert_before(webcc::handle parent, webcc::handle child, webcc::handle ref)
     int32_t ref_id = (int32_t)ref;
     if (ref_id == 0) {
         p.children.push_back((int32_t)child);
+        g_rev++;
         return;
     }
     auto it = std::find(p.children.begin(), p.children.end(), ref_id);
     if (it == p.children.end()) {
         p.children.push_back((int32_t)child);
+        g_rev++;
         return;
     }
     p.children.insert(it, (int32_t)child);
+    g_rev++;
 }
 void remove_element(webcc::handle h) {
     auto& n = ensure_node(h);
@@ -126,6 +137,7 @@ void remove_element(webcc::handle h) {
     int32_t id = (int32_t)h;
     p.children.erase(std::remove(p.children.begin(), p.children.end(), id), p.children.end());
     n.parent = webcc::handle();
+    g_rev++;
 }
 void move_before(webcc::handle parent, webcc::handle node, webcc::handle ref) {
     auto& p = ensure_node(parent);
@@ -134,14 +146,17 @@ void move_before(webcc::handle parent, webcc::handle node, webcc::handle ref) {
     p.children.erase(std::remove(p.children.begin(), p.children.end(), node_id), p.children.end());
     if (ref_id == 0) {
         p.children.push_back(node_id);
+        g_rev++;
         return;
     }
     auto it = std::find(p.children.begin(), p.children.end(), ref_id);
     if (it == p.children.end()) {
         p.children.push_back(node_id);
+        g_rev++;
         return;
     }
     p.children.insert(it, node_id);
+    g_rev++;
 }
 
 void add_click_listener(webcc::handle) {}
