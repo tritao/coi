@@ -1,6 +1,29 @@
 #include "runtime/util.h"
 
-#include "runtime/prelude.h"
+#include <array>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <string>
+#include <system_error>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
+#include "runtime/deps_sokol.h"
 #include "runtime/deps_clay_sokol.h"
 #include "runtime/deps_stb.h"
 
