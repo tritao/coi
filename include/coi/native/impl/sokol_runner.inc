@@ -686,14 +686,12 @@
             sdtx_font(0);
             sdtx_origin(1.0f, 1.0f);
             sdtx_home();
-            sdtx_color3f(1.0f, 1.0f, 1.0f);
-            sdtx_puts("COI native runtime (sokol)\n");
-	        sdtx_printf("dt: %.3f\n\n", dt);
-#if defined(COI_NATIVE_FONTSTASH)
-#endif
-	            sdtx_printf("backend: %s\n\n", backend ? backend->name() : "unknown");
+	            sdtx_color3f(1.0f, 1.0f, 1.0f);
+	            sdtx_puts("COI native runtime (sokol)\n");
+		        sdtx_printf("dt: %.3f\n\n", dt);
+		            sdtx_printf("backend: %s\n\n", backend ? backend->name() : "unknown");
 
-            const char* show_dump = std::getenv("COI_NATIVE_SHOW_DUMP");
+	            const char* show_dump = std::getenv("COI_NATIVE_SHOW_DUMP");
             if (show_dump && *show_dump && std::string(show_dump) != std::string("0")) {
                 sdtx_origin(1.0f, 6.0f);
                 sdtx_home();
