@@ -23,5 +23,3 @@
 #include "sokol_gl.h"
 #include "sokol_glue.h"
 #include "sokol_time.h"
-#include "sokol_debugtext.h"
-

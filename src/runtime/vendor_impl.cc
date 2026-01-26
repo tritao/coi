@@ -26,7 +26,7 @@
 #define SOKOL_CLAY_IMPL
 #endif
 
-#include "runtime/deps_sokol.h"
+#include "runtime/deps_sokol_debugtext.h"
 #include "runtime/deps_stb.h"
 #include "runtime/deps_fontstash.h"
 #include "runtime/deps_clay.h"

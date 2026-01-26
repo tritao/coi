@@ -9,7 +9,7 @@
 #include "runtime/ui_tree.h"
 
 #if defined(COI_NATIVE_SOKOL)
-#include "runtime/deps_sokol.h"
+#include "runtime/deps_sokol_debugtext.h"
 #endif
 
 namespace coi::native {
@@ -78,4 +78,3 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 }
 
 } // namespace coi::native
-

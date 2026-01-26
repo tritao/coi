@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "runtime/backends/backend.h"
+#include "runtime/deps_sokol_debugtext.h"
 #include "runtime/deps_sokol.h"
 #include "runtime/deps_stb.h"
 
