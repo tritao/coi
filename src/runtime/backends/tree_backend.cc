@@ -2,9 +2,13 @@
 
 #include "runtime/backends/tree_backend.h"
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 #include "runtime/debug_text.h"
+#include "runtime/deps_sokol.h"
 #include "runtime/util.h"
 
 namespace coi::native {
