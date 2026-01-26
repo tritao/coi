@@ -18,6 +18,64 @@
 
 namespace fs = std::filesystem;
 
+static bool build_rmlui_if_needed(const fs::path& exe_dir, fs::path& out_rmlui_build_dir)
+{
+    const fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
+    const fs::path rmlui_include = rmlui_dir / "Include" / "RmlUi" / "Core.h";
+    std::error_code ec;
+    if (!fs::exists(rmlui_include, ec))
+    {
+        return false;
+    }
+
+    out_rmlui_build_dir = exe_dir / ".coi_cache" / "deps" / "rmlui";
+    fs::create_directories(out_rmlui_build_dir, ec);
+    if (ec)
+    {
+        std::cerr << "warn: failed to create RmlUI build dir: " << out_rmlui_build_dir << ": " << ec.message() << "\n";
+        return false;
+    }
+
+    const fs::path core_lib = out_rmlui_build_dir / "Source" / "Core" / "librmlui_core.a";
+    if (fs::exists(core_lib, ec))
+    {
+        return true;
+    }
+
+    std::string configure_cmd;
+    configure_cmd += "cmake -S " + rmlui_dir.string();
+    configure_cmd += " -B " + out_rmlui_build_dir.string();
+    configure_cmd += " -DCMAKE_BUILD_TYPE=Release";
+    configure_cmd += " -DBUILD_SHARED_LIBS=OFF";
+    configure_cmd += " -DRMLUI_SAMPLES=OFF";
+    configure_cmd += " -DBUILD_TESTING=OFF";
+    configure_cmd += " -DRMLUI_PRECOMPILED_HEADERS=OFF";
+    configure_cmd += " -DRMLUI_WARNINGS_AS_ERRORS=OFF";
+    std::cerr << "Running: " << configure_cmd << std::endl;
+    if (system(configure_cmd.c_str()) != 0)
+    {
+        std::cerr << "warn: failed to configure RmlUI (cmake)\n";
+        return false;
+    }
+
+    std::string build_cmd;
+    build_cmd += "cmake --build " + out_rmlui_build_dir.string() + " --config Release";
+    std::cerr << "Running: " << build_cmd << std::endl;
+    if (system(build_cmd.c_str()) != 0)
+    {
+        std::cerr << "warn: failed to build RmlUI (cmake)\n";
+        return false;
+    }
+
+    if (!fs::exists(core_lib, ec))
+    {
+        std::cerr << "warn: RmlUI built but expected library not found: " << core_lib << "\n";
+        return false;
+    }
+
+    return true;
+}
+
 // =========================================================
 // INCLUDE DETECTION
 // =========================================================
@@ -1783,8 +1841,17 @@ int main(int argc, char **argv)
 			                cmd += " -DCOI_NATIVE_CLAY";
 			            }
 			            if (has_rmlui) {
+			                fs::path rmlui_build_dir;
+			                if (build_rmlui_if_needed(exe_dir, rmlui_build_dir)) {
 			                cmd += " -I" + (rmlui_dir / "Include").string();
 			                cmd += " -DCOI_NATIVE_RMLUI";
+				                cmd += " -DRMLUI_STATIC_LIB";
+				                cmd += " -L" + (rmlui_build_dir / "Source" / "Core").string();
+				                cmd += " -L" + (rmlui_build_dir / "Source" / "Debugger").string();
+				                cmd += " -lrmlui_core -lrmlui_debugger -lfreetype";
+			                } else {
+			                    std::cerr << "warn: RmlUI detected but not built; continuing without COI_NATIVE_RMLUI\n";
+			                }
 			            }
 			            if (has_sokol) {
 			                cmd += " -I" + sokol_dir.string();
