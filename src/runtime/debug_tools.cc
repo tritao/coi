@@ -2,7 +2,18 @@
 
 #include "coi/native/runtime_api.h"
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "runtime/state.h"
 
 #include "runtime/backends/backend.h"
