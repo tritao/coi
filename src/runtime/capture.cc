@@ -1,8 +1,17 @@
 #include "runtime/capture.h"
 
-#include "runtime/prelude.h"
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <system_error>
+#include <vector>
 
 #include "runtime/backends/backend.h"
+#include "runtime/deps_sokol.h"
 #include "runtime/deps_stb.h"
 
 #if defined(__linux__) || defined(__unix__)

@@ -1,11 +1,16 @@
 #include "coi/native/runtime_api.h"
 
-#include "runtime/prelude.h"
+#include <cstdint>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+
 #include "runtime/state.h"
 
 #include "runtime/backends/registry.h"
 #include "runtime/capture.h"
 #include "runtime/debug_text.h"
+#include "runtime/deps_sokol.h"
 #include "runtime/util.h"
 
 #if defined(__linux__) || defined(__unix__)
@@ -293,4 +298,3 @@ int run_sokol(void* app, int frames, tick_fn tick) {
 }
 
 } // namespace coi::native
-
