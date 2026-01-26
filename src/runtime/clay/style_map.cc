@@ -2,7 +2,11 @@
 
 #if defined(COI_NATIVE_CLAY)
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+
+#include "coi/style/css.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -156,4 +160,3 @@ DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root
 } // namespace coi::native
 
 #endif // COI_NATIVE_CLAY
-

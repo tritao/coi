@@ -2,7 +2,14 @@
 
 #if defined(COI_NATIVE_CLAY)
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+
+#include "runtime/deps_sokol.h"
 
 #include "runtime/clay_internal.h"
 #include "runtime/deps_clay_sokol.h"
