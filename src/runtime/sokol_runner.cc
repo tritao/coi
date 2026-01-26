@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "runtime/state.h"
 
@@ -20,6 +21,11 @@
 namespace coi::native {
 
 #if defined(COI_NATIVE_SOKOL)
+
+bool g_sokol_frame_started = false;
+
+webcc::function<bool(webcc::handle)> g_click_dispatcher;
+void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) { g_click_dispatcher = std::move(cb); }
 
 struct SokolRunnerImpl {
     static inline void* app = nullptr;
