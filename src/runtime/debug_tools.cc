@@ -10,7 +10,8 @@
 #include "runtime/backends/clay_backend.h"
 #include "runtime/backends/rmlui_backend.h"
 
-#include "runtime/clay_engine.h"
+#include "runtime/clay/engine.h"
+#include "runtime/clay/style_map.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -64,7 +65,7 @@ inline void dump_layout() {
 inline void dump_layout(float w, float h) {
 #if defined(COI_NATIVE_CLAY)
     (void)ClayEngine::layout(w, h);
-    if (!ClayEngine::ctx) return;
+    if (!ClayEngine::ctx()) return;
 
     std::cout << "--- COI_NATIVE_LAYOUT ---\n";
     auto dump = [&](auto&& self, int32_t id, int depth) -> void {
@@ -108,7 +109,7 @@ inline void dump_render() {
 inline void dump_render(float w, float h) {
 #if defined(COI_NATIVE_CLAY)
     Clay_RenderCommandArray render_commands = ClayEngine::layout(w, h);
-    if (!ClayEngine::ctx) return;
+    if (!ClayEngine::ctx()) return;
 
     std::cout << "--- COI_NATIVE_RENDER_DUMP ---\n";
     auto iround = [](float v) -> int { return (int)std::lround((double)v); };

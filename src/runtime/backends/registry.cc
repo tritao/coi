@@ -6,7 +6,7 @@
 #include "runtime/backends/rmlui_backend.h"
 #include "runtime/backends/tree_backend.h"
 
-#include "runtime/clay_engine.h"
+#include "runtime/clay/engine.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -46,8 +46,8 @@ void init_sokol_backends(float fbw, float fbh, float dpi) {
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
     const float safe_dpi = (dpi > 0.0f) ? dpi : 1.0f;
     ClayEngine::ensure(fbw / safe_dpi, fbh / safe_dpi);
-    if (ClayEngine::ctx && clay_backend().font_ok()) {
-        Clay_SetCurrentContext(ClayEngine::ctx);
+    if (ClayEngine::ctx() && clay_backend().font_ok()) {
+        Clay_SetCurrentContext(ClayEngine::ctx());
         Clay_SetMeasureTextFunction(sclay_measure_text, clay_backend().measure_userdata());
         Clay_ResetMeasureTextCache();
     }
@@ -132,4 +132,3 @@ void shutdown_sokol_backends() {
 }
 
 } // namespace coi::native
-

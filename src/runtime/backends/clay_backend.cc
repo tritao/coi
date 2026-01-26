@@ -4,10 +4,8 @@
 
 #include "runtime/backends/clay_backend.h"
 
-#include "runtime/clay_engine.h"
-#include "runtime/clay_internal.h"
 #include "runtime/debug_text.h"
-#include "runtime/style_class_parser.h"
+#include "runtime/clay/engine.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -113,7 +111,7 @@ class ClayBackend final : public UiBackend {
 
     void layout(float w, float h, float dpi) override {
         render_commands = ClayEngine::layout(w, h, dpi);
-        ok = (ClayEngine::ctx != nullptr);
+        ok = (ClayEngine::ctx() != nullptr);
     }
 
     void render(float w, float h, float) override {
@@ -225,7 +223,7 @@ class ClayBackend final : public UiBackend {
     bool hit_test(float x, float y, float dpi, webcc::handle& out) override {
         out = webcc::handle();
         if (!ok) return false;
-        Clay_SetCurrentContext(ClayEngine::ctx);
+        Clay_SetCurrentContext(ClayEngine::ctx());
         float cx = x;
         float cy = y;
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)

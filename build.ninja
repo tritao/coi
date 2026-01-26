@@ -71,11 +71,13 @@ build build/obj/runtime/ui_tree.o: cxx_native_runtime src/runtime/ui_tree.cc
 build build/obj/runtime/runtime_sokol.o: cxx_native_runtime src/runtime/runtime_sokol.cc
 build build/obj/runtime/sokol_runner.o: cxx_native_runtime src/runtime/sokol_runner.cc
 build build/obj/runtime/debug_tools.o: cxx_native_runtime src/runtime/debug_tools.cc
+build build/obj/runtime/clay_engine.o: cxx_native_runtime src/runtime/clay/engine.cc
+build build/obj/runtime/clay_style_map.o: cxx_native_runtime src/runtime/clay/style_map.cc
 build build/obj/runtime/backends/tree_backend.o: cxx_native_runtime src/runtime/backends/tree_backend.cc
 build build/obj/runtime/backends/clay_backend.o: cxx_native_runtime src/runtime/backends/clay_backend.cc
 build build/obj/runtime/backends/rmlui_backend.o: cxx_native_runtime src/runtime/backends/rmlui_backend.cc
 build build/obj/runtime/backends/registry.o: cxx_native_runtime src/runtime/backends/registry.cc
-build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/runtime_sokol.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o build/obj/runtime/backends/tree_backend.o build/obj/runtime/backends/clay_backend.o build/obj/runtime/backends/rmlui_backend.o build/obj/runtime/backends/registry.o
+build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/runtime_sokol.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o build/obj/runtime/clay_engine.o build/obj/runtime/clay_style_map.o build/obj/runtime/backends/tree_backend.o build/obj/runtime/backends/clay_backend.o build/obj/runtime/backends/rmlui_backend.o build/obj/runtime/backends/registry.o
 build coi_native_runtime: phony build/libcoi_native_runtime.a
 
 # Generate def cache at build time
