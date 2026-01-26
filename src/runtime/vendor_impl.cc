@@ -26,10 +26,10 @@
 #define SOKOL_CLAY_IMPL
 #endif
 
-#include "runtime/third_party/deps.h"
+#include "runtime/deps.h"
 
 #if defined(COI_NATIVE_CLAY)
-#include "runtime/internal/clay_internal.h"
+#include "runtime/clay_internal.h"
 
 Clay_Vector2 coi_native_clay_scroll_offset_for_open_element(void) {
     Clay_Context* c = Clay_GetCurrentContext();

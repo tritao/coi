@@ -1,4 +1,4 @@
-#include "runtime/internal/state.h"
+#include "runtime/state.h"
 
 inline bool g_layout_dumped = false;
 inline bool g_click_done = false;

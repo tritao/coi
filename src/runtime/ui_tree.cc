@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "runtime/impl/ui_tree.h"
+#include "runtime/ui_tree.h"
 
 namespace coi::ui {
 

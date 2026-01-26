@@ -47,13 +47,13 @@
 #include "coi/style/css.h"
 
 // Retained UI tree declarations (implementation lives in core/ui_tree.cc).
-#include "runtime/impl/ui_tree.h"
+#include "runtime/ui_tree.h"
 
 #if defined(COI_NATIVE_SOKOL)
 
-#include "runtime/internal/state.h"
-#include "runtime/internal/clay_internal.h"
-#include "runtime/third_party/deps.h"
+#include "runtime/state.h"
+#include "runtime/clay_internal.h"
+#include "runtime/deps.h"
 
 #if defined(COI_NATIVE_RMLUI)
 #include <RmlUi/Core.h>
@@ -69,14 +69,14 @@ namespace coi::native {
 
 bool g_sokol_frame_started = false;
 
-#include "runtime/impl/util.h"
-#include "runtime/impl/style_class_parser.h"
-#include "runtime/impl/clay_engine.h"
-#include "runtime/impl/debug_text.h"
-#include "runtime/impl/ui_backend.h"
-#include "runtime/impl/rmlui_backend.h"
-#include "runtime/impl/sokol_runner.h"
-#include "runtime/impl/debug_tools.h"
+#include "runtime/util.h"
+#include "runtime/style_class_parser.h"
+#include "runtime/clay_engine.h"
+#include "runtime/debug_text.h"
+#include "runtime/ui_backend.h"
+#include "runtime/rmlui_backend.h"
+#include "runtime/sokol_runner.h"
+#include "runtime/debug_tools.h"
 
 } // namespace coi::native
 

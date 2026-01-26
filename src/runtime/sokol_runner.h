@@ -1,5 +1,5 @@
 	#if defined(COI_NATIVE_SOKOL)
-	#include "runtime/internal/state.h"
+	#include "runtime/state.h"
 	#if defined(__linux__) || defined(__unix__)
 	#include <X11/Xlib.h>
 	#include <GL/gl.h>
