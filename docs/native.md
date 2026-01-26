@@ -57,11 +57,13 @@ The intended architecture is to keep a single `view {}` tree and implement multi
 For native layout + text:
 
 - Pick a layout engine (flexbox-like) and a text system (shaping + bidi + wrapping + editing) that can share a text-measure path.
+- **Clay** can be used as a renderer-agnostic layout engine (flexbox-like), given a text-measure callback.
+- **Skribidi** can provide shaping + bidi + wrapping + editing primitives and can also serve as Clay’s text measurement source.
 
 The missing pieces to become a real native UI are:
 
 1. Window + main loop (SDL2/GLFW/etc.)
 2. Input events mapped into Coi’s event dispatch
-3. Layout engine
-4. Text system
+3. Layout engine (e.g. Clay)
+4. Text system (e.g. Skribidi)
 5. Renderer (Skia/wgpu/OpenGL/etc.)

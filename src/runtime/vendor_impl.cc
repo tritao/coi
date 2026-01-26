@@ -18,4 +18,31 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #endif
 
+#if defined(COI_NATIVE_CLAY)
+#define CLAY_IMPLEMENTATION
+#endif
+
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
+#define SOKOL_CLAY_IMPL
+#endif
+
 #include "runtime/deps_extra.h"
+
+#if defined(COI_NATIVE_CLAY)
+#include "runtime/clay_internal.h"
+
+Clay_Vector2 coi_native_clay_scroll_offset_for_open_element(void) {
+    Clay_Context* c = Clay_GetCurrentContext();
+    Clay_LayoutElement* open = Clay__GetOpenLayoutElement();
+    Clay_Vector2 off{0, 0};
+    if (!c || !open) return off;
+    for (int32_t i = 0; i < c->scrollContainerDatas.length; i++) {
+        Clay__ScrollContainerDataInternal* mapping = Clay__ScrollContainerDataInternalArray_Get(&c->scrollContainerDatas, i);
+        if (mapping && mapping->elementId == open->id) {
+            off = mapping->scrollPosition;
+            break;
+        }
+    }
+    return off;
+}
+#endif

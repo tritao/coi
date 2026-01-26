@@ -4,7 +4,7 @@
 
 namespace coi::native {
 
-enum class BackendPref { Auto, Tree, RmlUi };
+enum class BackendPref { Auto, Tree, Clay, RmlUi };
 
 BackendPref backend_pref_from_env();
 const char* backend_pref_name(BackendPref pref);

@@ -15,7 +15,7 @@ rule ar
   command = rm -f $out && $ar rcs $out $in
   description = AR $out
 
-native_runtime_cflags = -std=c++20 -O2 -pthread -Isrc -Iinclude -Ideps/sokol -Ideps/sokol/util -Ideps/sokol/tests/ext -Ideps/stb -Ideps/rmlui/Include -DCOI_NATIVE -DCOI_NATIVE_SOKOL -DCOI_NATIVE_RMLUI -DRMLUI_STATIC_LIB -DCOI_NATIVE_FONTSTASH -DCOI_NATIVE_CAPTURE
+native_runtime_cflags = -std=c++20 -O2 -pthread -Isrc -Iinclude -Ideps/sokol -Ideps/sokol/util -Ideps/sokol/tests/ext -Ideps/clay -Ideps/stb -Ideps/rmlui/Include -DCOI_NATIVE -DCOI_NATIVE_SOKOL -DCOI_NATIVE_CLAY -DCOI_NATIVE_RMLUI -DRMLUI_STATIC_LIB -DCOI_NATIVE_FONTSTASH -DCOI_NATIVE_CAPTURE
 
 rule cxx_native_runtime
   command = $cxx $native_runtime_cflags -MD -MF $out.d -c $in -o $out
@@ -72,10 +72,13 @@ build build/obj/runtime/capture.o: cxx_native_runtime src/runtime/capture.cc
 build build/obj/runtime/util.o: cxx_native_runtime src/runtime/util.cc
 build build/obj/runtime/sokol_runner.o: cxx_native_runtime src/runtime/sokol_runner.cc
 build build/obj/runtime/debug_tools.o: cxx_native_runtime src/runtime/debug_tools.cc
+build build/obj/runtime/clay_engine.o: cxx_native_runtime src/runtime/clay/engine.cc
+build build/obj/runtime/clay_style_map.o: cxx_native_runtime src/runtime/clay/style_map.cc
 build build/obj/runtime/backends/tree_backend.o: cxx_native_runtime src/runtime/backends/tree_backend.cc
+build build/obj/runtime/backends/clay_backend.o: cxx_native_runtime src/runtime/backends/clay_backend.cc
 build build/obj/runtime/backends/rmlui_backend.o: cxx_native_runtime src/runtime/backends/rmlui_backend.cc
 build build/obj/runtime/backends/registry.o: cxx_native_runtime src/runtime/backends/registry.cc
-build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/capture.o build/obj/runtime/util.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o build/obj/runtime/backends/tree_backend.o build/obj/runtime/backends/rmlui_backend.o build/obj/runtime/backends/registry.o
+build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/capture.o build/obj/runtime/util.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o build/obj/runtime/clay_engine.o build/obj/runtime/clay_style_map.o build/obj/runtime/backends/tree_backend.o build/obj/runtime/backends/clay_backend.o build/obj/runtime/backends/rmlui_backend.o build/obj/runtime/backends/registry.o
 build coi_native_runtime: phony build/libcoi_native_runtime.a
 
 # Generate def cache at build time

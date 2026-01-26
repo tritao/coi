@@ -19,4 +19,12 @@
 #include "sokol_fontstash.h"
 #endif
 
-// (Additional layout backends are added in follow-up commits.)
+// Clay layout.
+#if defined(COI_NATIVE_CLAY)
+#include "clay.h"
+#endif
+
+// Clay's Sokol renderer (requires both Clay and Fontstash).
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
+#include "runtime/clay/sokol_clay.h"
+#endif
