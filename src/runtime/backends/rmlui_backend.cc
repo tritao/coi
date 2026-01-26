@@ -419,6 +419,8 @@ class RmlUiBackend final : public UiBackend {
             ctx->ProcessMouseButtonDown(0, 0);
         } else if (!pending_input.mouse_down && prev_mouse_down) {
             ctx->ProcessMouseButtonUp(0, 0);
+            // Focus editable element on click-release (for simple test widgets).
+            focus_editable_at((float)pending_input.mouse_x, (float)pending_input.mouse_y);
         }
         prev_mouse_down = pending_input.mouse_down;
         if (pending_input.scroll_x != 0.0f || pending_input.scroll_y != 0.0f) {
@@ -431,13 +433,28 @@ class RmlUiBackend final : public UiBackend {
             const int km = to_rml_modifiers(ev.modifiers);
             switch (ev.type) {
             case InputEventType::KeyDown:
+                if (focused_edit_elem && (int)ev.key_code == SAPP_KEYCODE_BACKSPACE) {
+                    auto& s = edit_values[focused_edit_id];
+                    if (!s.empty()) s.pop_back();
+                    refresh_focused_edit_display();
+                }
                 ctx->ProcessKeyDown(to_rml_key((int)ev.key_code), km);
                 break;
             case InputEventType::KeyUp:
                 ctx->ProcessKeyUp(to_rml_key((int)ev.key_code), km);
                 break;
             case InputEventType::Char:
-                if (ev.char_code != 0) ctx->ProcessTextInput((Rml::Character)ev.char_code);
+                if (ev.char_code != 0) {
+                    // Drive a simple editable div for tests (RmlUI Controls isn't vendored here).
+                    if (focused_edit_elem && focused_edit_id != 0) {
+                        const char ch = (char)ev.char_code;
+                        if (ch == '\r') break;
+                        if ((ch == '\n') && !focused_edit_multiline) break;
+                        edit_values[focused_edit_id].push_back(ch);
+                        refresh_focused_edit_display();
+                    }
+                    ctx->ProcessTextInput((Rml::Character)ev.char_code);
+                }
                 break;
             }
         }
@@ -686,6 +703,55 @@ class RmlUiBackend final : public UiBackend {
         }
     }
 
+    void focus_editable_at(float x, float y) {
+        if (!ctx) return;
+
+        Rml::Element* e = ctx->GetElementAtPoint(Rml::Vector2f{x, y});
+        while (e) {
+            Rml::Variant* v = e->GetAttribute("data-coi-edit");
+            if (v) {
+                // Element itself must have a COI id (we always emit data-coi-id for UI nodes).
+                int id = 0;
+                if (Rml::Variant* idv = e->GetAttribute("data-coi-id")) {
+                    const Rml::String s = idv->Get<Rml::String>();
+                    (void)std::sscanf(s.c_str(), "%d", &id);
+                }
+                if (id != 0) {
+                    set_focused_edit(e, id);
+                    return;
+                }
+            }
+            e = e->GetParentNode();
+        }
+    }
+
+    void set_focused_edit(Rml::Element* e, int id) {
+        if (focused_edit_elem && focused_edit_id != 0) {
+            const std::string& prev = edit_values[focused_edit_id];
+            focused_edit_elem->SetInnerRML(Rml::String(escape_text(prev).c_str()));
+        }
+
+        focused_edit_elem = e;
+        focused_edit_id = id;
+        focused_edit_multiline = false;
+        if (focused_edit_elem) {
+            if (Rml::Variant* mv = focused_edit_elem->GetAttribute("data-coi-multiline")) {
+                const Rml::String s = mv->Get<Rml::String>();
+                focused_edit_multiline = (s == "1" || s == "true" || s == "yes");
+            }
+            focused_edit_elem->Focus(true);
+        }
+        refresh_focused_edit_display();
+    }
+
+    void refresh_focused_edit_display() {
+        if (!focused_edit_elem || focused_edit_id == 0) return;
+        const std::string& val = edit_values[focused_edit_id];
+        std::string shown = escape_text(val);
+        shown += "|";
+        focused_edit_elem->SetInnerRML(Rml::String(shown.c_str()));
+    }
+
     static uint64_t get_tree_rev() {
         // Conservative: rebuild on any structural or content changes signaled by the UI tree.
         return coi::ui::g_rev;
@@ -890,6 +956,8 @@ class RmlUiBackend final : public UiBackend {
             doc->Close();
             doc = nullptr;
         }
+        focused_edit_elem = nullptr;
+        focused_edit_id = 0;
 
         // Using LoadDocumentFromMemory ensures the document is properly initialized and attached
         // to the context's document stack for rendering.
@@ -924,6 +992,11 @@ class RmlUiBackend final : public UiBackend {
 
     uint64_t last_tree_rev = 0;
     float last_dp_ratio = 0.0f;
+
+    Rml::Element* focused_edit_elem = nullptr;
+    int focused_edit_id = 0;
+    bool focused_edit_multiline = false;
+    std::unordered_map<int, std::string> edit_values;
 };
 
 UiBackend& rmlui_backend() {
