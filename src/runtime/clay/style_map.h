@@ -3,7 +3,7 @@
 #include "runtime/ui_tree.h"
 
 #if defined(COI_NATIVE_CLAY)
-#include "runtime/deps_clay.h"
+#include "clay.h"
 
 namespace coi::native {
 

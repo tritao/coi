@@ -9,7 +9,7 @@
 
 #include "runtime/clay/engine.h"
 #include "runtime/deps_sokol.h"
-#include "runtime/deps_clay_sokol.h"
+#include "runtime/deps_extra.h"
 #include "runtime/util.h"
 
 namespace coi::native {
@@ -46,7 +46,7 @@ void init_sokol_backends(float fbw, float fbh, float dpi) {
 #if defined(COI_NATIVE_CLAY)
     clay_backend().init_gfx();
 
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     const float safe_dpi = (dpi > 0.0f) ? dpi : 1.0f;
     ClayEngine::ensure(fbw / safe_dpi, fbh / safe_dpi);
     if (ClayEngine::ctx() && clay_backend().font_ok()) {

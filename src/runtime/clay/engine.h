@@ -1,7 +1,7 @@
 #pragma once
 
 #if defined(COI_NATIVE_CLAY)
-#include "runtime/deps_clay.h"
+#include "clay.h"
 #include "webcc/core/handle.h"
 
 namespace coi::native {

@@ -9,7 +9,7 @@
 #include "runtime/ui_tree.h"
 
 #if defined(COI_NATIVE_SOKOL)
-#include "runtime/deps_sokol_debugtext.h"
+#include "runtime/deps_sokol.h"
 #endif
 
 namespace coi::native {

@@ -16,10 +16,20 @@
 #include <vector>
 
 #include "runtime/deps_sokol.h"
-#include "runtime/deps_rmlui.h"
-#include "runtime/deps_stb.h"
 #include "runtime/util.h"
 #include "coi/style/css.h"
+
+#include "stb_image.h"
+
+#if defined(COI_NATIVE_RMLUI)
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementText.h>
+#include <RmlUi/Core/RenderInterface.h>
+#include <RmlUi/Core/SystemInterface.h>
+#endif
 
 namespace coi::native {
 

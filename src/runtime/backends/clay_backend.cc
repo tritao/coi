@@ -11,9 +11,7 @@
 #include <system_error>
 #include <vector>
 
-#include "runtime/deps_sokol.h"
-#include "runtime/deps_clay_sokol.h"
-#include "runtime/deps_fontstash.h"
+#include "runtime/deps_extra.h"
 #include "runtime/debug_text.h"
 #include "runtime/clay/engine.h"
 #include "runtime/util.h"
@@ -27,7 +25,7 @@ class ClayBackend final : public UiBackend {
 
     void init_gfx() override {
 #if defined(COI_NATIVE_FONTSTASH)
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         sclay_setup();
 #else
         sfons_desc_t fs_desc{};
@@ -62,7 +60,7 @@ class ClayBackend final : public UiBackend {
 
         const std::string font_path_s = font_path.empty() ? std::string() : font_path.string();
         if (!font_path_s.empty() && read_file_bytes(font_path_s.c_str(), font_bytes)) {
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
             clay_fonts[0] = sclay_add_font_mem(font_bytes.data(), (int)font_bytes.size());
             if (clay_fonts[0] == FONS_INVALID) {
                 std::cerr << "[font] failed to load ttf from " << font_path_s << "\n";
@@ -85,7 +83,7 @@ class ClayBackend final : public UiBackend {
 
     void shutdown_gfx() override {
 #if defined(COI_NATIVE_FONTSTASH)
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         sclay_shutdown();
         clay_fonts[0] = FONS_INVALID;
 #else
@@ -98,7 +96,7 @@ class ClayBackend final : public UiBackend {
         font_bytes.clear();
 #endif
 
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         native_image_cache_shutdown();
 #endif
 
@@ -110,7 +108,7 @@ class ClayBackend final : public UiBackend {
     void set_input(const InputState& input, float dt, float dpi) override {
         float mx = input.mouse_x;
         float my = input.mouse_y;
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         if (dpi > 0.0f) {
             mx /= dpi;
             my /= dpi;
@@ -126,7 +124,7 @@ class ClayBackend final : public UiBackend {
 
     void render(float w, float h, float) override {
         if (!ok) return;
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         // Ensure a full-target scissor before rendering; Clay emits scissor only for clip elements.
         sgl_scissor_rect(0, 0, (int)w, (int)h, true /* origin_top_left */);
         // Clay's reference sokol renderer expects identity matrices.
@@ -227,7 +225,7 @@ class ClayBackend final : public UiBackend {
             sgl_draw();
         }
 #endif
-#endif // COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED
+#endif // COI_NATIVE_CLAY && COI_NATIVE_FONTSTASH
     }
 
     bool hit_test(float x, float y, float dpi, webcc::handle& out) override {
@@ -236,7 +234,7 @@ class ClayBackend final : public UiBackend {
         Clay_SetCurrentContext(ClayEngine::ctx());
         float cx = x;
         float cy = y;
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         if (dpi > 0.0f) {
             cx /= dpi;
             cy /= dpi;
@@ -267,7 +265,7 @@ class ClayBackend final : public UiBackend {
     bool is_ok() const override { return ok; }
 
     bool font_ok() const override {
-#if defined(COI_NATIVE_FONTSTASH) && defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_FONTSTASH) && defined(COI_NATIVE_CLAY)
         return clay_fonts[0] != FONS_INVALID;
 #elif defined(COI_NATIVE_FONTSTASH)
         return fons_ctx && fons_font != FONS_INVALID;
@@ -277,7 +275,7 @@ class ClayBackend final : public UiBackend {
     }
 
     void* measure_userdata() override {
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
         return (void*)clay_fonts;
 #else
         return nullptr;
@@ -289,7 +287,7 @@ class ClayBackend final : public UiBackend {
     bool ok = false;
 
 #if defined(COI_NATIVE_FONTSTASH)
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     sclay_font_t clay_fonts[1] = {FONS_INVALID};
     std::vector<unsigned char> font_bytes;
 #else

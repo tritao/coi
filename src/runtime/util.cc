@@ -23,9 +23,7 @@
 #include <windows.h>
 #endif
 
-#include "runtime/deps_sokol.h"
-#include "runtime/deps_clay_sokol.h"
-#include "runtime/deps_stb.h"
+#include "runtime/deps_extra.h"
 
 namespace coi::native {
 
@@ -126,7 +124,7 @@ bool read_file_bytes(const char* path, std::vector<unsigned char>& out) {
     return (bool)f;
 }
 
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
 namespace {
 
 struct CachedImage {

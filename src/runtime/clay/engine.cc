@@ -9,10 +9,8 @@
 #include <cstring>
 #include <iostream>
 
-#include "runtime/deps_sokol.h"
-
 #include "runtime/clay_internal.h"
-#include "runtime/deps_clay_sokol.h"
+#include "runtime/deps_extra.h"
 #include "runtime/clay/style_map.h"
 #include "runtime/util.h"
 
@@ -75,7 +73,7 @@ Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_roo
     if (st.h_grow) sy = CLAY_SIZING_GROW(0);
 
     const NativeImageInfo* img = nullptr;
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     if (is_img) {
         const webcc::string* src = attr(n, "src");
         img = native_image_get_or_load(src ? src->c_str() : nullptr);
@@ -159,7 +157,7 @@ Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_roo
     if (st.has_corner_radius) {
         decl.cornerRadius = st.corner_radius;
     }
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     if (is_img && img) {
         decl.image = Clay_ImageElementConfig{.imageData = (void*)img->image_data};
     }
@@ -270,7 +268,7 @@ void ClayEngine::set_input(float x, float y, bool down, float scroll_x, float sc
 }
 
 Clay_RenderCommandArray ClayEngine::layout(float w_px, float h_px, float dpi_scale) {
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     const float safe_dpi = (dpi_scale > 0.0f) ? dpi_scale : 1.0f;
     ensure(w_px / safe_dpi, h_px / safe_dpi);
 #else
@@ -279,7 +277,7 @@ Clay_RenderCommandArray ClayEngine::layout(float w_px, float h_px, float dpi_sca
 #endif
     if (!s_ctx) return Clay_RenderCommandArray{};
     Clay_SetCurrentContext(s_ctx);
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
+#if defined(COI_NATIVE_CLAY) && defined(COI_NATIVE_FONTSTASH)
     sclay_set_layout_dimensions(Clay_Dimensions{w_px, h_px}, (dpi_scale > 0.0f) ? dpi_scale : 1.0f);
 #else
     Clay_SetLayoutDimensions(Clay_Dimensions{w_px, h_px});
