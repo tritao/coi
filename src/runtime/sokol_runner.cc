@@ -3,12 +3,7 @@
 #include "runtime/prelude.h"
 #include "runtime/state.h"
 
-#include "runtime/backends/backend.h"
-#include "runtime/backends/tree_backend.h"
-#include "runtime/backends/clay_backend.h"
-#include "runtime/backends/rmlui_backend.h"
-
-#include "runtime/clay_engine.h"
+#include "runtime/backends/registry.h"
 #include "runtime/debug_text.h"
 #include "runtime/util.h"
 
@@ -55,18 +50,7 @@ namespace coi::native {
         return true;
 	    }
 
-	    enum class BackendPref { Auto, Tree, Clay, RmlUi };
-	    static BackendPref backend_pref() {
-	        const char* e = std::getenv("COI_NATIVE_UI_BACKEND");
-	        if (!e || !*e) return BackendPref::Auto;
-	        std::string v(e);
-	        if (v == "tree") return BackendPref::Tree;
-	        if (v == "clay") return BackendPref::Clay;
-	        if (v == "rmlui") return BackendPref::RmlUi;
-	        return BackendPref::Auto;
-	    }
-
-	    static void init(void) {
+		    static void init(void) {
         stm_setup();
         sg_desc desc{};
         desc.logger.func = sg_log;
@@ -88,23 +72,8 @@ namespace coi::native {
 	        ddesc.fonts[5] = sdtx_font_oric();
 	        sdtx_setup(&ddesc);
 
-#if defined(COI_NATIVE_CLAY)
-		        clay_backend().init_gfx();
-#endif
-
-#if defined(COI_NATIVE_CLAY)
-#if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
-	        const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
-	        ClayEngine::ensure((float)sapp_width() / dpi, (float)sapp_height() / dpi);
-		        if (ClayEngine::ctx && clay_backend().font_ok()) {
-		            Clay_SetCurrentContext(ClayEngine::ctx);
-		            Clay_SetMeasureTextFunction(sclay_measure_text, clay_backend().measure_userdata());
-		            Clay_ResetMeasureTextCache();
-		        }
-#else
-	        ClayEngine::ensure((float)sapp_width(), (float)sapp_height());
-#endif
-#endif
+        const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
+        init_sokol_backends((float)sapp_width(), (float)sapp_height(), dpi);
 
 #if defined(COI_NATIVE_CAPTURE)
 	        capture_init();
@@ -612,67 +581,10 @@ namespace coi::native {
         scroll_x = 0.0f;
         scroll_y = 0.0f;
 
-		        UiBackend* backend = &tree_backend();
-	        const BackendPref pref = backend_pref();
-#if defined(COI_NATIVE_CLAY)
-	        const float fbw = (float)sapp_width();
-	        const float fbh = (float)sapp_height();
-	        auto try_clay = [&]() -> bool {
-		            clay_backend().set_input(input, (float)dt, dpi);
-		            clay_backend().layout(fbw, fbh, dpi);
-		            if (clay_backend().is_ok()) {
-		                backend = &clay_backend();
-		                return true;
-		            }
-	            return false;
-	        };
-#else
-	        const float fbw = (float)sapp_width();
-	        const float fbh = (float)sapp_height();
-#endif
-
-#if defined(COI_NATIVE_RMLUI)
-	        auto try_rmlui = [&]() -> bool {
-		            rmlui_backend().set_input(input, (float)dt, dpi);
-		            rmlui_backend().layout(fbw, fbh, dpi);
-		            if (rmlui_backend().is_ok()) {
-		                backend = &rmlui_backend();
-		                return true;
-		            }
-	            return false;
-	        };
-#endif
-
-	        bool selected = false;
-	        if (pref == BackendPref::Tree) {
-		            tree_backend().layout(fbw, fbh, dpi);
-		            selected = true;
-	        } else if (pref == BackendPref::Clay) {
-#if defined(COI_NATIVE_CLAY)
-	            selected = try_clay();
-#endif
-	        } else if (pref == BackendPref::RmlUi) {
-#if defined(COI_NATIVE_RMLUI)
-	            selected = try_rmlui();
-#endif
-	        } else {
-	            // Auto: prefer Clay, then RmlUI, then fallback tree.
-#if defined(COI_NATIVE_CLAY)
-	            selected = try_clay();
-#endif
-#if defined(COI_NATIVE_RMLUI)
-	            if (!selected) selected = try_rmlui();
-#endif
-	            if (!selected) {
-		                tree_backend().layout(fbw, fbh, dpi);
-		                selected = true;
-		            }
-	        }
-
-	        if (!selected) {
-		            tree_backend().layout(fbw, fbh, dpi);
-		            backend = &tree_backend();
-		        }
+        const float fbw = (float)sapp_width();
+        const float fbh = (float)sapp_height();
+        UiBackend& backend_ref = select_backend(input, (float)dt, dpi, fbw, fbh);
+        UiBackend* backend = &backend_ref;
 
         if (click_pending && g_click_dispatcher) {
             click_pending = false;
@@ -743,17 +655,12 @@ namespace coi::native {
 
 	    static void cleanup(void) {
 #if defined(COI_NATIVE_CAPTURE)
-		        capture_shutdown();
+			        capture_shutdown();
 #endif
-#if defined(COI_NATIVE_CLAY)
-		        // Backend resources (textures, font atlases, etc) must be destroyed before sg_shutdown().
-			        clay_backend().shutdown_gfx();
-#endif
-#if defined(COI_NATIVE_RMLUI)
-			        rmlui_backend().shutdown_gfx();
-#endif
-		        sdtx_shutdown();
-		        sgl_shutdown();
+			        // Backend resources (textures, font atlases, etc) must be destroyed before sg_shutdown().
+                    shutdown_sokol_backends();
+			        sdtx_shutdown();
+			        sgl_shutdown();
 
 		        sg_shutdown();
 		    }
