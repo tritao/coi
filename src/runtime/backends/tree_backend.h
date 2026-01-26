@@ -1,3 +1,12 @@
+#pragma once
+
+#include "runtime/prelude.h"
+#include "runtime/backends/backend.h"
+#include "runtime/debug_text.h"
+#include "runtime/util.h"
+
+namespace coi::native {
+
 class TreeBackend final : public UiBackend {
   public:
     const char* name() const override { return "tree"; }
@@ -107,3 +116,4 @@ inline TreeBackend& tree_backend() {
     return b;
 }
 
+} // namespace coi::native

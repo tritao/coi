@@ -1,4 +1,10 @@
-	inline bool asset_debug_enabled() {
+#pragma once
+
+#include "runtime/prelude.h"
+
+namespace coi::native {
+
+inline bool asset_debug_enabled() {
 	    const char* e = std::getenv("COI_NATIVE_ASSET_DEBUG");
 	    if (!e || !*e) return false;
 	    return !(e[0] == '0' && e[1] == '\0');
@@ -188,12 +194,10 @@
 	};
 #endif
 
-	// Desktop event dispatch hooks (set by generated app code).
-	// The dispatcher is expected to return true when the event was handled.
-inline webcc::function<bool(webcc::handle)> g_click_dispatcher;
-void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) {
-    g_click_dispatcher = std::move(cb);
-}
+// Native event dispatch hooks (set by generated app code).
+// The dispatcher is expected to return true when the event was handled.
+extern webcc::function<bool(webcc::handle)> g_click_dispatcher;
+void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb);
 
 inline bool dispatch_click_bubble(webcc::handle start) {
     if (!g_click_dispatcher) return false;
@@ -231,3 +235,5 @@ inline void color_from_hash(uint32_t h, float& r, float& g, float& b) {
     g = 0.25f + (((h >> 8) & 0xFF) / 255.0f) * 0.65f;
     b = 0.25f + (((h >> 16) & 0xFF) / 255.0f) * 0.65f;
 }
+
+} // namespace coi::native

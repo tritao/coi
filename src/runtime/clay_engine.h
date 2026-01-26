@@ -1,3 +1,12 @@
+#pragma once
+
+#include "runtime/prelude.h"
+#include "runtime/clay_internal.h"
+#include "runtime/style_class_parser.h"
+#include "runtime/util.h"
+
+namespace coi::native {
+
 #if defined(COI_NATIVE_CLAY)
 struct ClayEngine {
     static inline Clay_Context* ctx = nullptr;
@@ -290,3 +299,5 @@ struct ClayEngine {
     }
 };
 #endif // COI_NATIVE_CLAY
+
+} // namespace coi::native

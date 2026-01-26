@@ -69,7 +69,9 @@ build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/
 build build/obj/runtime/vendor_impl.o: cxx_native_runtime src/runtime/vendor_impl.cc
 build build/obj/runtime/ui_tree.o: cxx_native_runtime src/runtime/ui_tree.cc
 build build/obj/runtime/runtime_sokol.o: cxx_native_runtime src/runtime/runtime_sokol.cc
-build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/runtime_sokol.o
+build build/obj/runtime/sokol_runner.o: cxx_native_runtime src/runtime/sokol_runner.cc
+build build/obj/runtime/debug_tools.o: cxx_native_runtime src/runtime/debug_tools.cc
+build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/runtime_sokol.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o
 build coi_native_runtime: phony build/libcoi_native_runtime.a
 
 # Generate def cache at build time

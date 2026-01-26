@@ -1,3 +1,21 @@
+#pragma once
+
+#include "runtime/prelude.h"
+#include "runtime/backends/backend.h"
+#include "runtime/util.h"
+
+#if defined(COI_NATIVE_RMLUI)
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementText.h>
+#include <RmlUi/Core/RenderInterface.h>
+#include <RmlUi/Core/SystemInterface.h>
+#endif
+
+namespace coi::native {
+
 #if defined(COI_NATIVE_RMLUI)
 
 class SokolRmlRenderInterface final : public Rml::RenderInterface {
@@ -692,3 +710,5 @@ inline RmlUiBackend& rmlui_backend() {
 }
 
 #endif // COI_NATIVE_RMLUI
+
+} // namespace coi::native

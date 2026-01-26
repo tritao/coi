@@ -1,3 +1,9 @@
+#pragma once
+
+#include "runtime/prelude.h"
+
+namespace coi::native {
+
 struct InputState {
     float mouse_x = 0.0f;
     float mouse_y = 0.0f;
@@ -34,3 +40,4 @@ class UiBackend {
     virtual void* measure_userdata() { return nullptr; }
 };
 
+} // namespace coi::native

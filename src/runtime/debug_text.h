@@ -1,3 +1,9 @@
+#pragma once
+
+#include "runtime/prelude.h"
+
+namespace coi::native {
+
 inline void sdtx_put_wrapped(const char* text, int cols) {
     if (!text || !*text) return;
     if (cols < 1) cols = 1;
@@ -55,3 +61,5 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
     int lines = (len + cols - 1) / cols;
     return lines * char_h;
 }
+
+} // namespace coi::native

@@ -1,3 +1,15 @@
+#pragma once
+
+#include "runtime/prelude.h"
+#include "runtime/backends/backend.h"
+#include "runtime/clay_engine.h"
+#include "runtime/clay_internal.h"
+#include "runtime/debug_text.h"
+#include "runtime/style_class_parser.h"
+#include "runtime/util.h"
+
+namespace coi::native {
+
 #if defined(COI_NATIVE_CLAY)
 class ClayBackend final : public UiBackend {
   public:
@@ -284,3 +296,4 @@ inline ClayBackend& clay_backend() {
 }
 #endif // COI_NATIVE_CLAY
 
+} // namespace coi::native

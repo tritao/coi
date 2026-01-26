@@ -1,3 +1,10 @@
+#pragma once
+
+#include "runtime/prelude.h"
+#include "runtime/util.h"
+
+namespace coi::native {
+
 #if defined(COI_NATIVE_CLAY)
 
 	struct DesktopClassStyle {
@@ -228,3 +235,5 @@
 	}
 
 #endif // COI_NATIVE_CLAY
+
+} // namespace coi::native
