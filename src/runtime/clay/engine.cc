@@ -66,11 +66,11 @@ Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_roo
     if (st.w_grow) sx = CLAY_SIZING_GROW(0);
     if (st.h_grow) sy = CLAY_SIZING_GROW(0);
 
-    const DesktopImage* img = nullptr;
+    const NativeImageInfo* img = nullptr;
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
     if (is_img) {
         const webcc::string* src = attr(n, "src");
-        img = DesktopImageCache::get_or_load(src ? src->c_str() : nullptr);
+        img = native_image_get_or_load(src ? src->c_str() : nullptr);
         if (img) {
             if (!st.w_fixed && !st.w_grow) {
                 sx = CLAY_SIZING_FIXED((float)img->w);
@@ -153,7 +153,7 @@ Clay_ElementDeclaration declaration_for_node(const coi::ui::Node& n, bool is_roo
     }
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
     if (is_img && img) {
-        decl.image = Clay_ImageElementConfig{.imageData = (void*)&img->scl};
+        decl.image = Clay_ImageElementConfig{.imageData = (void*)img->image_data};
     }
 #endif
     if (st.has_floating && st.floating_attach_to != CLAY_ATTACH_TO_NONE) {
@@ -295,4 +295,3 @@ void ClayEngine::shutdown() {
 } // namespace coi::native
 
 #endif // COI_NATIVE_CLAY
-

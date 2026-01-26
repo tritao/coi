@@ -89,7 +89,7 @@ class ClayBackend final : public UiBackend {
 #endif
 
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
-        DesktopImageCache::shutdown();
+        native_image_cache_shutdown();
 #endif
 
         ClayEngine::shutdown();

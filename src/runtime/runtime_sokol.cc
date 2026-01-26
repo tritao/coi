@@ -5,6 +5,8 @@
 #include "coi/native/runtime_api.h"
 
 #if defined(COI_NATIVE_SOKOL)
+#include <utility>
+
 #include "runtime/util.h"
 #include "runtime/state.h"
 

@@ -1,7 +1,6 @@
 #include "runtime/capture.h"
 
 #include "runtime/backends/backend.h"
-#include "runtime/util.h"
 
 #if defined(__linux__) || defined(__unix__)
 #include <GL/gl.h>
@@ -480,4 +479,3 @@ int capture_exit_code() { return 0; }
 #endif
 
 } // namespace coi::native
-
