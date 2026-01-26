@@ -232,22 +232,22 @@ inline void simulate_click_at(float x, float y, float w, float h) {
 #if defined(COI_NATIVE_RMLUI)
     const char* pref = std::getenv("COI_NATIVE_UI_BACKEND");
     if (pref && std::string(pref) == "rmlui") {
-        detail::rmlui_backend().layout(w, h, 1.0f);
-        if (detail::rmlui_backend().is_ok() && detail::rmlui_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
+        rmlui_backend().layout(w, h, 1.0f);
+        if (rmlui_backend().is_ok() && rmlui_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
             dispatch_click_bubble(target);
             return;
         }
     }
 #endif
 #if defined(COI_NATIVE_CLAY)
-    detail::clay_backend().layout(w, h, 1.0f);
-    if (detail::clay_backend().is_ok() && detail::clay_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
+    clay_backend().layout(w, h, 1.0f);
+    if (clay_backend().is_ok() && clay_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
         dispatch_click_bubble(target);
         return;
     }
 #endif
-    detail::tree_backend().layout(w, h, 1.0f);
-    if (detail::tree_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
+    tree_backend().layout(w, h, 1.0f);
+    if (tree_backend().hit_test(x, y, 1.0f, target) && target.is_valid()) {
         dispatch_click_bubble(target);
     }
 }
@@ -262,15 +262,15 @@ inline void simulate_scroll_at(float pointer_x, float pointer_y, float dx, float
 #if defined(COI_NATIVE_RMLUI)
     const char* pref = std::getenv("COI_NATIVE_UI_BACKEND");
     if (pref && std::string(pref) == "rmlui") {
-        detail::rmlui_backend().layout(w, h, 1.0f);
-        if (detail::rmlui_backend().is_ok()) {
-            detail::rmlui_backend().scroll_by(pointer_x, pointer_y, dx, dy, w, h);
+        rmlui_backend().layout(w, h, 1.0f);
+        if (rmlui_backend().is_ok()) {
+            rmlui_backend().scroll_by(pointer_x, pointer_y, dx, dy, w, h);
             return;
         }
     }
 #endif
 #if defined(COI_NATIVE_CLAY)
-    detail::clay_backend().scroll_by(pointer_x, pointer_y, dx, dy, w, h);
+    clay_backend().scroll_by(pointer_x, pointer_y, dx, dy, w, h);
 #endif
 }
 

@@ -1,7 +1,5 @@
 #if defined(COI_NATIVE_RMLUI)
 
-	namespace detail {
-
 class SokolRmlRenderInterface final : public Rml::RenderInterface {
   public:
     void init() {
@@ -693,5 +691,4 @@ inline RmlUiBackend& rmlui_backend() {
     return b;
 }
 
-} // namespace detail
 #endif // COI_NATIVE_RMLUI

@@ -73,18 +73,18 @@
 	        sdtx_setup(&ddesc);
 
 #if defined(COI_NATIVE_CLAY)
-	        detail::clay_backend().init_gfx();
+		        clay_backend().init_gfx();
 #endif
 
 #if defined(COI_NATIVE_CLAY)
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
 	        const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
 	        ClayEngine::ensure((float)sapp_width() / dpi, (float)sapp_height() / dpi);
-	        if (ClayEngine::ctx && detail::clay_backend().font_ok()) {
-	            Clay_SetCurrentContext(ClayEngine::ctx);
-	            Clay_SetMeasureTextFunction(sclay_measure_text, detail::clay_backend().measure_userdata());
-	            Clay_ResetMeasureTextCache();
-	        }
+		        if (ClayEngine::ctx && clay_backend().font_ok()) {
+		            Clay_SetCurrentContext(ClayEngine::ctx);
+		            Clay_SetMeasureTextFunction(sclay_measure_text, clay_backend().measure_userdata());
+		            Clay_ResetMeasureTextCache();
+		        }
 #else
 	        ClayEngine::ensure((float)sapp_width(), (float)sapp_height());
 #endif
@@ -401,7 +401,7 @@
         capture_pixels_flipped.resize(capture_pixels.size());
     }
 
-    static void capture_maybe(detail::UiBackend& backend, const sg_pass_action& action, double dt) {
+	    static void capture_maybe(UiBackend& backend, const sg_pass_action& action, double dt) {
         (void)dt;
         if (!capture_enabled) return;
         if (capture_mode != CaptureMode::Offscreen) return;
@@ -587,7 +587,7 @@
         coi::native::flush();
 
         const float dpi = (sapp_dpi_scale() > 0.0f) ? sapp_dpi_scale() : 1.0f;
-        detail::InputState input;
+	        InputState input;
         input.mouse_x = mouse_x;
         input.mouse_y = mouse_y;
         input.mouse_down = mouse_down;
@@ -596,18 +596,18 @@
         scroll_x = 0.0f;
         scroll_y = 0.0f;
 
-	        detail::UiBackend* backend = &detail::tree_backend();
+		        UiBackend* backend = &tree_backend();
 	        const BackendPref pref = backend_pref();
 #if defined(COI_NATIVE_CLAY)
 	        const float fbw = (float)sapp_width();
 	        const float fbh = (float)sapp_height();
 	        auto try_clay = [&]() -> bool {
-	            detail::clay_backend().set_input(input, (float)dt, dpi);
-	            detail::clay_backend().layout(fbw, fbh, dpi);
-	            if (detail::clay_backend().is_ok()) {
-	                backend = &detail::clay_backend();
-	                return true;
-	            }
+		            clay_backend().set_input(input, (float)dt, dpi);
+		            clay_backend().layout(fbw, fbh, dpi);
+		            if (clay_backend().is_ok()) {
+		                backend = &clay_backend();
+		                return true;
+		            }
 	            return false;
 	        };
 #else
@@ -617,20 +617,20 @@
 
 #if defined(COI_NATIVE_RMLUI)
 	        auto try_rmlui = [&]() -> bool {
-	            detail::rmlui_backend().set_input(input, (float)dt, dpi);
-	            detail::rmlui_backend().layout(fbw, fbh, dpi);
-	            if (detail::rmlui_backend().is_ok()) {
-	                backend = &detail::rmlui_backend();
-	                return true;
-	            }
+		            rmlui_backend().set_input(input, (float)dt, dpi);
+		            rmlui_backend().layout(fbw, fbh, dpi);
+		            if (rmlui_backend().is_ok()) {
+		                backend = &rmlui_backend();
+		                return true;
+		            }
 	            return false;
 	        };
 #endif
 
 	        bool selected = false;
 	        if (pref == BackendPref::Tree) {
-	            detail::tree_backend().layout(fbw, fbh, dpi);
-	            selected = true;
+		            tree_backend().layout(fbw, fbh, dpi);
+		            selected = true;
 	        } else if (pref == BackendPref::Clay) {
 #if defined(COI_NATIVE_CLAY)
 	            selected = try_clay();
@@ -648,15 +648,15 @@
 	            if (!selected) selected = try_rmlui();
 #endif
 	            if (!selected) {
-	                detail::tree_backend().layout(fbw, fbh, dpi);
-	                selected = true;
-	            }
+		                tree_backend().layout(fbw, fbh, dpi);
+		                selected = true;
+		            }
 	        }
 
 	        if (!selected) {
-	            detail::tree_backend().layout(fbw, fbh, dpi);
-	            backend = &detail::tree_backend();
-	        }
+		            tree_backend().layout(fbw, fbh, dpi);
+		            backend = &tree_backend();
+		        }
 
         if (click_pending && g_click_dispatcher) {
             click_pending = false;
@@ -731,10 +731,10 @@
 #endif
 #if defined(COI_NATIVE_CLAY)
 		        // Backend resources (textures, font atlases, etc) must be destroyed before sg_shutdown().
-		        detail::clay_backend().shutdown_gfx();
+			        clay_backend().shutdown_gfx();
 #endif
 #if defined(COI_NATIVE_RMLUI)
-		        detail::rmlui_backend().shutdown_gfx();
+			        rmlui_backend().shutdown_gfx();
 #endif
 		        sdtx_shutdown();
 		        sgl_shutdown();

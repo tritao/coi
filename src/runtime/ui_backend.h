@@ -1,4 +1,3 @@
-namespace detail {
 struct InputState {
     float mouse_x = 0.0f;
     float mouse_y = 0.0f;
@@ -470,5 +469,3 @@ inline ClayBackend& clay_backend() {
     return b;
 }
 #endif
-
-} // namespace detail
