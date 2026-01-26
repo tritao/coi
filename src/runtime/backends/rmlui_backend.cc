@@ -4,6 +4,7 @@
 
 #include "runtime/backends/rmlui_backend.h"
 
+#include "runtime/deps_stb.h"
 #include "runtime/util.h"
 
 #if defined(COI_NATIVE_RMLUI)

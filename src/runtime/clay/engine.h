@@ -1,7 +1,7 @@
 #pragma once
 
 #if defined(COI_NATIVE_CLAY)
-#include "runtime/deps.h"
+#include "runtime/deps_clay.h"
 #include "webcc/core/handle.h"
 
 namespace coi::native {
@@ -21,4 +21,3 @@ struct ClayEngine {
 } // namespace coi::native
 
 #endif // COI_NATIVE_CLAY
-

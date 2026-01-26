@@ -47,6 +47,5 @@
 
 // Native graphics deps (Sokol + optional Clay/RmlUI helpers).
 #if defined(COI_NATIVE_SOKOL)
-#include "runtime/deps.h"
+#include "runtime/deps_sokol.h"
 #endif
-

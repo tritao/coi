@@ -3,7 +3,7 @@
 #include "runtime/ui_tree.h"
 
 #if defined(COI_NATIVE_CLAY)
-#include "runtime/deps.h"
+#include "runtime/deps_clay.h"
 
 namespace coi::native {
 
@@ -93,4 +93,3 @@ DesktopClassStyle parse_desktop_class_style(const coi::ui::Node& n, bool is_root
 } // namespace coi::native
 
 #endif // COI_NATIVE_CLAY
-

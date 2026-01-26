@@ -4,6 +4,8 @@
 
 #include "runtime/backends/clay_backend.h"
 
+#include "runtime/deps_clay_sokol.h"
+#include "runtime/deps_fontstash.h"
 #include "runtime/debug_text.h"
 #include "runtime/clay/engine.h"
 #include "runtime/util.h"

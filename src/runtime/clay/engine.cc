@@ -5,6 +5,7 @@
 #include "runtime/prelude.h"
 
 #include "runtime/clay_internal.h"
+#include "runtime/deps_clay_sokol.h"
 #include "runtime/clay/style_map.h"
 #include "runtime/util.h"
 

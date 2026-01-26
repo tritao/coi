@@ -1,6 +1,7 @@
 #include "runtime/capture.h"
 
 #include "runtime/backends/backend.h"
+#include "runtime/deps_stb.h"
 
 #if defined(__linux__) || defined(__unix__)
 #include <GL/gl.h>

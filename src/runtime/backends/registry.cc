@@ -7,6 +7,7 @@
 #include "runtime/backends/tree_backend.h"
 
 #include "runtime/clay/engine.h"
+#include "runtime/deps_clay_sokol.h"
 #include "runtime/util.h"
 
 namespace coi::native {

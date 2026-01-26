@@ -1,6 +1,8 @@
 #include "runtime/util.h"
 
 #include "runtime/prelude.h"
+#include "runtime/deps_clay_sokol.h"
+#include "runtime/deps_stb.h"
 
 namespace coi::native {
 
@@ -242,4 +244,3 @@ void color_from_hash(uint32_t h, float& r, float& g, float& b) {
 }
 
 } // namespace coi::native
-
