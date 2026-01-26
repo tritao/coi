@@ -8,11 +8,12 @@ declare -a SCENE_PATTERNS=()
 SET_NAME=""
 RUN=1
 OPEN_AFTER=0
+NATIVE_UI_BACKENDS="clay,rmlui" # comma-separated list (e.g. clay,rmlui or clay or rmlui)
 
 usage() {
   cat <<EOF
 Usage:
-  $0 (--scene <name|glob> | --set <name>) [--out <dir>] [--no-run] [--open]
+  $0 (--scene <name|glob> | --set <name>) [--out <dir>] [--native-ui-backends <list>] [--no-run] [--open]
 
 Examples:
   $0 --scene paint_rects
@@ -20,7 +21,7 @@ Examples:
   $0 --set golden
 
 Outputs:
-  <out>/native/<scene>/frame_*.png
+  <out>/native/<ui-backend>/<scene>/frame_*.png
   <out>/web/<scene>/frame_*.png
   <out>/index.html
 EOF
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --scene) SCENE_PATTERNS+=("${2:-}"); shift 2;;
     --set) SET_NAME="${2:-}"; shift 2;;
     --out) OUT_DIR="${2:-}"; shift 2;;
+    --native-ui-backends) NATIVE_UI_BACKENDS="${2:-}"; shift 2;;
     --no-run) RUN=0; shift;;
     --open) OPEN_AFTER=1; shift;;
     *) echo "error: unknown arg: $1"; usage; exit 1;;
@@ -65,14 +67,38 @@ mkdir -p "$OUT_DIR"
 NATIVE_BASE="$OUT_DIR/native"
 WEB_BASE="$OUT_DIR/web"
 
+IFS=',' read -r -a NATIVE_UI_LIST <<<"$NATIVE_UI_BACKENDS"
+if [[ "${#NATIVE_UI_LIST[@]}" -eq 0 ]]; then
+  echo "error: empty --native-ui-backends"
+  exit 1
+fi
+
 if [[ "$RUN" -eq 1 ]]; then
   for pat in "${SCENE_PATTERNS[@]}"; do
-    "$ROOT_DIR/tests/run_visual.sh" --backend native --update --scene "$pat" --baseline-dir "$NATIVE_BASE" --out-dir "$OUT_DIR/.out/native"
+    for ui in "${NATIVE_UI_LIST[@]}"; do
+      ui="${ui#"${ui%%[![:space:]]*}"}"
+      ui="${ui%"${ui##*[![:space:]]}"}"
+      if [[ -z "$ui" ]]; then
+        continue
+      fi
+      "$ROOT_DIR/tests/run_visual.sh" --backend native --native-ui-backend "$ui" --update --scene "$pat" --baseline-dir "$NATIVE_BASE/$ui" --out-dir "$OUT_DIR/.out/native/$ui"
+    done
     "$ROOT_DIR/tests/run_visual.sh" --backend web --update --scene "$pat" --baseline-dir "$WEB_BASE" --out-dir "$OUT_DIR/.out/web"
   done
 fi
 
-python3 "$ROOT_DIR/tests/visual/make_gallery.py" --native "$NATIVE_BASE" --web "$WEB_BASE" --out "$OUT_DIR/index.html" --title "COI Native vs Web"
+cols=()
+for ui in "${NATIVE_UI_LIST[@]}"; do
+  ui="${ui#"${ui%%[![:space:]]*}"}"
+  ui="${ui%"${ui##*[![:space:]]}"}"
+  if [[ -z "$ui" ]]; then
+    continue
+  fi
+  cols+=(--col "native-$ui=$NATIVE_BASE/$ui")
+done
+cols+=(--col "web=$WEB_BASE")
+
+python3 "$ROOT_DIR/tests/visual/make_gallery.py" "${cols[@]}" --out "$OUT_DIR/index.html" --title "COI Gallery"
 
 echo "wrote: $OUT_DIR/index.html"
 

@@ -16,6 +16,7 @@ MODE="compare"    # compare | update
 SCENE_FILTER=""
 LIST_ONLY=0
 OPEN_AFTER=0
+NATIVE_UI_BACKEND="" # auto|tree|clay|rmlui (optional)
 
 # Common
 BASELINE_DIR=""
@@ -62,6 +63,7 @@ Native-specific:
   --headless                   Run scenes headlessly (default)
   --capture-mode <mode>        Capture mode: offscreen|x11|auto (default: $CAPTURE_MODE)
   --xvfb / --no-xvfb           Force/disable xvfb-run wrapper
+  --native-ui-backend <name>   Select native UI backend: auto|tree|clay|rmlui (sets COI_NATIVE_UI_BACKEND)
 
 Web-specific:
   --web-driver <playwright|chrome> Web driver (default: $WEB_DRIVER)
@@ -83,6 +85,7 @@ while [[ $# -gt 0 ]]; do
       fi
       shift
       ;;
+    --native-ui-backend) NATIVE_UI_BACKEND="${2:-}"; shift 2;;
     --baseline-dir) BASELINE_DIR="${2:-}"; shift 2;;
     --out-dir) OUT_DIR="${2:-}"; shift 2;;
     --size) CAPTURE_SIZE="${2:-}"; shift 2;;
@@ -319,6 +322,9 @@ run_scene_native() {
 
   if [[ -z "${COI_NATIVE_ASSET_ROOT:-}" ]]; then
     extra_env_local+=("COI_NATIVE_ASSET_ROOT=$ROOT_DIR")
+  fi
+  if [[ -n "$NATIVE_UI_BACKEND" ]]; then
+    extra_env_local+=("COI_NATIVE_UI_BACKEND=$NATIVE_UI_BACKEND")
   fi
 
   if [[ "$CAPTURE_MODE" != "offscreen" && "$CAPTURE_MODE" != "x11" && "$CAPTURE_MODE" != "auto" ]]; then

@@ -34,65 +34,86 @@ def relpath(from_dir: Path, to_file: Path) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--native", type=Path, required=True, help="Directory containing native scene subdirs")
-    ap.add_argument("--web", type=Path, required=True, help="Directory containing web scene subdirs")
+    ap.add_argument("--native", type=Path, help="Directory containing native scene subdirs (legacy)")
+    ap.add_argument("--web", type=Path, help="Directory containing web scene subdirs (legacy)")
+    ap.add_argument(
+        "--col",
+        action="append",
+        default=[],
+        help="Add a column in the form 'label=DIR'. Can be passed multiple times (preferred).",
+    )
     ap.add_argument("--out", type=Path, required=True, help="Output HTML path")
     ap.add_argument("--title", type=str, default="COI Visual Gallery")
     args = ap.parse_args()
 
-    native_root = args.native
-    web_root = args.web
+    cols: list[tuple[str, Path]] = []
+    for item in args.col:
+        if "=" not in item:
+            raise SystemExit(f"error: invalid --col '{item}' (expected label=DIR)")
+        label, raw = item.split("=", 1)
+        label = label.strip()
+        raw = raw.strip()
+        if not label or not raw:
+            raise SystemExit(f"error: invalid --col '{item}' (expected label=DIR)")
+        cols.append((label, Path(raw)))
+
+    # Back-compat: --native/--web produce two columns if --col isn't used.
+    if not cols:
+        if not args.native or not args.web:
+            raise SystemExit("error: provide --col label=DIR (one or more), or use legacy --native/--web")
+        cols = [("native", args.native), ("web", args.web)]
+
     out_path = args.out
     out_dir = out_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    scenes = sorted(find_scenes(native_root) | find_scenes(web_root))
+    scenes: set[str] = set()
+    for _, root in cols:
+        scenes |= find_scenes(root)
+    scenes_sorted = sorted(scenes)
 
     rows: list[str] = []
-    for scene in scenes:
-        ndir = native_root / scene
-        wdir = web_root / scene
-        frames = sorted(set(find_frames(ndir)) | set(find_frames(wdir)))
+    for scene in scenes_sorted:
+        frame_set: set[str] = set()
+        for _, root in cols:
+            frame_set |= set(find_frames(root / scene))
+        frames = sorted(frame_set)
         if not frames:
             continue
 
         rows.append(f'<h2 id="{html.escape(scene)}">{html.escape(scene)}</h2>')
         rows.append("<div class='scene'>")
         for frame in frames:
-            nfile = ndir / frame
-            wfile = wdir / frame
             rows.append("<div class='frame'>")
             rows.append(f"<div class='framehdr'>{html.escape(frame)}</div>")
             rows.append("<div class='cols'>")
 
-            if nfile.exists():
-                src = relpath(out_dir, nfile)
-                rows.append(
-                    "<div class='col'>"
-                    "<div class='label'>native</div>"
-                    f"<img loading='lazy' src='{html.escape(src)}' />"
-                    "</div>"
-                )
-            else:
-                rows.append("<div class='col missing'><div class='label'>native</div><div class='miss'>missing</div></div>")
-
-            if wfile.exists():
-                src = relpath(out_dir, wfile)
-                rows.append(
-                    "<div class='col'>"
-                    "<div class='label'>web</div>"
-                    f"<img loading='lazy' src='{html.escape(src)}' />"
-                    "</div>"
-                )
-            else:
-                rows.append("<div class='col missing'><div class='label'>web</div><div class='miss'>missing</div></div>")
+            for label, root in cols:
+                f = root / scene / frame
+                if f.exists():
+                    src = relpath(out_dir, f)
+                    rows.append(
+                        "<div class='col'>"
+                        f"<div class='label'>{html.escape(label)}</div>"
+                        f"<img loading='lazy' src='{html.escape(src)}' />"
+                        "</div>"
+                    )
+                else:
+                    rows.append(
+                        "<div class='col missing'>"
+                        f"<div class='label'>{html.escape(label)}</div>"
+                        "<div class='miss'>missing</div>"
+                        "</div>"
+                    )
 
             rows.append("</div>")
             rows.append("</div>")
         rows.append("</div>")
 
-    toc = "\n".join(f"<li><a href='#{html.escape(s)}'>{html.escape(s)}</a></li>" for s in scenes)
+    toc = "\n".join(f"<li><a href='#{html.escape(s)}'>{html.escape(s)}</a></li>" for s in scenes_sorted)
     body = "\n".join(rows) if rows else "<p>No scenes found.</p>"
+    col_count = max(1, len(cols))
+    paths_str = " · ".join(f"{label}: {root}" for label, root in cols)
 
     out_path.write_text(
         f"""<!doctype html>
@@ -185,7 +206,7 @@ def main() -> int:
     }}
     .cols {{
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat({col_count}, 1fr);
       gap: 10px;
     }}
     .col {{
@@ -216,7 +237,7 @@ def main() -> int:
 <body>
   <header>
     <div><strong>{html.escape(args.title)}</strong></div>
-    <div class="paths">native: {html.escape(str(native_root))} · web: {html.escape(str(web_root))}</div>
+    <div class="paths">{html.escape(paths_str)}</div>
   </header>
   <main>
     <nav>
