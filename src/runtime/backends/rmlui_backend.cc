@@ -413,6 +413,11 @@ class RmlUiBackend final : public UiBackend {
         elapsed += pending_dt;
         system.set_elapsed(elapsed);
 
+        const bool input_dbg = []() -> bool {
+            const char* e = std::getenv("COI_NATIVE_RMLUI_INPUT_DEBUG");
+            return (e && *e && std::string(e) != "0");
+        }();
+
         // Feed input.
         ctx->ProcessMouseMove((int)std::lround(pending_input.mouse_x), (int)std::lround(pending_input.mouse_y), 0);
         if (pending_input.mouse_down && !prev_mouse_down) {
@@ -438,14 +443,14 @@ class RmlUiBackend final : public UiBackend {
                     if (!s.empty()) s.pop_back();
                     refresh_focused_edit_display();
                 }
-                ctx->ProcessKeyDown(to_rml_key((int)ev.key_code), km);
+                (void)ctx->ProcessKeyDown(to_rml_key((int)ev.key_code), km);
                 break;
             case InputEventType::KeyUp:
-                ctx->ProcessKeyUp(to_rml_key((int)ev.key_code), km);
+                (void)ctx->ProcessKeyUp(to_rml_key((int)ev.key_code), km);
                 break;
             case InputEventType::Char:
                 if (ev.char_code != 0) {
-                    // Drive a simple editable div for tests (RmlUI Controls isn't vendored here).
+                    // Drive a simple editable div for tests (independent from RmlUI's built-in form controls).
                     if (focused_edit_elem && focused_edit_id != 0) {
                         const char ch = (char)ev.char_code;
                         if (ch == '\r') break;
@@ -453,9 +458,26 @@ class RmlUiBackend final : public UiBackend {
                         edit_values[focused_edit_id].push_back(ch);
                         refresh_focused_edit_display();
                     }
-                    ctx->ProcessTextInput((Rml::Character)ev.char_code);
+                    const bool consumed = ctx->ProcessTextInput((Rml::Character)ev.char_code);
+                    if (input_dbg) {
+                        Rml::Element* f = ctx->GetFocusElement();
+                        std::cerr << "[rmlui-input] char=" << (uint32_t)ev.char_code << " consumed=" << (consumed ? 1 : 0);
+                        if (f) std::cerr << " focus=<" << f->GetTagName().c_str() << ">";
+                        std::cerr << "\n";
+                    }
                 }
                 break;
+            }
+        }
+
+        if (input_dbg) {
+            Rml::Element* f = ctx->GetFocusElement();
+            if (f != last_focus_debug) {
+                std::cerr << "[rmlui-input] focus=";
+                if (f) std::cerr << "<" << f->GetTagName().c_str() << ">";
+                else std::cerr << "(none)";
+                std::cerr << "\n";
+                last_focus_debug = f;
             }
         }
 
@@ -997,6 +1019,8 @@ class RmlUiBackend final : public UiBackend {
     int focused_edit_id = 0;
     bool focused_edit_multiline = false;
     std::unordered_map<int, std::string> edit_values;
+
+    Rml::Element* last_focus_debug = nullptr;
 };
 
 UiBackend& rmlui_backend() {

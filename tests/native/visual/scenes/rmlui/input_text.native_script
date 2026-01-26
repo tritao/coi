@@ -12,4 +12,4 @@ mousedown 80 260
 wait 1
 mouseup 80 260
 wait 1
-text line1\\nline2
+text line1\nline2
