@@ -4,6 +4,9 @@
 [submodule "deps/sokol"]
 	path = deps/sokol
 	url = https://github.com/floooh/sokol
+[submodule "deps/clay"]
+	path = deps/clay
+	url = https://github.com/nicbarker/clay
 [submodule "deps/rmlui"]
 	path = deps/rmlui
 	url = https://github.com/mikke89/RmlUi
