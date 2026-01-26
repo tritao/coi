@@ -231,4 +231,3 @@ inline void color_from_hash(uint32_t h, float& r, float& g, float& b) {
     g = 0.25f + (((h >> 8) & 0xFF) / 255.0f) * 0.65f;
     b = 0.25f + (((h >> 16) & 0xFF) / 255.0f) * 0.65f;
 }
-

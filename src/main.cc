@@ -1809,76 +1809,60 @@ int main(int argc, char **argv)
 			            }
 
 			            fs::path coi_include_dir = exe_dir / "include";
-			            fs::path native_runtime_h = coi_include_dir / "coi" / "native_runtime.h";
-			            if (!fs::exists(native_runtime_h))
-			            {
-			                ErrorHandler::cli_error("Could not find COI native runtime headers",
-			                                        "Expected: " + native_runtime_h.string());
-			                return 1;
-			            }
-			            fs::path native_runtime_cc = coi_include_dir / "coi" / "native" / "runtime.cc";
-			            if (!fs::exists(native_runtime_cc))
-			            {
-			                ErrorHandler::cli_error("Could not find COI native runtime source",
-			                                        "Expected: " + native_runtime_cc.string());
-			                return 1;
-			            }
+				            fs::path native_runtime_h = coi_include_dir / "coi" / "native_runtime.h";
+				            if (!fs::exists(native_runtime_h))
+				            {
+				                ErrorHandler::cli_error("Could not find COI native runtime headers",
+				                                        "Expected: " + native_runtime_h.string());
+				                return 1;
+				            }
 
-			            fs::path sokol_dir = exe_dir / "deps" / "sokol";
-			            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
-			            fs::path fontstash_dir = sokol_dir / "tests" / "ext";
-			            const bool has_fontstash = fs::exists(fontstash_dir / "fontstash.h") && fs::exists(fontstash_dir / "stb_truetype.h");
-			            fs::path clay_dir = exe_dir / "deps" / "clay";
-			            const bool has_clay = fs::exists(clay_dir / "clay.h");
-			            fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
-			            const bool has_rmlui = fs::exists(rmlui_dir / "Include" / "RmlUi" / "Core.h");
-			            fs::path stb_dir = exe_dir / "deps" / "stb";
-			            const bool has_stb_write = fs::exists(stb_dir / "stb_image_write.h");
+				            fs::path native_runtime_lib = exe_dir / "build" / "libcoi_native_runtime.a";
+				            if (!fs::exists(native_runtime_lib))
+				            {
+				                // Build on-demand (keeps `./build.sh` fast for web-only users).
+				                std::string build_cmd = "ninja -C " + exe_dir.string() + " coi_native_runtime";
+				                std::cerr << "Building native runtime: " << build_cmd << std::endl;
+				                if (system(build_cmd.c_str()) != 0 || !fs::exists(native_runtime_lib))
+				                {
+				                    ErrorHandler::cli_error("Could not build COI native runtime library",
+				                                            "Expected: " + native_runtime_lib.string());
+				                    return 1;
+				                }
+				            }
+
+				            fs::path sokol_dir = exe_dir / "deps" / "sokol";
+				            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
+				            fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
+				            const bool has_rmlui = fs::exists(rmlui_dir / "Include" / "RmlUi" / "Core.h");
 
 		            fs::path abs_output_cc = fs::absolute(output_cc);
 		            fs::path abs_output_dir = fs::absolute(final_output_dir);
 		            fs::path out_bin = abs_output_dir / "app";
 
-			            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
-			            std::string link_tail;
-			            cmd += " -I" + include_dir.string();
-			            cmd += " -I" + coi_include_dir.string();
-			            if (has_clay) {
-			                cmd += " -I" + clay_dir.string();
-			                cmd += " -DCOI_NATIVE_CLAY";
-			            }
-			            if (has_rmlui) {
-			                fs::path rmlui_build_dir;
-			                if (build_rmlui_if_needed(exe_dir, rmlui_build_dir)) {
-			                cmd += " -I" + (rmlui_dir / "Include").string();
-			                cmd += " -DCOI_NATIVE_RMLUI";
-				                cmd += " -DRMLUI_STATIC_LIB";
-				                link_tail += " -L" + rmlui_build_dir.string();
-				                link_tail += " -lrmlui -lrmlui_debugger -lfreetype";
-			                } else {
-			                    std::cerr << "warn: RmlUI detected but not built; continuing without COI_NATIVE_RMLUI\n";
-			                }
-			            }
-			            if (has_sokol) {
-			                cmd += " -I" + sokol_dir.string();
-			                cmd += " -I" + (sokol_dir / "util").string();
-			                if (has_fontstash) {
-			                    cmd += " -I" + fontstash_dir.string();
-			                    cmd += " -DCOI_NATIVE_FONTSTASH";
-			                }
-			                if (has_stb_write) {
-			                    cmd += " -I" + stb_dir.string();
-			                    cmd += " -DCOI_NATIVE_CAPTURE";
-			                }
+				            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
+				            std::string link_tail;
+				            cmd += " -I" + include_dir.string();
+				            cmd += " -I" + coi_include_dir.string();
+				            if (has_rmlui) {
+				                fs::path rmlui_build_dir;
+				                if (build_rmlui_if_needed(exe_dir, rmlui_build_dir)) {
+					                link_tail += " -L" + rmlui_build_dir.string();
+					                link_tail += " -lrmlui -lrmlui_debugger -lfreetype";
+				                } else {
+				                    std::cerr << "warn: RmlUI detected but not built; continuing without COI_NATIVE_RMLUI\n";
+				                }
+				            }
+				            if (has_sokol) {
 #if defined(__linux__) || defined(__unix__)
-			                cmd += " -DCOI_NATIVE_SOKOL";
-		                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
+				                cmd += " -DCOI_NATIVE_SOKOL";
+			                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
 #endif
-		            }
-		            cmd += " " + native_runtime_cc.string();
-		            cmd += " " + abs_output_cc.string();
-		            cmd += " -o " + out_bin.string();
-		            cmd += link_tail;
+				            }
+				            cmd += " " + abs_output_cc.string();
+				            cmd += " " + native_runtime_lib.string();
+				            cmd += " -o " + out_bin.string();
+				            cmd += link_tail;
 
 		            std::cerr << "Running: " << cmd << std::endl;
 		            int ret = system(cmd.c_str());

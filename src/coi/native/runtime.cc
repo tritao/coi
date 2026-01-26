@@ -1,4 +1,13 @@
-// Native runtime implementation (single TU). Included by `include/coi/native/runtime.cc`.
+// Native runtime implementation (single TU).
+// Built as a normal project source (not via .inc includes in public headers).
+//
+// This file provides:
+// - A retained-tree "UI" in namespace `coi::ui` (used by codegen).
+// - A Sokol-based renderer/event loop under COI_NATIVE_SOKOL.
+//
+// NOTE: This is intentionally a single translation unit today to keep integration simple
+// (and to ensure 3rd-party header-impl sections are compiled exactly once).
+
 #include "coi/native/runtime_api.h"
 
 #include <algorithm>
@@ -30,24 +39,21 @@
 #include <windows.h>
 #endif
 
-#include "webcc/core/handle.h"
-#include "webcc/core/string_view.h"
-#include "webcc/core/string.h"
-#include "webcc/core/function.h"
 #include "webcc/core/allocator.h"
-#include "webcc/core/new.h"
 #include "webcc/core/array.h"
-#include "webcc/core/vector.h"
+#include "webcc/core/function.h"
+#include "webcc/core/handle.h"
+#include "webcc/core/new.h"
 #include "webcc/core/random.h"
+#include "webcc/core/string.h"
+#include "webcc/core/string_view.h"
+#include "webcc/core/vector.h"
 
 // Shared class-token parsing + CSS emitters used by multiple native UI backends.
 #include "coi/style/css.h"
 
-// Desktop backend runtime for Coi.
-// - Provides a retained-tree "UI" in namespace coi::ui (used by codegen).
-// - Optionally provides a Sokol window renderer under COI_NATIVE_SOKOL.
-
-#include "coi/native/impl/ui_tree.inc"
+// Retained UI tree and DOM-like operations.
+#include "coi/native/impl/ui_tree.h"
 
 #if defined(COI_NATIVE_SOKOL)
 #if defined(COI_NATIVE_RMLUI)
@@ -60,7 +66,8 @@
 #include <RmlUi/Core/SystemInterface.h>
 #endif
 
-#include "coi/native/impl/sokol_impl.inc"
+// 3rd-party implementations + Sokol/Clay integration (compiled once in this TU).
+#include "coi/native/impl/sokol_impl.h"
 
 namespace coi::native {
 struct Rect {
@@ -71,14 +78,15 @@ struct Rect {
 // that happens before sapp_run() starts when window/capture is enabled.
 inline bool g_sokol_frame_started = false;
 
-    #include "coi/native/impl/util.inc"
-    #include "coi/native/impl/style_class_parser.inc"
-    #include "coi/native/impl/clay_engine.inc"
-    #include "coi/native/impl/debug_text.inc"
-    #include "coi/native/impl/ui_backend.inc"
-    #include "coi/native/impl/rmlui_backend.inc"
-    #include "coi/native/impl/sokol_runner.inc"
-    #include "coi/native/impl/debug_tools.inc"
+#include "coi/native/impl/util.h"
+#include "coi/native/impl/style_class_parser.h"
+#include "coi/native/impl/clay_engine.h"
+#include "coi/native/impl/debug_text.h"
+#include "coi/native/impl/ui_backend.h"
+#include "coi/native/impl/rmlui_backend.h"
+#include "coi/native/impl/sokol_runner.h"
+#include "coi/native/impl/debug_tools.h"
 
 } // namespace coi::native
 #endif // COI_NATIVE_SOKOL
+

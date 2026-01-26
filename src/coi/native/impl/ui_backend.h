@@ -457,4 +457,3 @@ inline ClayBackend& clay_backend() {
 #endif
 
 } // namespace detail
-

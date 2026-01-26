@@ -55,4 +55,3 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
     int lines = (len + cols - 1) / cols;
     return lines * char_h;
 }
-
