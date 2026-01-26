@@ -1,0 +1,20 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row gap-20 bg-none">
+                <div class="a w-300 h-180 pad-20 border-8">RmlUI smoke</div>
+                <div class="b grow h-180 pad-20 border-8">text + flex-grow</div>
+            </div>
+            <div class="row row gap-20 bg-none">
+                <div class="c w-120 h-80 pad-0 border-4"></div>
+                <div class="d grow h-80 pad-0 border-4"></div>
+                <div class="e w-120 h-80 pad-0 border-4"></div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

@@ -32,6 +32,7 @@ text_alignment|tests/native/visual/scenes/text/alignment.coi|native,web
 
 input_zindex_click|tests/native/visual/scenes/input/zindex_click.coi|native,web
 input_clip_click|tests/native/visual/scenes/input/clip_click.coi|native,web
+rmlui_smoke|tests/native/visual/scenes/rmlui/smoke.coi|native
 
 # Native-only “render dump pass” golden scenes
 border_render_dump_pass|tests/native/runtime/border_render_dump_pass.coi|native

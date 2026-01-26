@@ -8,6 +8,7 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
         if (premult_pip.id != 0) return;
 
         sg_pipeline_desc pip{};
+        pip.cull_mode = SG_CULLMODE_NONE;
         pip.colors[0].blend.enabled = true;
         pip.colors[0].blend.src_factor_rgb = SG_BLENDFACTOR_ONE;
         pip.colors[0].blend.dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
@@ -55,8 +56,24 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
     }
 
     void RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, Rml::TextureHandle texture) override {
+        render_geometry_calls++;
         auto it = geometries.find((uintptr_t)geometry);
         if (it == geometries.end()) return;
+
+        const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+        if (dbg && *dbg && std::string(dbg) != "0" && render_geometry_calls == 1) {
+            const Geometry& g = it->second;
+            std::cerr << "[rmlui] RenderGeometry first: idx=" << g.indices.size() << " vtx=" << g.vertices.size() << " tx=" << texture
+                      << " translate=" << translation.x << "," << translation.y << "\n";
+            for (int k = 0; k < 3 && k < (int)g.indices.size(); k++) {
+                int vi = g.indices[(size_t)k];
+                if (vi < 0 || (size_t)vi >= g.vertices.size()) continue;
+                const Rml::Vertex& v = g.vertices[(size_t)vi];
+                const auto c = v.colour;
+                std::cerr << "[rmlui]  v" << k << " pos=" << v.position.x << "," << v.position.y << " uv=" << v.tex_coord.x << "," << v.tex_coord.y
+                          << " rgba=" << (int)c.red << "," << (int)c.green << "," << (int)c.blue << "," << (int)c.alpha << "\n";
+            }
+        }
 
         sgl_push_pipeline();
         if (premult_pip.id != 0) {
@@ -169,6 +186,7 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
 
     void EnableScissorRegion(bool enable) override {
         scissor_enabled = enable;
+        scissor_has_region = false;
         if (!enable) {
             // Reset to a full scissor, required because scissor state persists across passes.
             sgl_scissor_rect(0, 0, viewport_w, viewport_h, true /* origin_top_left */);
@@ -177,7 +195,27 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
 
     void SetScissorRegion(Rml::Rectanglei region) override {
         if (!scissor_enabled) return;
+        scissor_has_region = true;
         sgl_scissor_rect(region.Left(), region.Top(), region.Width(), region.Height(), true /* origin_top_left */);
+    }
+
+    void EnableClipMask(bool enable) override {
+        clip_enabled = enable;
+        clip_enable_calls++;
+        (void)enable;
+    }
+
+    void RenderToClipMask(Rml::ClipMaskOperation, Rml::CompiledGeometryHandle, Rml::Vector2f) override {
+        clip_render_calls++;
+    }
+
+    Rml::LayerHandle PushLayer() override {
+        layer_push_calls++;
+        return {};
+    }
+    void PopLayer() override { layer_pop_calls++; }
+    void CompositeLayers(Rml::LayerHandle, Rml::LayerHandle, Rml::BlendMode, Rml::Span<const Rml::CompiledFilterHandle>) override {
+        layer_composite_calls++;
     }
 
     void SetTransform(const Rml::Matrix4f* transform) override {
@@ -189,15 +227,28 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
     }
 
     void begin_frame(int w, int h) {
+        render_geometry_calls = 0;
+        clip_enable_calls = 0;
+        clip_render_calls = 0;
+        layer_push_calls = 0;
+        layer_pop_calls = 0;
+        layer_composite_calls = 0;
         viewport_w = std::max(1, w);
         viewport_h = std::max(1, h);
-        if (!scissor_enabled) {
-            sgl_scissor_rect(0, 0, viewport_w, viewport_h, true /* origin_top_left */);
-        }
+        // Always start with a full-target scissor to avoid leaking prior state.
+        sgl_scissor_rect(0, 0, viewport_w, viewport_h, true /* origin_top_left */);
+        scissor_has_region = false;
         // Keep texture matrix defaulted.
         sgl_matrix_mode_texture();
         sgl_load_identity();
     }
+
+    int get_and_clear_render_geometry_calls() const { return render_geometry_calls; }
+    int get_clip_enable_calls() const { return clip_enable_calls; }
+    int get_clip_render_calls() const { return clip_render_calls; }
+    int get_layer_push_calls() const { return layer_push_calls; }
+    int get_layer_pop_calls() const { return layer_pop_calls; }
+    int get_layer_composite_calls() const { return layer_composite_calls; }
 
   private:
     struct Geometry {
@@ -233,14 +284,23 @@ class SokolRmlRenderInterface final : public Rml::RenderInterface {
     uintptr_t next_texture = 1;
 
     bool scissor_enabled = false;
+    bool scissor_has_region = false;
     int viewport_w = 1;
     int viewport_h = 1;
 
+    bool clip_enabled = false;
     bool transform_active = false;
     float transform_m[16] = {0};
 
     sgl_pipeline premult_pip{};
     sg_sampler default_sampler{};
+
+    mutable int render_geometry_calls = 0;
+    mutable int clip_enable_calls = 0;
+    mutable int clip_render_calls = 0;
+    mutable int layer_push_calls = 0;
+    mutable int layer_pop_calls = 0;
+    mutable int layer_composite_calls = 0;
 };
 
 class SokolRmlSystemInterface final : public Rml::SystemInterface {
@@ -266,6 +326,10 @@ class RmlUiBackend final : public UiBackend {
         if (!initialized) {
             std::cerr << "[rmlui] Rml::Initialise failed\n";
             return;
+        }
+        const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+        if (dbg && *dbg && std::string(dbg) != "0") {
+            std::cerr << "[rmlui] global render interface=" << (void*)Rml::GetRenderInterface() << " local=" << (void*)&renderer << "\n";
         }
 
         // Load a default font face if possible.
@@ -334,13 +398,46 @@ class RmlUiBackend final : public UiBackend {
             last_tree_rev = tree_rev;
         }
 
-        ctx->Update();
+        const bool ok = ctx->Update();
+        const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+            if (dbg && *dbg && std::string(dbg) != "0") {
+                if (!ok) std::cerr << "[rmlui] Context::Update returned false\n";
+            if (doc) {
+                std::cerr << "[rmlui] doc children=" << doc->GetNumChildren() << " size=" << doc->GetOffsetWidth() << "x" << doc->GetOffsetHeight() << "\n";
+                if (doc->GetNumChildren() > 0) {
+                    Rml::Element* c0 = doc->GetChild(0);
+                    if (c0) {
+                        std::cerr << "[rmlui] child0 <" << c0->GetTagName().c_str() << "> size=" << c0->GetOffsetWidth() << "x" << c0->GetOffsetHeight()
+                                  << " pos=" << c0->GetAbsoluteLeft() << "," << c0->GetAbsoluteTop() << "\n";
+                        std::cerr << "[rmlui] child0 children=" << c0->GetNumChildren() << "\n";
+                        const int nchild = std::min(3, c0->GetNumChildren());
+                        for (int i = 0; i < nchild; i++) {
+                            Rml::Element* c = c0->GetChild(i);
+                            if (!c) continue;
+                            std::cerr << "[rmlui] child0[" << i << "] <" << c->GetTagName().c_str() << "> size=" << c->GetOffsetWidth() << "x"
+                                      << c->GetOffsetHeight() << " pos=" << c->GetAbsoluteLeft() << "," << c->GetAbsoluteTop()
+                                      << " children=" << c->GetNumChildren() << "\n";
+                        }
+                    }
+                }
+            }
+            }
     }
 
     void render(float w, float h, float) override {
         if (!ctx) return;
         renderer.begin_frame((int)std::lround(w), (int)std::lround(h));
-        ctx->Render();
+        const bool ok = ctx->Render();
+        const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+        if (dbg && *dbg && std::string(dbg) != "0") {
+            if (!ok) std::cerr << "[rmlui] Context::Render returned false\n";
+            const int calls = renderer.get_and_clear_render_geometry_calls();
+            std::cerr << "[rmlui] RenderGeometry calls: " << calls << "\n";
+            std::cerr << "[rmlui] ClipMask enable=" << renderer.get_clip_enable_calls() << " render=" << renderer.get_clip_render_calls() << "\n";
+            std::cerr << "[rmlui] Layers push=" << renderer.get_layer_push_calls() << " pop=" << renderer.get_layer_pop_calls()
+                      << " composite=" << renderer.get_layer_composite_calls() << "\n";
+            std::cerr << "[rmlui] sgl cmds=" << sgl_num_commands() << " verts=" << sgl_num_vertices() << "\n";
+        }
         sgl_draw();
     }
 
@@ -383,10 +480,15 @@ class RmlUiBackend final : public UiBackend {
         if (!initialized) init_gfx();
         if (!initialized) return;
         if (!ctx) {
-            ctx = Rml::CreateContext("coi", Rml::Vector2i{w, h});
+            // Pass explicit render interface to avoid relying on the global default.
+            ctx = Rml::CreateContext("coi", Rml::Vector2i{w, h}, &renderer);
             if (!ctx) {
                 std::cerr << "[rmlui] CreateContext failed\n";
                 return;
+            }
+            const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+            if (dbg && *dbg && std::string(dbg) != "0") {
+                std::cerr << "[rmlui] context created, docs=" << ctx->GetNumDocuments() << "\n";
             }
         }
         ctx->SetDimensions(Rml::Vector2i{w, h});
@@ -401,89 +503,120 @@ class RmlUiBackend final : public UiBackend {
             Rml::RemoveContext("coi");
             ctx = nullptr;
         }
-        element_by_node.clear();
-        text_by_node.clear();
     }
 
-    static void set_px(Rml::Element* e, const char* prop, float v) {
+    static void css_append(std::string& out, const char* key, const std::string& value) {
+        if (value.empty()) return;
+        out += key;
+        out += ": ";
+        out += value;
+        out += "; ";
+    }
+    static void css_append(std::string& out, const char* key, const char* value) {
+        if (!value || !*value) return;
+        out += key;
+        out += ": ";
+        out += value;
+        out += "; ";
+    }
+    static void css_append_px(std::string& out, const char* key, float v) {
         char buf[64];
         std::snprintf(buf, sizeof(buf), "%.0fpx", (double)v);
-        (void)e->SetProperty(prop, buf);
+        css_append(out, key, buf);
     }
-    static void set_color_rgba(Rml::Element* e, const char* prop, float r, float g, float b, float a) {
+    static void css_append_rgba(std::string& out, const char* key, float r, float g, float b, float a) {
         char buf[96];
-        std::snprintf(buf, sizeof(buf), "rgba(%d,%d,%d,%.3f)", (int)std::lround(r * 255.0), (int)std::lround(g * 255.0), (int)std::lround(b * 255.0), (double)a);
-        (void)e->SetProperty(prop, buf);
+        // RmlUI expects the alpha channel as 0..255 (not 0..1).
+        const int rr = (int)std::lround(r * 255.0);
+        const int gg = (int)std::lround(g * 255.0);
+        const int bb = (int)std::lround(b * 255.0);
+        int aa = (int)std::lround(a * 255.0);
+        if (aa < 0) aa = 0;
+        if (aa > 255) aa = 255;
+        std::snprintf(buf, sizeof(buf), "rgba(%d,%d,%d,%d)", rr, gg, bb, aa);
+        css_append(out, key, buf);
     }
 
-    static void apply_style(Rml::Element* e, const coi::ui::Node& n, const DesktopClassStyle& st, bool is_root) {
+    static std::string style_attr_for_node(const coi::ui::Node& n, const DesktopClassStyle& st, bool is_root) {
         const webcc::string* cls = attr(n, "class");
         uint32_t h = hash_u32(cls ? cls->c_str() : n.tag.c_str());
         float cr = 0.2f, cg = 0.2f, cb = 0.2f;
         color_from_hash(h, cr, cg, cb);
 
+        std::string css;
+        css.reserve(256);
+
         if (is_root) {
-            (void)e->SetProperty("position", "relative");
-            (void)e->SetProperty("width", "100%");
-            (void)e->SetProperty("height", "100%");
+            css_append(css, "position", "relative");
+            css_append(css, "width", "100%");
+            css_append(css, "height", "100%");
         }
 
         if (st.has_dir) {
-            (void)e->SetProperty("display", "flex");
-            (void)e->SetProperty("flex-direction", (st.dir == CLAY_LEFT_TO_RIGHT) ? "row" : "column");
+            css_append(css, "display", "flex");
+            css_append(css, "flex-direction", (st.dir == CLAY_LEFT_TO_RIGHT) ? "row" : "column");
+        } else {
+            css_append(css, "display", "block");
         }
 
-        if (st.has_pad) set_px(e, "padding", (float)st.pad);
-        if (st.has_gap) set_px(e, "gap", (float)st.gap);
+        if (st.has_pad) css_append_px(css, "padding", (float)st.pad);
+        if (st.has_gap) css_append_px(css, "gap", (float)st.gap);
 
-        if (st.w_fixed) set_px(e, "width", st.w);
-        if (st.h_fixed) set_px(e, "height", st.h);
-
-        if (st.w_has_min) set_px(e, "min-width", st.w_min);
-        if (st.w_has_max) set_px(e, "max-width", st.w_max);
-        if (st.h_has_min) set_px(e, "min-height", st.h_min);
-        if (st.h_has_max) set_px(e, "max-height", st.h_max);
+        if (st.w_fixed) css_append_px(css, "width", st.w);
+        if (st.h_fixed) css_append_px(css, "height", st.h);
+        if (st.w_has_min) css_append_px(css, "min-width", st.w_min);
+        if (st.w_has_max) css_append_px(css, "max-width", st.w_max);
+        if (st.h_has_min) css_append_px(css, "min-height", st.h_min);
+        if (st.h_has_max) css_append_px(css, "max-height", st.h_max);
 
         if (st.w_grow || st.h_grow) {
-            (void)e->SetProperty("flex-grow", "1");
-            (void)e->SetProperty("flex-shrink", "1");
-            (void)e->SetProperty("flex-basis", "auto");
+            css_append(css, "flex-grow", "1");
+            css_append(css, "flex-shrink", "1");
+            css_append(css, "flex-basis", "auto");
         }
 
-        if (!st.bg_none) {
-            set_color_rgba(e, "background-color", cr, cg, cb, 0.18f);
+        if (!st.bg_none && !is_root) {
+            css_append_rgba(css, "background-color", cr, cg, cb, 0.18f);
         } else {
-            (void)e->SetProperty("background-color", "transparent");
+            css_append(css, "background-color", "transparent");
         }
 
         if (st.has_border) {
-            if (st.border_width.top) set_px(e, "border-top-width", (float)st.border_width.top);
-            if (st.border_width.right) set_px(e, "border-right-width", (float)st.border_width.right);
-            if (st.border_width.bottom) set_px(e, "border-bottom-width", (float)st.border_width.bottom);
-            if (st.border_width.left) set_px(e, "border-left-width", (float)st.border_width.left);
-            if (st.border_width.top || st.border_width.right || st.border_width.bottom || st.border_width.left) {
-                set_color_rgba(e, "border-color", cr, cg, cb, 0.60f);
+            const float a = 0.60f;
+            if (st.border_width.top) {
+                css_append_px(css, "border-top-width", (float)st.border_width.top);
+                css_append_rgba(css, "border-top-color", cr, cg, cb, a);
+            }
+            if (st.border_width.right) {
+                css_append_px(css, "border-right-width", (float)st.border_width.right);
+                css_append_rgba(css, "border-right-color", cr, cg, cb, a);
+            }
+            if (st.border_width.bottom) {
+                css_append_px(css, "border-bottom-width", (float)st.border_width.bottom);
+                css_append_rgba(css, "border-bottom-color", cr, cg, cb, a);
+            }
+            if (st.border_width.left) {
+                css_append_px(css, "border-left-width", (float)st.border_width.left);
+                css_append_rgba(css, "border-left-color", cr, cg, cb, a);
             }
         }
 
         if (st.has_corner_radius) {
-            set_px(e, "border-top-left-radius", (float)st.corner_radius.topLeft);
-            set_px(e, "border-top-right-radius", (float)st.corner_radius.topRight);
-            set_px(e, "border-bottom-right-radius", (float)st.corner_radius.bottomRight);
-            set_px(e, "border-bottom-left-radius", (float)st.corner_radius.bottomLeft);
+            css_append_px(css, "border-top-left-radius", (float)st.corner_radius.topLeft);
+            css_append_px(css, "border-top-right-radius", (float)st.corner_radius.topRight);
+            css_append_px(css, "border-bottom-right-radius", (float)st.corner_radius.bottomRight);
+            css_append_px(css, "border-bottom-left-radius", (float)st.corner_radius.bottomLeft);
         }
 
         if (st.has_opacity) {
             char buf[32];
             std::snprintf(buf, sizeof(buf), "%.3f", (double)st.opacity);
-            (void)e->SetProperty("opacity", buf);
+            css_append(css, "opacity", buf);
         }
 
         if (st.has_clip) {
-            const char* ox = st.scroll_x ? "scroll" : (st.clip_x ? "hidden" : "visible");
-            const char* oy = st.scroll_y ? "scroll" : (st.clip_y ? "hidden" : "visible");
-            (void)e->SetProperty("overflow-x", ox);
-            (void)e->SetProperty("overflow-y", oy);
+            css_append(css, "overflow-x", st.scroll_x ? "scroll" : (st.clip_x ? "hidden" : "visible"));
+            css_append(css, "overflow-y", st.scroll_y ? "scroll" : (st.clip_y ? "hidden" : "visible"));
         }
 
         if (st.has_align_x || st.has_align_y) {
@@ -509,117 +642,210 @@ class RmlUiBackend final : public UiBackend {
                 }
             };
             if (is_row) {
-                if (st.has_align_x) (void)e->SetProperty("justify-content", ax(st.align_x));
-                if (st.has_align_y) (void)e->SetProperty("align-items", ay(st.align_y));
+                if (st.has_align_x) css_append(css, "justify-content", ax(st.align_x));
+                if (st.has_align_y) css_append(css, "align-items", ay(st.align_y));
             } else {
-                if (st.has_align_y) (void)e->SetProperty("justify-content", ay(st.align_y));
-                if (st.has_align_x) (void)e->SetProperty("align-items", ax(st.align_x));
+                if (st.has_align_y) css_append(css, "justify-content", ay(st.align_y));
+                if (st.has_align_x) css_append(css, "align-items", ax(st.align_x));
             }
         }
 
-        // Text styling
         if (!n.text.empty()) {
-            if (st.has_font_size) set_px(e, "font-size", (float)st.font_size);
-            if (st.has_letter_spacing) set_px(e, "letter-spacing", (float)st.letter_spacing);
-            if (st.has_line_height) set_px(e, "line-height", (float)st.line_height);
+            if (st.has_font_size) css_append_px(css, "font-size", (float)st.font_size);
+            if (st.has_letter_spacing) css_append_px(css, "letter-spacing", (float)st.letter_spacing);
+            if (st.has_line_height) css_append_px(css, "line-height", (float)st.line_height);
             if (st.has_text_align) {
                 const char* ta = "left";
                 if (st.text_align == CLAY_TEXT_ALIGN_CENTER) ta = "center";
                 else if (st.text_align == CLAY_TEXT_ALIGN_RIGHT) ta = "right";
-                (void)e->SetProperty("text-align", ta);
+                css_append(css, "text-align", ta);
             }
-            // Ensure visible text color.
-            (void)e->SetProperty("color", "rgba(255,255,255,0.92)");
+            css_append(css, "color", "rgba(255,255,255,235)");
         }
 
         if (st.has_floating || st.has_float_x || st.has_float_y || st.has_z_index) {
-            (void)e->SetProperty("position", "absolute");
-            if (st.has_float_x) set_px(e, "left", st.float_x);
-            if (st.has_float_y) set_px(e, "top", st.float_y);
+            css_append(css, "position", "absolute");
+            if (st.has_float_x) css_append_px(css, "left", st.float_x);
+            if (st.has_float_y) css_append_px(css, "top", st.float_y);
             if (st.has_z_index) {
                 char buf[32];
                 std::snprintf(buf, sizeof(buf), "%d", (int)st.z_index);
-                (void)e->SetProperty("z-index", buf);
+                css_append(css, "z-index", buf);
             }
         }
+
+        return css;
     }
 
-    void rebuild_document() {
-        if (!ctx) return;
-        element_by_node.clear();
-        text_by_node.clear();
-
-        if (doc) {
-            doc->Close();
-            doc = nullptr;
+    static std::string escape_attr(const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (char c : s) {
+            switch (c) {
+            case '&':
+                out += "&amp;";
+                break;
+            case '"':
+                out += "&quot;";
+                break;
+            case '<':
+                out += "&lt;";
+                break;
+            case '>':
+                out += "&gt;";
+                break;
+            default:
+                out.push_back(c);
+                break;
+            }
         }
-
-        doc = ctx->CreateDocument("body");
-        if (!doc) {
-            std::cerr << "[rmlui] CreateDocument failed\n";
-            return;
-        }
-        doc->Show();
-
-        auto root_it = coi::ui::g_nodes.find(0);
-        if (root_it == coi::ui::g_nodes.end()) return;
-        // Apply styles directly to the document root (node 0 is "body").
-        const coi::ui::Node& root = root_it->second;
-        doc->SetAttribute("data-coi-id", Rml::String("0"));
-#if defined(COI_NATIVE_CLAY)
-        DesktopClassStyle st = parse_desktop_class_style(root, true);
-        apply_style(doc, root, st, true);
-#endif
-        element_by_node[0] = doc;
-        for (int32_t c : root.children) {
-            build_node(doc, c, false);
-        }
+        return out;
     }
 
-    void build_node(Rml::Element* parent, int32_t id, bool is_root) {
+    static std::string escape_text(const std::string& s) {
+        std::string out;
+        out.reserve(s.size());
+        for (char c : s) {
+            switch (c) {
+            case '&':
+                out += "&amp;";
+                break;
+            case '<':
+                out += "&lt;";
+                break;
+            case '>':
+                out += "&gt;";
+                break;
+            default:
+                out.push_back(c);
+                break;
+            }
+        }
+        return out;
+    }
+
+    static void append_node_rml(std::string& out, int32_t id, bool is_root) {
         auto it = coi::ui::g_nodes.find(id);
         if (it == coi::ui::g_nodes.end()) return;
         const coi::ui::Node& n = it->second;
         if (n.tag == "comment") return;
 
-        Rml::ElementPtr el = doc->CreateElement(n.tag.c_str());
-        if (!el) {
-            el = doc->CreateElement("div");
-            if (!el) return;
+        const char* tag = "div";
+        bool self_close = false;
+        const webcc::string* src = attr(n, "src");
+        if (n.tag == "img" && src && n.children.empty() && n.text.empty()) {
+            tag = "img";
+            self_close = true;
         }
-        Rml::Element* e = el.get();
-        parent->AppendChild(std::move(el));
-
-        // Copy attributes (best-effort).
-        for (const auto& a : n.attrs) {
-            e->SetAttribute(a.key.c_str(), Rml::String(a.value.c_str()));
-        }
-
-        // Map back to COI handles for hit-testing / dispatch.
-        char id_buf[32];
-        std::snprintf(id_buf, sizeof(id_buf), "%d", id);
-        e->SetAttribute("data-coi-id", Rml::String(id_buf));
 
 #if defined(COI_NATIVE_CLAY)
         DesktopClassStyle st = parse_desktop_class_style(n, is_root);
-        apply_style(e, n, st, is_root);
+        std::string css = style_attr_for_node(n, st, is_root);
+#else
+        std::string css;
 #endif
 
-        element_by_node[id] = e;
+        out += "<";
+        out += tag;
+        out += " data-coi-id=\"";
+        out += std::to_string(id);
+        out += "\"";
 
-        if (!n.text.empty()) {
-            Rml::ElementPtr t = doc->CreateTextNode(Rml::String(n.text.c_str()));
-            if (t) {
-                Rml::Element* tp = t.get();
-                e->AppendChild(std::move(t));
-                if (auto* et = dynamic_cast<Rml::ElementText*>(tp)) {
-                    text_by_node[id] = et;
-                }
-            }
+        if (!css.empty()) {
+            out += " style=\"";
+            out += escape_attr(css);
+            out += "\"";
         }
 
-        for (int32_t c : n.children) {
-            build_node(e, c, false);
+        if (tag == std::string("img") && src) {
+            out += " src=\"";
+            out += escape_attr(std::string(src->c_str()));
+            out += "\"";
+        }
+
+        for (const auto& a : n.attrs) {
+            if (a.key == "class") continue;
+            if (tag == std::string("img") && a.key == "src") continue;
+            out += " ";
+            out += a.key.c_str();
+            out += "=\"";
+            out += escape_attr(std::string(a.value.c_str()));
+            out += "\"";
+        }
+
+        if (self_close) {
+            out += " />";
+            return;
+        }
+
+        out += ">";
+        if (!n.text.empty()) out += escape_text(std::string(n.text.c_str()));
+        for (int32_t c : n.children) append_node_rml(out, c, false);
+        out += "</";
+        out += tag;
+        out += ">";
+    }
+
+	    static std::string build_document_rml() {
+	        const char* smoke = std::getenv("COI_NATIVE_RMLUI_SMOKE");
+	        if (smoke && *smoke && std::string(smoke) != "0") {
+	            return "<rml><body style=\"margin:0; width:100%; height:100%; background-color: rgb(20,20,26);\">"
+	                   "<div style=\"display:block; position:absolute; left:50px; top:50px; width:300px; height:180px; background-color:#ff0000; opacity:0.7;\"></div>"
+	                   "</body></rml>";
+	        }
+
+        std::string out;
+        out.reserve(4096);
+
+        auto it = coi::ui::g_nodes.find(0);
+        if (it == coi::ui::g_nodes.end()) return "<rml><body></body></rml>";
+        const coi::ui::Node& root = it->second;
+
+#if defined(COI_NATIVE_CLAY)
+        DesktopClassStyle st = parse_desktop_class_style(root, true);
+        std::string css = style_attr_for_node(root, st, true);
+#else
+        std::string css;
+#endif
+
+	        out += "<rml><head><style>"
+	               "body{margin:0; font-family: Roboto; font-size:16px; color: rgba(255,255,255,235);} "
+	               "*,*:before,*:after{box-sizing:border-box;}"
+	               "</style></head><body data-coi-id=\"0\"";
+        if (!css.empty()) {
+            out += " style=\"";
+            out += escape_attr(css);
+            out += "\"";
+        }
+        out += ">";
+        for (int32_t c : root.children) append_node_rml(out, c, false);
+        out += "</body></rml>";
+        return out;
+    }
+
+    void rebuild_document() {
+        if (!ctx) return;
+        if (doc) {
+            doc->Close();
+            doc = nullptr;
+        }
+
+        // Using LoadDocumentFromMemory ensures the document is properly initialized and attached
+        // to the context's document stack for rendering.
+        const std::string rml = build_document_rml();
+        const char* dbg = std::getenv("COI_NATIVE_RMLUI_DEBUG");
+        if (dbg && *dbg && std::string(dbg) != "0") {
+            std::cerr << "[rmlui] rml: " << rml.substr(0, 400) << (rml.size() > 400 ? "..." : "") << "\n";
+        }
+        doc = ctx->LoadDocumentFromMemory(Rml::String(rml.c_str()), "[coi native rmlui]");
+        if (!doc) {
+            std::cerr << "[rmlui] LoadDocumentFromMemory failed\n";
+            return;
+        }
+        doc->Show();
+
+        if (dbg && *dbg && std::string(dbg) != "0") {
+            std::cerr << "[rmlui] documents: " << ctx->GetNumDocuments() << "\n";
         }
     }
 
@@ -636,8 +862,6 @@ class RmlUiBackend final : public UiBackend {
     double elapsed = 0.0;
 
     uint64_t last_tree_rev = 0;
-    std::unordered_map<int32_t, Rml::Element*> element_by_node;
-    std::unordered_map<int32_t, Rml::ElementText*> text_by_node;
 };
 
 inline RmlUiBackend& rmlui_backend() {
