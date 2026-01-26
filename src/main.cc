@@ -1766,6 +1766,8 @@ int main(int argc, char **argv)
 			            const bool has_fontstash = fs::exists(fontstash_dir / "fontstash.h") && fs::exists(fontstash_dir / "stb_truetype.h");
 			            fs::path clay_dir = exe_dir / "deps" / "clay";
 			            const bool has_clay = fs::exists(clay_dir / "clay.h");
+			            fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
+			            const bool has_rmlui = fs::exists(rmlui_dir / "Include" / "RmlUi" / "Core.h");
 			            fs::path stb_dir = exe_dir / "deps" / "stb";
 			            const bool has_stb_write = fs::exists(stb_dir / "stb_image_write.h");
 
@@ -1779,6 +1781,10 @@ int main(int argc, char **argv)
 			            if (has_clay) {
 			                cmd += " -I" + clay_dir.string();
 			                cmd += " -DCOI_NATIVE_CLAY";
+			            }
+			            if (has_rmlui) {
+			                cmd += " -I" + (rmlui_dir / "Include").string();
+			                cmd += " -DCOI_NATIVE_RMLUI";
 			            }
 			            if (has_sokol) {
 			                cmd += " -I" + sokol_dir.string();
