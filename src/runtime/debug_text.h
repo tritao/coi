@@ -1,9 +1,20 @@
 #pragma once
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <string>
+
+#include "runtime/ui_tree.h"
+
+#if defined(COI_NATIVE_SOKOL)
+#include "runtime/deps_sokol.h"
+#endif
 
 namespace coi::native {
 
+#if defined(COI_NATIVE_SOKOL)
 inline void sdtx_put_wrapped(const char* text, int cols) {
     if (!text || !*text) return;
     if (cols < 1) cols = 1;
@@ -49,6 +60,10 @@ inline void sdtx_dump_node(int32_t id, int depth) {
     sdtx_printf("%s\n", s.c_str());
     for (int32_t c : n.children) sdtx_dump_node(c, depth + 1);
 }
+#else
+inline void sdtx_put_wrapped(const char*, int) {}
+inline void sdtx_dump_node(int32_t, int) {}
+#endif
 
 inline float measure_text_h(const coi::ui::Node& n, float w) {
     if (n.text.empty()) return 0.0f;
@@ -63,3 +78,4 @@ inline float measure_text_h(const coi::ui::Node& n, float w) {
 }
 
 } // namespace coi::native
+

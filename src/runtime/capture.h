@@ -1,6 +1,8 @@
 #pragma once
 
-#include "runtime/prelude.h"
+#include <cstdint>
+
+struct sg_pass_action;
 
 namespace coi::native {
 
@@ -35,4 +37,3 @@ void capture_maybe_offscreen(UiBackend& backend, const sg_pass_action& action, i
 int capture_exit_code();
 
 } // namespace coi::native
-

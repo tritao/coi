@@ -1,5 +1,7 @@
 #include "runtime/capture.h"
 
+#include "runtime/prelude.h"
+
 #include "runtime/backends/backend.h"
 #include "runtime/deps_stb.h"
 
