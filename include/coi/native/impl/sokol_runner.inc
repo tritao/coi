@@ -690,11 +690,6 @@
             sdtx_puts("COI native runtime (sokol)\n");
 	        sdtx_printf("dt: %.3f\n\n", dt);
 #if defined(COI_NATIVE_FONTSTASH)
-#if defined(COI_NATIVE_CLAY)
-	            sdtx_printf("fontstash: %s\n\n", detail::clay_backend().font_ok() ? "on" : "off");
-#else
-	            sdtx_printf("fontstash: off\n\n");
-#endif
 #endif
 	            sdtx_printf("backend: %s\n\n", backend ? backend->name() : "unknown");
 
