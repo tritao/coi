@@ -7,6 +7,16 @@ struct InputState {
     float scroll_y = 0.0f;
 };
 
+// Shared geometry helper for the tree backend's retained layout map.
+// (Kept here because TreeBackend stores rectangles and this type is used
+// in method bodies defined in this header.)
+struct Rect {
+    float x = 0.0f;
+    float y = 0.0f;
+    float w = 0.0f;
+    float h = 0.0f;
+};
+
 class UiBackend {
   public:
     virtual ~UiBackend() = default;
@@ -20,6 +30,11 @@ class UiBackend {
     virtual void render(float w, float h, float dpi) = 0;
     virtual bool hit_test(float x, float y, float dpi, webcc::handle& out) = 0;
     virtual void scroll_by(float pointer_x, float pointer_y, float dx, float dy, float w, float h) = 0;
+
+    // Backend health / optional capabilities.
+    virtual bool is_ok() const { return true; }
+    virtual bool font_ok() const { return true; }
+    virtual void* measure_userdata() { return nullptr; }
 };
 
 class TreeBackend final : public UiBackend {
@@ -388,7 +403,7 @@ class ClayBackend final : public UiBackend {
         Clay_SetPointerState(Clay_Vector2{cx, cy}, false);
         Clay_ElementIdArray ids = Clay_GetPointerOverIds();
         for (int32_t i = ids.length - 1; i >= 0; --i) {
-            Clay_ElementId* eid = Clay_ElementIdArray_Get(&ids, i);
+            Clay_ElementId* eid = (ids.internalArray && i >= 0) ? (ids.internalArray + i) : nullptr;
             if (!eid) continue;
             int32_t hid = (int32_t)(eid->id ^ 0xC01D0000u);
             if (coi::ui::g_nodes.find(hid) == coi::ui::g_nodes.end()) continue;
@@ -407,9 +422,9 @@ class ClayBackend final : public UiBackend {
         (void)ClayEngine::layout(w, h, 1.0f);
     }
 
-    bool is_ok() const { return ok; }
+    bool is_ok() const override { return ok; }
 
-    bool font_ok() const {
+    bool font_ok() const override {
 #if defined(COI_NATIVE_FONTSTASH) && defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
         return clay_fonts[0] != FONS_INVALID;
 #elif defined(COI_NATIVE_FONTSTASH)
@@ -419,7 +434,7 @@ class ClayBackend final : public UiBackend {
 #endif
     }
 
-    void* measure_userdata() {
+    void* measure_userdata() override {
 #if defined(COI_NATIVE_RUNTIME_SOKOL_CLAY_INCLUDED)
         return (void*)clay_fonts;
 #else

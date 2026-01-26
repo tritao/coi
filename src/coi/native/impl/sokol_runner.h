@@ -1,4 +1,9 @@
 	#if defined(COI_NATIVE_SOKOL)
+	#include "coi/native/internal/state.h"
+	#if defined(__linux__) || defined(__unix__)
+	#include <X11/Xlib.h>
+	#include <GL/gl.h>
+	#endif
 	struct SokolRunnerImpl {
 	    static inline void* app = nullptr;
 	    static inline tick_fn tick = nullptr;

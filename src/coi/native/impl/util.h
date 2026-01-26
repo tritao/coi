@@ -190,7 +190,7 @@
 
 	// Desktop event dispatch hooks (set by generated app code).
 	// The dispatcher is expected to return true when the event was handled.
-webcc::function<bool(webcc::handle)> g_click_dispatcher;
+inline webcc::function<bool(webcc::handle)> g_click_dispatcher;
 void set_click_dispatcher(webcc::function<bool(webcc::handle)> cb) {
     g_click_dispatcher = std::move(cb);
 }

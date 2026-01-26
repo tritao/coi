@@ -234,20 +234,8 @@ struct ClayEngine {
             // Clay_GetScrollOffset() returns the scroll offset by matching the current open
             // layout element pointer. At this point (between OpenElement and ConfigureOpenElement),
             // the cached scroll container mapping hasn't been updated to point at the new
-            // per-frame layout element yet. Query by elementId instead.
-            Clay_Context* c = Clay_GetCurrentContext();
-            Clay_LayoutElement* open = Clay__GetOpenLayoutElement();
-            Clay_Vector2 off{0, 0};
-            if (c && open) {
-                for (int32_t i = 0; i < c->scrollContainerDatas.length; i++) {
-                    Clay__ScrollContainerDataInternal* mapping = Clay__ScrollContainerDataInternalArray_Get(&c->scrollContainerDatas, i);
-                    if (mapping && mapping->elementId == open->id) {
-                        off = mapping->scrollPosition;
-                        break;
-                    }
-                }
-            }
-            decl.clip.childOffset = off;
+            // per-frame layout element yet. Use an internal helper to query by elementId.
+            decl.clip.childOffset = ::coi_native_clay_scroll_offset_for_open_element();
         }
         return decl;
     }

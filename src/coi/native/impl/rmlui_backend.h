@@ -467,7 +467,7 @@ class RmlUiBackend final : public UiBackend {
         ctx->ProcessMouseWheel(Rml::Vector2f{dx, dy}, 0);
     }
 
-    bool is_ok() const { return ctx != nullptr; }
+    bool is_ok() const override { return ctx != nullptr; }
 
   private:
     static uint64_t get_tree_rev() {

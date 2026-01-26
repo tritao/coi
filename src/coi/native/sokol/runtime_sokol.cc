@@ -1,12 +1,6 @@
-// Native runtime implementation (single TU).
-// Built as a normal project source (not via .inc includes in public headers).
-//
-// This file provides:
-// - A retained-tree "UI" in namespace `coi::ui` (used by codegen).
-// - A Sokol-based renderer/event loop under COI_NATIVE_SOKOL.
-//
-// NOTE: This is intentionally a single translation unit today to keep integration simple
-// (and to ensure 3rd-party header-impl sections are compiled exactly once).
+// Native runtime implementation for the Sokol backend.
+// This TU intentionally owns the bulk of the runtime logic (Clay/RmlUI backends,
+// capture, debug tools) but depends on `third_party/impl.cc` for header-only impls.
 
 #include "coi/native/runtime_api.h"
 
@@ -52,10 +46,15 @@
 // Shared class-token parsing + CSS emitters used by multiple native UI backends.
 #include "coi/style/css.h"
 
-// Retained UI tree and DOM-like operations.
+// Retained UI tree declarations (implementation lives in core/ui_tree.cc).
 #include "coi/native/impl/ui_tree.h"
 
 #if defined(COI_NATIVE_SOKOL)
+
+#include "coi/native/internal/state.h"
+#include "coi/native/internal/clay_internal.h"
+#include "coi/native/third_party/deps.h"
+
 #if defined(COI_NATIVE_RMLUI)
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Context.h>
@@ -66,17 +65,9 @@
 #include <RmlUi/Core/SystemInterface.h>
 #endif
 
-// 3rd-party implementations + Sokol/Clay integration (compiled once in this TU).
-#include "coi/native/impl/sokol_impl.h"
-
 namespace coi::native {
-struct Rect {
-    float x, y, w, h;
-};
 
-// Used to avoid running desktop scripts/simulated input in the "pre-run" flush
-// that happens before sapp_run() starts when window/capture is enabled.
-inline bool g_sokol_frame_started = false;
+bool g_sokol_frame_started = false;
 
 #include "coi/native/impl/util.h"
 #include "coi/native/impl/style_class_parser.h"
@@ -88,5 +79,5 @@ inline bool g_sokol_frame_started = false;
 #include "coi/native/impl/debug_tools.h"
 
 } // namespace coi::native
-#endif // COI_NATIVE_SOKOL
 
+#endif // COI_NATIVE_SOKOL

@@ -66,8 +66,10 @@ build build/obj/json_codegen.o: cxx src/json_codegen.cc
 build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/type_checker.o build/obj/cli.o build/obj/def_parser.o build/obj/json_codegen.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o
 
 # Native runtime (optional; built on-demand by `coi run`).
-build build/obj/coi/native/runtime.o: cxx_native_runtime src/coi/native/runtime.cc
-build build/libcoi_native_runtime.a: ar build/obj/coi/native/runtime.o
+build build/obj/coi/native/third_party/impl.o: cxx_native_runtime src/coi/native/third_party/impl.cc
+build build/obj/coi/native/core/ui_tree.o: cxx_native_runtime src/coi/native/core/ui_tree.cc
+build build/obj/coi/native/sokol/runtime_sokol.o: cxx_native_runtime src/coi/native/sokol/runtime_sokol.cc
+build build/libcoi_native_runtime.a: ar build/obj/coi/native/third_party/impl.o build/obj/coi/native/core/ui_tree.o build/obj/coi/native/sokol/runtime_sokol.o
 build coi_native_runtime: phony build/libcoi_native_runtime.a
 
 # Generate def cache at build time
