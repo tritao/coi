@@ -1,8 +1,8 @@
 // Clay backend implementation.
 
-#include "runtime/prelude.h"
-
 #include "runtime/backends/clay_backend.h"
+
+#include "runtime/prelude.h"
 
 #include "runtime/deps_clay_sokol.h"
 #include "runtime/deps_fontstash.h"

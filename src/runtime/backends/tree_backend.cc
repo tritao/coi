@@ -1,8 +1,8 @@
 // Tree backend implementation.
 
-#include "runtime/prelude.h"
-
 #include "runtime/backends/tree_backend.h"
+
+#include "runtime/prelude.h"
 
 #include "runtime/debug_text.h"
 #include "runtime/util.h"

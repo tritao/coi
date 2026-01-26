@@ -1,8 +1,8 @@
 // RmlUI backend implementation.
 
-#include "runtime/prelude.h"
-
 #include "runtime/backends/rmlui_backend.h"
+
+#include "runtime/prelude.h"
 
 #include "runtime/deps_stb.h"
 #include "runtime/util.h"
