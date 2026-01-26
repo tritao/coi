@@ -1,0 +1,19 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="scroll col w-920 h-360 pad-20 gap-20 bg-none border-8 scroll-y">
+                <div class="a w-840 h-100 pad-0 border-10"></div>
+                <div class="b w-840 h-100 pad-0 border-10"></div>
+                <div class="c w-840 h-100 pad-0 border-10"></div>
+                <div class="d w-840 h-100 pad-0 border-10"></div>
+                <div class="e w-840 h-100 pad-0 border-10"></div>
+                <div class="f w-840 h-100 pad-0 border-10"></div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

@@ -1,0 +1,4 @@
+# Capture 0 happens on frame 0, so delay scroll until after the first frame.
+pointer 226 216
+wait 1
+scroll 0 220

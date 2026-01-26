@@ -1,0 +1,26 @@
+component App {
+  view {
+    <div class="col gap-24 pad-24">
+      <div class="row gap-24 border-4 r-18 pad-16 w-900 h-260">
+        <div class="w-200 h-180 r-12">In-flow A</div>
+        <div class="w-200 h-180 r-12">In-flow B</div>
+        <div class="w-200 h-180 r-12">In-flow C</div>
+      </div>
+
+      <div class="float fx-120 fy-90 z-10 w-420 h-220 border-8 r-28 op-230">
+        <div class="pad-16">FLOAT z-10 (should be under)</div>
+      </div>
+      <div class="float fx-200 fy-140 z-20 w-420 h-220 border-8 r-28 op-230">
+        <div class="pad-16">FLOAT z-20 (should be on top)</div>
+      </div>
+
+      <div class="float float-pass fx-520 fy-120 z-30 w-320 h-160 border-6 r-20 op-200">
+        <div class="pad-16">FLOAT z-30</div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

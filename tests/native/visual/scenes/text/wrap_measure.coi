@@ -1,0 +1,25 @@
+component App {
+    view {
+        <div class="root col pad-20 gap-20 fill bg-none">
+            <div class="row row pad-0 gap-20 bg-none">
+                <div class="narrow col w-300 h-420 pad-20 gap-12 bg-none border-8">
+                    <div class="hdr fs-16 lh-20">Narrow (wrap)</div>
+                    <div class="body fs-18 lh-24">
+                        The quick brown fox jumps over the lazy dog. This sentence should wrap into multiple lines when the container is narrow.
+                    </div>
+                </div>
+                <div class="wide col w-620 h-420 pad-20 gap-12 bg-none border-8">
+                    <div class="hdr fs-16 lh-20">Wide (less wrap)</div>
+                    <div class="body fs-18 lh-24">
+                        The quick brown fox jumps over the lazy dog. This sentence should wrap into fewer lines when the container is wide.
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

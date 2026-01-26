@@ -1,0 +1,4 @@
+# Click in the overlap region between A and B.
+# First capture is on frame 0, so delay until after that.
+wait 1
+click 200 200

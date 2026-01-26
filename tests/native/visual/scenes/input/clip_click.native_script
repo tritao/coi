@@ -1,0 +1,9 @@
+# Capture 0 happens on frame 0, so delay until after that.
+wait 1
+
+# Click below each container (outside the panel) but still within the oversized child.
+# - clipped: should NOT register
+# - unclipped: should register
+click 120 320
+click 620 320
+

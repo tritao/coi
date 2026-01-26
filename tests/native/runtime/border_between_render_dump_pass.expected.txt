@@ -1,0 +1,7 @@
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048578 tag=div class="a w-30 h-20 pad-0" x=0 y=0 w=30 h=20
+RECT id=1048579 tag=div class="b w-30 h-20 pad-0" x=30 y=0 w=30 h=20
+RECT id=1048580 tag=div class="c w-30 h-20 pad-0" x=60 y=0 w=30 h=20
+BORDER owner=1048577 tag=div class="row row w-100 h-20 pad-0 gap-0 border-between-2 bg-none" x=0 y=0 w=100 h=20 l=0 r=0 t=0 b=0 between=2 color=87,141,156,180
+RECT_BETWEEN owner=1048577 tag=div class="row row w-100 h-20 pad-0 gap-0 border-between-2 bg-none" x=30 y=0 w=2 h=20 color=87,141,156,180
+RECT_BETWEEN owner=1048577 tag=div class="row row w-100 h-20 pad-0 gap-0 border-between-2 bg-none" x=60 y=0 w=2 h=20 color=87,141,156,180

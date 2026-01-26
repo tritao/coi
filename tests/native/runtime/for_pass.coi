@@ -1,0 +1,16 @@
+component App {
+    mut int n = 3;
+
+    view {
+        <div class="root">
+            <for i in 0:n>
+                <div class="item">Item {i}</div>
+            </for>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

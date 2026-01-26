@@ -1,0 +1,39 @@
+component App {
+  view {
+    <div class="root col pad-20 gap-20 fill bg-none">
+      <div class="row gap-24">
+        <div class="col gap-12 pad-16 border-4 r-18 w-450 h-420">
+          <div>Nested outer clip + inner scroll</div>
+          <div class="clip border-10 r-48 w-380 h-320 pad-0 bg-none">
+            <div class="scroll-y col w-420 h-320 pad-16 gap-16 border-6 r-24">
+              <div class="itemA w-520 h-90 border-10"></div>
+              <div class="itemB w-520 h-90 border-10"></div>
+              <div class="itemC w-520 h-90 border-10"></div>
+              <div class="itemD w-520 h-90 border-10"></div>
+              <div class="itemE w-520 h-90 border-10"></div>
+              <div class="itemF w-520 h-90 border-10"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col gap-12 pad-16 border-4 r-18 w-450 h-420">
+          <div>No outer clip (overflow should show)</div>
+          <div class="border-10 r-48 w-380 h-320 pad-0 bg-none">
+            <div class="scroll-y col w-420 h-320 pad-16 gap-16 border-6 r-24">
+              <div class="itemA w-520 h-90 border-10"></div>
+              <div class="itemB w-520 h-90 border-10"></div>
+              <div class="itemC w-520 h-90 border-10"></div>
+              <div class="itemD w-520 h-90 border-10"></div>
+              <div class="itemE w-520 h-90 border-10"></div>
+              <div class="itemF w-520 h-90 border-10"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

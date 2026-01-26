@@ -1,0 +1,134 @@
+--- COI_NATIVE_SCRIPT_STEP 1: snapshot ---
+--- COI_NATIVE_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root col pad-0 gap-4 fill"></div>
+    <div coi-scope="App" class="btn w-120 h-30 pad-0 border-1">Count:0</div>
+    <div coi-scope="App" class="scroller w-200 h-60 pad-0 border-1 scroll-y clip"></div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">A</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">B</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">C</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">D</div>
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048576 tag=div class="root col pad-0 gap-4 fill" x=0 y=0 w=240 h=160
+RECT id=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30
+TEXT x=0 y=0 w=56 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Count:0"
+BORDER owner=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30 l=1 r=1 t=1 b=1 between=0 color=75,141,179,180
+SCISSOR_START x=0 y=34 w=200 h=60
+RECT id=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60
+RECT id=1048579 tag=div class="item w-180 h-20 pad-0" x=0 y=34 w=180 h=20
+TEXT x=0 y=34 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="A"
+RECT id=1048580 tag=div class="item w-180 h-20 pad-0" x=0 y=64 w=180 h=20
+TEXT x=0 y=64 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="B"
+RECT id=1048581 tag=div class="item w-180 h-20 pad-0" x=0 y=94 w=180 h=20
+TEXT x=0 y=94 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="C"
+RECT id=1048582 tag=div class="item w-180 h-20 pad-0" x=0 y=124 w=180 h=20
+TEXT x=0 y=124 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="D"
+BORDER owner=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60 l=1 r=1 t=1 b=1 between=0 color=210,181,107,180
+SCISSOR_END
+--- COI_NATIVE_SCRIPT_STEP 2: click 10 10 ---
+--- COI_NATIVE_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root col pad-0 gap-4 fill"></div>
+    <div coi-scope="App" class="btn w-120 h-30 pad-0 border-1">Count:1</div>
+    <div coi-scope="App" class="scroller w-200 h-60 pad-0 border-1 scroll-y clip"></div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">A</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">B</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">C</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">D</div>
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048576 tag=div class="root col pad-0 gap-4 fill" x=0 y=0 w=240 h=160
+RECT id=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30
+TEXT x=0 y=0 w=56 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Count:1"
+BORDER owner=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30 l=1 r=1 t=1 b=1 between=0 color=75,141,179,180
+SCISSOR_START x=0 y=34 w=200 h=60
+RECT id=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60
+RECT id=1048579 tag=div class="item w-180 h-20 pad-0" x=0 y=34 w=180 h=20
+TEXT x=0 y=34 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="A"
+RECT id=1048580 tag=div class="item w-180 h-20 pad-0" x=0 y=64 w=180 h=20
+TEXT x=0 y=64 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="B"
+RECT id=1048581 tag=div class="item w-180 h-20 pad-0" x=0 y=94 w=180 h=20
+TEXT x=0 y=94 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="C"
+RECT id=1048582 tag=div class="item w-180 h-20 pad-0" x=0 y=124 w=180 h=20
+TEXT x=0 y=124 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="D"
+BORDER owner=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60 l=1 r=1 t=1 b=1 between=0 color=210,181,107,180
+SCISSOR_END
+--- COI_NATIVE_SCRIPT_STEP 3: click 10 10 ---
+--- COI_NATIVE_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root col pad-0 gap-4 fill"></div>
+    <div coi-scope="App" class="btn w-120 h-30 pad-0 border-1">Count:2</div>
+    <div coi-scope="App" class="scroller w-200 h-60 pad-0 border-1 scroll-y clip"></div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">A</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">B</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">C</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">D</div>
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048576 tag=div class="root col pad-0 gap-4 fill" x=0 y=0 w=240 h=160
+RECT id=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30
+TEXT x=0 y=0 w=56 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Count:2"
+BORDER owner=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30 l=1 r=1 t=1 b=1 between=0 color=75,141,179,180
+SCISSOR_START x=0 y=34 w=200 h=60
+RECT id=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60
+RECT id=1048579 tag=div class="item w-180 h-20 pad-0" x=0 y=34 w=180 h=20
+TEXT x=0 y=34 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="A"
+RECT id=1048580 tag=div class="item w-180 h-20 pad-0" x=0 y=64 w=180 h=20
+TEXT x=0 y=64 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="B"
+RECT id=1048581 tag=div class="item w-180 h-20 pad-0" x=0 y=94 w=180 h=20
+TEXT x=0 y=94 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="C"
+RECT id=1048582 tag=div class="item w-180 h-20 pad-0" x=0 y=124 w=180 h=20
+TEXT x=0 y=124 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="D"
+BORDER owner=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60 l=1 r=1 t=1 b=1 between=0 color=210,181,107,180
+SCISSOR_END
+--- COI_NATIVE_SCRIPT_STEP 4: pointer 10 50 ---
+--- COI_NATIVE_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root col pad-0 gap-4 fill"></div>
+    <div coi-scope="App" class="btn w-120 h-30 pad-0 border-1">Count:2</div>
+    <div coi-scope="App" class="scroller w-200 h-60 pad-0 border-1 scroll-y clip"></div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">A</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">B</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">C</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">D</div>
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048576 tag=div class="root col pad-0 gap-4 fill" x=0 y=0 w=240 h=160
+RECT id=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30
+TEXT x=0 y=0 w=56 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Count:2"
+BORDER owner=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30 l=1 r=1 t=1 b=1 between=0 color=75,141,179,180
+SCISSOR_START x=0 y=34 w=200 h=60
+RECT id=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60
+RECT id=1048579 tag=div class="item w-180 h-20 pad-0" x=0 y=34 w=180 h=20
+TEXT x=0 y=34 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="A"
+RECT id=1048580 tag=div class="item w-180 h-20 pad-0" x=0 y=64 w=180 h=20
+TEXT x=0 y=64 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="B"
+RECT id=1048581 tag=div class="item w-180 h-20 pad-0" x=0 y=94 w=180 h=20
+TEXT x=0 y=94 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="C"
+RECT id=1048582 tag=div class="item w-180 h-20 pad-0" x=0 y=124 w=180 h=20
+TEXT x=0 y=124 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="D"
+BORDER owner=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60 l=1 r=1 t=1 b=1 between=0 color=210,181,107,180
+SCISSOR_END
+--- COI_NATIVE_SCRIPT_STEP 5: scroll 0 30 ---
+--- COI_NATIVE_DUMP ---
+<body></body>
+  <div coi-scope="App" class="root col pad-0 gap-4 fill"></div>
+    <div coi-scope="App" class="btn w-120 h-30 pad-0 border-1">Count:2</div>
+    <div coi-scope="App" class="scroller w-200 h-60 pad-0 border-1 scroll-y clip"></div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">A</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">B</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">C</div>
+      <div coi-scope="App" class="item w-180 h-20 pad-0">D</div>
+--- COI_NATIVE_RENDER_DUMP ---
+RECT id=1048576 tag=div class="root col pad-0 gap-4 fill" x=0 y=0 w=240 h=160
+RECT id=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30
+TEXT x=0 y=0 w=56 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="Count:2"
+BORDER owner=1048577 tag=div class="btn w-120 h-30 pad-0 border-1" x=0 y=0 w=120 h=30 l=1 r=1 t=1 b=1 between=0 color=75,141,179,180
+SCISSOR_START x=0 y=34 w=200 h=60
+RECT id=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60
+RECT id=1048579 tag=div class="item w-180 h-20 pad-0" x=0 y=-16 w=180 h=20
+RECT id=1048580 tag=div class="item w-180 h-20 pad-0" x=0 y=14 w=180 h=20
+TEXT x=0 y=14 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="B"
+RECT id=1048581 tag=div class="item w-180 h-20 pad-0" x=0 y=44 w=180 h=20
+TEXT x=0 y=44 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="C"
+RECT id=1048582 tag=div class="item w-180 h-20 pad-0" x=0 y=74 w=180 h=20
+TEXT x=0 y=74 w=8 h=8 color=235,235,240,255 font=0 size=8 ls=0 lh=8 text="D"
+BORDER owner=1048578 tag=div class="scroller w-200 h-60 pad-0 border-1 scroll-y clip" x=0 y=34 w=200 h=60 l=1 r=1 t=1 b=1 between=0 color=210,181,107,180
+SCISSOR_END

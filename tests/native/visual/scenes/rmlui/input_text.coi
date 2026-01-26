@@ -1,0 +1,19 @@
+component App {
+  view {
+    <div class="root fill bg-none">
+      <div class="panel float-parent fx-40 fy-40 z-0 w-880 h-320 pad-0 border-6 r-20">
+        <div class="title float-parent fx-60 fy-60 z-1 fs-24 bg-none">RmlUI input test</div>
+        <div class="hint float-parent fx-60 fy-100 z-1 fs-16 bg-none">
+          Script focuses the field and types. You should see caret + text.
+        </div>
+
+        <input type="text" value="" class="field float-parent fx-60 fy-140 z-1 w-820 h-56 pad-14 border-4 r-12" />
+        <textarea class="area float-parent fx-60 fy-220 z-1 w-820 h-120 pad-14 border-4 r-12"></textarea>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

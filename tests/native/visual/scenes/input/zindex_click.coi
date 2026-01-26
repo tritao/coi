@@ -1,0 +1,68 @@
+component App {
+  mut int a = 0;
+  mut int b = 0;
+  mut int state = 0;
+
+  def clickA() : void {
+    a += 1;
+    state = 1;
+  }
+
+  def clickB() : void {
+    b += 1;
+    state = 2;
+  }
+
+  view {
+    <div class="root fill bg-none">
+      <div class="status float-parent fx-24 fy-24 z-30 pad-12 border-4 r-12" >
+        clicks: A={a} B={b}
+      </div>
+
+      <div class="a float-parent fx-80 fy-80 z-10 w-420 h-220 pad-0 border-10 r-32" onclick={clickA}>
+        <div class="pad-16">A (z-10)</div>
+      </div>
+
+      <div class="b float-parent fx-160 fy-140 z-20 w-420 h-220 pad-0 border-10 r-32" onclick={clickB}>
+        <div class="pad-16">B (z-20) should win</div>
+        <div class="w-420 h-160 pad-0">
+          <if state == 2>
+            <div class="row row gap-0 w-420 h-160 pad-0">
+              <div class="p1 grow h-160"></div>
+              <div class="p2 grow h-160 bg-none"></div>
+              <div class="p3 grow h-160"></div>
+              <div class="p4 grow h-160 bg-none"></div>
+              <div class="p5 grow h-160"></div>
+              <div class="p6 grow h-160 bg-none"></div>
+              <div class="p7 grow h-160"></div>
+              <div class="p8 grow h-160 bg-none"></div>
+            </div>
+          <else>
+            <div class="w-420 h-160 pad-0 bg-none"></div>
+          </else>
+          </if>
+        </div>
+      </div>
+
+      <if state == 2>
+        <div class="hashbar float-parent fx-0 fy-0 z-5 w-960 h-140 pad-0 bg-none">
+          <div class="row row gap-0 w-960 h-140 pad-0">
+            <div class="hb1 grow h-140"></div>
+            <div class="hb2 grow h-140 bg-none"></div>
+            <div class="hb3 grow h-140"></div>
+            <div class="hb4 grow h-140 bg-none"></div>
+            <div class="hb5 grow h-140"></div>
+            <div class="hb6 grow h-140 bg-none"></div>
+            <div class="hb7 grow h-140"></div>
+            <div class="hb8 grow h-140 bg-none"></div>
+            <div class="hb9 grow h-140"></div>
+          </div>
+        </div>
+      </if>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

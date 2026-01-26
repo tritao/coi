@@ -1,0 +1,37 @@
+component App {
+  view {
+    <div class="col gap-24 pad-24">
+      <div class="row gap-24">
+        <div class="col gap-16 pad-16 border-4 r-18 w-420 h-220">
+          <div class="w-360 h-80 r-12">Opaque child over parent</div>
+          <div class="w-360 h-80 r-12 op-120">Semi-transparent child (op-120)</div>
+        </div>
+
+        <div class="col gap-16 pad-16 border-4 r-18 w-420 h-220">
+          <div class="w-360 h-80 r-12 op-200">Less transparent (op-200)</div>
+          <div class="w-360 h-80 r-12 op-60">More transparent (op-60)</div>
+        </div>
+      </div>
+
+      <div class="row gap-24">
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-220 op-120">
+          <div class="w-360 h-80 r-12">Parent is semi-transparent</div>
+          <div class="w-360 h-80 r-12">Child inherits look but uses its own color</div>
+        </div>
+
+        <div class="col gap-12 pad-16 border-4 r-18 w-420 h-220">
+          <div class="w-360 h-80 r-12">
+            Text should fade with opacity:
+          </div>
+          <div class="w-360 h-80 r-12 op-80">
+            op-80 text + bg
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}

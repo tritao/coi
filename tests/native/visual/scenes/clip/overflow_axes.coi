@@ -1,0 +1,42 @@
+component App {
+  view {
+    <div class="root col pad-20 gap-20 fill bg-none">
+      <div class="row row gap-20 bg-none">
+        <div class="panel col w-440 h-220 pad-16 gap-12 bg-none border-8 r-24">
+          <div class="pad-0 h-24 bg-none">clip-x (should clip right, allow bottom overflow)</div>
+          <div class="clipX clip-x border-8 r-16 w-408 h-140 pad-0 bg-none">
+            <div class="bigX w-520 h-220 pad-0 border-10 r-32"></div>
+          </div>
+        </div>
+
+        <div class="panel col w-440 h-220 pad-16 gap-12 bg-none border-8 r-24">
+          <div class="pad-0 h-24 bg-none">clip-y (should clip bottom, allow right overflow)</div>
+          <div class="clipY clip-y border-8 r-16 w-408 h-140 pad-0 bg-none">
+            <div class="bigY w-520 h-220 pad-0 border-10 r-32"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row row gap-20 bg-none">
+        <div class="panel col w-440 h-220 pad-16 gap-12 bg-none border-8 r-24">
+          <div class="pad-0 h-24 bg-none">clip (should clip both axes)</div>
+          <div class="clipBoth clip border-8 r-16 w-408 h-140 pad-0 bg-none">
+            <div class="bigBoth w-520 h-220 pad-0 border-10 r-32"></div>
+          </div>
+        </div>
+
+        <div class="panel col w-440 h-220 pad-16 gap-12 bg-none border-8 r-24">
+          <div class="pad-0 h-24 bg-none">no clip (overflow visible)</div>
+          <div class="noClip border-8 r-16 w-408 h-140 pad-0 bg-none">
+            <div class="bigNoClip w-520 h-220 pad-0 border-10 r-32"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}
+

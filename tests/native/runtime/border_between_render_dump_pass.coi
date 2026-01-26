@@ -1,0 +1,16 @@
+component App {
+    view {
+        <div class="root pad-0 gap-0 fill bg-none">
+            <div class="row row w-100 h-20 pad-0 gap-0 border-between-2 bg-none">
+                <div class="a w-30 h-20 pad-0"></div>
+                <div class="b w-30 h-20 pad-0"></div>
+                <div class="c w-30 h-20 pad-0"></div>
+            </div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

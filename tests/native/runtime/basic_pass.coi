@@ -1,0 +1,14 @@
+component App {
+    mut int count = 0;
+
+    view {
+        <div class="root">
+            <div>Count:{count}</div>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}
+

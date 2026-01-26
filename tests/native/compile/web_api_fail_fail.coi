@@ -1,0 +1,13 @@
+component App {
+    def go() : void {
+        System.openUrl("https://example.com");
+    }
+
+    view {
+        <div onclick={go}>Hi</div>
+    }
+}
+
+app {
+    root = App;
+}
