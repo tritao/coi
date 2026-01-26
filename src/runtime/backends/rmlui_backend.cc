@@ -2,20 +2,24 @@
 
 #include "runtime/backends/rmlui_backend.h"
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <iostream>
+#include <string>
+#include <system_error>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
+#include "runtime/deps_sokol.h"
+#include "runtime/deps_rmlui.h"
 #include "runtime/deps_stb.h"
 #include "runtime/util.h"
-
-#if defined(COI_NATIVE_RMLUI)
-#include <RmlUi/Core.h>
-#include <RmlUi/Core/Context.h>
-#include <RmlUi/Core/Element.h>
-#include <RmlUi/Core/ElementDocument.h>
-#include <RmlUi/Core/ElementText.h>
-#include <RmlUi/Core/RenderInterface.h>
-#include <RmlUi/Core/SystemInterface.h>
-#endif
+#include "coi/style/css.h"
 
 namespace coi::native {
 

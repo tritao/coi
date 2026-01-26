@@ -2,8 +2,16 @@
 
 #include "runtime/backends/clay_backend.h"
 
-#include "runtime/prelude.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <string>
+#include <system_error>
+#include <vector>
 
+#include "runtime/deps_sokol.h"
 #include "runtime/deps_clay_sokol.h"
 #include "runtime/deps_fontstash.h"
 #include "runtime/debug_text.h"
