@@ -5,7 +5,6 @@
 struct Clay_Vector2;
 
 // Returns the scroll offset for the currently-open Clay layout element.
-// Implemented in `src/coi/native/third_party/impl.cc` (where CLAY_IMPLEMENTATION is defined).
+// Implemented in `src/runtime/third_party/impl.cc` (where CLAY_IMPLEMENTATION is defined).
 Clay_Vector2 coi_native_clay_scroll_offset_for_open_element(void);
 #endif
-

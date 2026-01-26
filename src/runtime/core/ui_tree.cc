@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "coi/native/impl/ui_tree.h"
+#include "runtime/impl/ui_tree.h"
 
 namespace coi::ui {
 
@@ -172,4 +172,3 @@ void add_keydown_listener(webcc::handle) {}
 void scroll_to_top() {}
 
 } // namespace coi::ui
-

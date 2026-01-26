@@ -4,7 +4,7 @@
 // This header must be included by any TU that uses the native Sokol runtime types.
 //
 // IMPORTANT: Do NOT define implementation macros here (SOKOL_IMPL, CLAY_IMPLEMENTATION, stb impls, ...).
-// Those are compiled exactly once in `src/coi/native/third_party/impl.cc`.
+// Those are compiled exactly once in `src/runtime/third_party/impl.cc`.
 
 #ifndef COI_NATIVE_RUNTIME_SOKOL_INCLUDED
 #define COI_NATIVE_RUNTIME_SOKOL_INCLUDED (1)

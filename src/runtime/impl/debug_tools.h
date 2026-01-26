@@ -1,4 +1,4 @@
-#include "coi/native/internal/state.h"
+#include "runtime/internal/state.h"
 
 inline bool g_layout_dumped = false;
 inline bool g_click_done = false;
