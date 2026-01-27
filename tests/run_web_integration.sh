@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COI_BIN="$ROOT_DIR/coi"
 MANIFEST="$ROOT_DIR/tests/visual/scenes_manifest.txt"
 source "$ROOT_DIR/tests/visual/web_runner_lib.sh"
-
 SCENE_FILTER=""
 LIST_ONLY=0
 HEADED=0
@@ -98,7 +97,6 @@ load_web_scenes() {
     esac
   done <"$MANIFEST"
 }
-
 pick_web_test_file() {
   local path="$1"
   local base="${path%.coi}"
@@ -161,7 +159,7 @@ for i in "${!names[@]}"; do
   rm -rf "$scene_out"
   mkdir -p "$build_dir"
 
-  "$COI_BIN" "$scene_path" --out "$build_dir" >/dev/null
+  "$COI_BIN" "$scene_path" --target web --out "$build_dir" >/dev/null
   coi_web_touch_favicon "$build_dir"
 
   test_file="$(pick_web_test_file "$scene_path")"
@@ -210,4 +208,3 @@ if [[ "$ran" -eq 0 ]]; then
 fi
 
 exit "$fail"
-

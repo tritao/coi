@@ -40,6 +40,10 @@ function parseArgs(argv) {
 
 async function waitForCoiMount(page) {
   await page.waitForFunction(() => {
+    // eslint-disable-next-line no-undef
+    if (window.__coi_visual_done === true) return true;
+    // eslint-disable-next-line no-undef
+    if (window.__coi_visual_ready === true) return true;
     if (document.querySelector(".root")) return true;
     const kids = document.body ? document.body.children : [];
     for (const el of kids) {
@@ -70,6 +74,13 @@ function makeExpect(page) {
       const text = await selectorOrLocator.innerText();
       if (!text.includes(substring)) throw new Error(msg || `Expected locator to contain '${substring}', got '${text}'`);
     },
+    async notTextContains(selector, substring, msg = "") {
+      await page.waitForSelector(selector);
+      const text = await page.locator(selector).innerText();
+      if (text.includes(substring)) {
+        throw new Error(msg || `Expected ${selector} to NOT contain '${substring}', got '${text}'`);
+      }
+    },
     async ok(cond, msg = "Expected condition to be true") {
       if (!cond) throw new Error(msg);
     },
@@ -77,6 +88,10 @@ function makeExpect(page) {
       const b = await locator.boundingBox();
       if (!b) throw new Error(msg);
       return b;
+    },
+    async screenshot(pngPath) {
+      await fs.mkdir(path.dirname(pngPath), { recursive: true });
+      await page.screenshot({ path: pngPath });
     },
   };
 }
@@ -97,7 +112,12 @@ async function main() {
   const browser = await chromium.launch({
     headless: !headed,
     executablePath: browserPath || undefined,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--hide-scrollbars", `--window-size=${width},${height}`],
+    args: [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--hide-scrollbars",
+      `--window-size=${width},${height}`,
+    ],
   });
 
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -117,6 +137,9 @@ async function main() {
     const expect = makeExpect(page);
     if (test) {
       await runTestModule(test, { page, expect });
+    } else {
+      // Default smoke: page loaded and COI mounted.
+      await expect.ok(true);
     }
 
     if (consoleErrors.length) {
@@ -125,7 +148,8 @@ async function main() {
   } catch (err) {
     if (screenshot) {
       try {
-        await fs.mkdir(path.dirname(screenshot), { recursive: true });
+        const dir = path.dirname(screenshot);
+        await fs.mkdir(dir, { recursive: true });
         await page.screenshot({ path: screenshot });
       } catch {
         // ignore screenshot failures
