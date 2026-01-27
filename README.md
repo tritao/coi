@@ -165,6 +165,9 @@ Open `http://localhost:8000` in your browser.
 | `coi dev` | Build and start dev server |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
+> [!NOTE]
+> Experimental native builds are available via `--target native`. See `docs/native.md`.
+
 ### Project Structure
 
 ```
