@@ -27,11 +27,23 @@ int init_project(const std::string& project_name_arg);
 
 // Build a Coi project in the current directory
 // Returns 0 on success, non-zero on error
-int build_project(bool keep_cc = false, bool cc_only = false, bool silent_banner = false);
+int build_project(bool keep_cc = false, bool cc_only = false, const std::string& target = "web", bool silent_banner = false);
 
 // Build and start dev server
 // Returns 0 on success, non-zero on error  
-int dev_project(bool keep_cc = false, bool cc_only = false);
+int dev_project(bool keep_cc = false, bool cc_only = false, const std::string& target = "web");
+
+// Build and run once
+// If input_file is empty, runs the current project (src/App.coi -> dist/).
+// If input_file is provided, compiles that file into a temp run directory and executes it.
+// Returns 0 on success, non-zero on error.
+int run_project(bool keep_cc = false,
+                bool cc_only = false,
+                const std::string& target = "web",
+                const std::string& input_file = "",
+                bool window = false,
+                int frames = -1,
+                const std::string& dump = "");
 
 // Print help message
 void print_help(const char* program_name);

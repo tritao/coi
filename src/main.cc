@@ -19,6 +19,64 @@
 
 namespace fs = std::filesystem;
 
+static bool build_rmlui_if_needed(const fs::path& exe_dir, fs::path& out_rmlui_build_dir)
+{
+    const fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
+    const fs::path rmlui_include = rmlui_dir / "Include" / "RmlUi" / "Core.h";
+    std::error_code ec;
+    if (!fs::exists(rmlui_include, ec))
+    {
+        return false;
+    }
+
+    out_rmlui_build_dir = exe_dir / ".coi_cache" / "deps" / "rmlui";
+    fs::create_directories(out_rmlui_build_dir, ec);
+    if (ec)
+    {
+        std::cerr << "warn: failed to create RmlUI build dir: " << out_rmlui_build_dir << ": " << ec.message() << "\n";
+        return false;
+    }
+
+    const fs::path core_lib = out_rmlui_build_dir / "librmlui.a";
+    if (fs::exists(core_lib, ec))
+    {
+        return true;
+    }
+
+    std::string configure_cmd;
+    configure_cmd += "cmake -S " + rmlui_dir.string();
+    configure_cmd += " -B " + out_rmlui_build_dir.string();
+    configure_cmd += " -DCMAKE_BUILD_TYPE=Release";
+    configure_cmd += " -DBUILD_SHARED_LIBS=OFF";
+    configure_cmd += " -DRMLUI_SAMPLES=OFF";
+    configure_cmd += " -DBUILD_TESTING=OFF";
+    configure_cmd += " -DRMLUI_PRECOMPILED_HEADERS=OFF";
+    configure_cmd += " -DRMLUI_WARNINGS_AS_ERRORS=OFF";
+    std::cerr << "Running: " << configure_cmd << std::endl;
+    if (system(configure_cmd.c_str()) != 0)
+    {
+        std::cerr << "warn: failed to configure RmlUI (cmake)\n";
+        return false;
+    }
+
+    std::string build_cmd;
+    build_cmd += "cmake --build " + out_rmlui_build_dir.string() + " --config Release";
+    std::cerr << "Running: " << build_cmd << std::endl;
+    if (system(build_cmd.c_str()) != 0)
+    {
+        std::cerr << "warn: failed to build RmlUI (cmake)\n";
+        return false;
+    }
+
+    if (!fs::exists(core_lib, ec))
+    {
+        std::cerr << "warn: RmlUI built but expected library not found: " << core_lib << "\n";
+        return false;
+    }
+
+    return true;
+}
+
 // =========================================================
 // INCLUDE DETECTION
 // =========================================================
@@ -218,8 +276,7 @@ static void collect_used_types(const Component &comp, std::set<std::string> &typ
 }
 
 // Determine which headers are needed based on used types
-static std::set<std::string> get_required_headers(const std::vector<Component> &components)
-{
+static std::set<std::string> get_required_headers(const std::vector<Component>& components, bool include_web_runtime_headers) {
     static auto type_to_header = build_type_to_header();
 
     std::set<std::string> used_types;
@@ -229,13 +286,14 @@ static std::set<std::string> get_required_headers(const std::vector<Component> &
     }
 
     std::set<std::string> headers;
-    // Always include dom, system, and input (needed for basic DOM operations, main loop, and key state)
-    headers.insert("dom");
-    headers.insert("system");
-    headers.insert("input");
-
-    for (const auto &type : used_types)
-    {
+    if (include_web_runtime_headers) {
+        // For the web target we always need dom/system/input for rendering + main loop + key state.
+        headers.insert("dom");
+        headers.insert("system");
+        headers.insert("input");
+    }
+    
+    for (const auto& type : used_types) {
         auto it = type_to_header.find(type);
         if (it != type_to_header.end())
         {
@@ -839,23 +897,251 @@ int main(int argc, char **argv)
     // Parse build flags (shared by build, dev, and direct compilation)
     bool keep_cc = false;
     bool cc_only = false;
-    for (int i = 2; i < argc; ++i)
-    {
+    std::string target = "web";
+    for (int i = 2; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--keep-cc")
-            keep_cc = true;
-        else if (arg == "--cc-only")
-            cc_only = true;
+        if (arg == "--keep-cc") keep_cc = true;
+        else if (arg == "--cc-only") cc_only = true;
+        else if (arg == "--target") {
+            if (i + 1 < argc) {
+                target = argv[++i];
+            } else {
+                ErrorHandler::cli_error("--target requires an argument (web|native)");
+                return 1;
+            }
+        }
     }
 
-    if (first_arg == "build")
-    {
-        return build_project(keep_cc, cc_only);
+    if (first_arg == "build") {
+        return build_project(keep_cc, cc_only, target);
+    }
+    
+    if (first_arg == "dev") {
+        return dev_project(keep_cc, cc_only, target);
     }
 
-    if (first_arg == "dev")
-    {
-        return dev_project(keep_cc, cc_only);
+    if (first_arg == "run") {
+        std::string run_input;
+        bool window = false;
+        bool window_set = false;
+        int frames = -1;
+        std::string dump;
+        bool test_sidecars = false;
+        std::string native_script;
+        bool native_script_set = false;
+        std::string native_ui_backend;
+        std::string capture_dir;
+        std::string capture_size;
+        int capture_every = -1;
+        int capture_max = -1;
+        std::string capture_baseline;
+        int capture_tolerance = -1;
+        bool capture_overlay = false;
+        bool capture_fail = false;
+
+        // Parse run flags (includes build flags too).
+        for (int i = 2; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--keep-cc") {
+                keep_cc = true;
+            } else if (arg == "--cc-only") {
+                cc_only = true;
+            } else if (arg == "--target") {
+                if (i + 1 < argc) {
+                    target = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--target requires an argument (web|native)");
+                    return 1;
+                }
+            } else if (arg == "--test") {
+                test_sidecars = true;
+            } else if (arg == "--script") {
+                if (i + 1 < argc) {
+                    native_script = argv[++i];
+                    native_script_set = true;
+                } else {
+                    ErrorHandler::cli_error("--script requires a path");
+                    return 1;
+                }
+            } else if (arg == "--ui-backend") {
+                if (i + 1 < argc) {
+                    native_ui_backend = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--ui-backend requires an argument (auto|clay|rmlui|tree)");
+                    return 1;
+                }
+            } else if (arg == "--window") {
+                window = true;
+                window_set = true;
+            } else if (arg == "--headless") {
+                window = false;
+                window_set = true;
+            } else if (arg == "--frames") {
+                if (i + 1 < argc) {
+                    frames = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--frames requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--dump") {
+                if (i + 1 < argc) {
+                    dump = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--dump requires an argument (0|1|always)");
+                    return 1;
+                }
+            } else if (arg == "--capture" || arg == "--capture-dir") {
+                if (i + 1 < argc) {
+                    capture_dir = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture requires a directory");
+                    return 1;
+                }
+            } else if (arg == "--capture-size") {
+                if (i + 1 < argc) {
+                    capture_size = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture-size requires WxH");
+                    return 1;
+                }
+            } else if (arg == "--capture-every") {
+                if (i + 1 < argc) {
+                    capture_every = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-every requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-max") {
+                if (i + 1 < argc) {
+                    capture_max = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-max requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-baseline") {
+                if (i + 1 < argc) {
+                    capture_baseline = argv[++i];
+                } else {
+                    ErrorHandler::cli_error("--capture-baseline requires a directory");
+                    return 1;
+                }
+            } else if (arg == "--capture-tolerance") {
+                if (i + 1 < argc) {
+                    capture_tolerance = std::atoi(argv[++i]);
+                } else {
+                    ErrorHandler::cli_error("--capture-tolerance requires an integer");
+                    return 1;
+                }
+            } else if (arg == "--capture-overlay") {
+                capture_overlay = true;
+            } else if (arg == "--capture-fail") {
+                capture_fail = true;
+            } else if (run_input.empty() && !arg.empty() && arg[0] != '-') {
+                run_input = arg;
+            } else {
+                ErrorHandler::cli_error("Unknown argument: " + arg);
+                return 1;
+            }
+        }
+
+        if (target != "web" && target != "native") {
+            ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or native");
+            return 1;
+        }
+        if (target == "native" && !window_set) {
+            window = true; // run defaults to windowed for native
+        }
+
+        if (target == "native") {
+#if defined(_WIN32)
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                _putenv_s(k.c_str(), v.c_str());
+            };
+#else
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                setenv(k.c_str(), v.c_str(), 1);
+            };
+#endif
+
+            if (!native_ui_backend.empty()) putenv_kv("COI_NATIVE_UI_BACKEND", native_ui_backend);
+            if (native_script_set && !native_script.empty()) putenv_kv("COI_NATIVE_SCRIPT", native_script);
+
+            if (test_sidecars && !run_input.empty()) {
+                try {
+                    fs::path in = fs::path(run_input);
+                    fs::path base = in;
+                    base.replace_extension();
+                    fs::path env_path = base;
+                    env_path += ".native_env";
+                    fs::path script_path = base;
+                    script_path += ".native_script";
+
+                    if (fs::exists(env_path)) {
+                        std::ifstream f(env_path);
+                        std::string line;
+                        while (std::getline(f, line)) {
+                            // trim
+                            auto ltrim = [&](std::string& s) {
+                                size_t i = 0;
+                                while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n')) i++;
+                                s.erase(0, i);
+                            };
+                            auto rtrim = [&](std::string& s) {
+                                size_t j = s.size();
+                                while (j > 0 && (s[j - 1] == ' ' || s[j - 1] == '\t' || s[j - 1] == '\r' || s[j - 1] == '\n')) j--;
+                                s.erase(j);
+                            };
+                            ltrim(line);
+                            rtrim(line);
+                            if (line.empty() || line[0] == '#') continue;
+                            size_t eq = line.find('=');
+                            if (eq == std::string::npos || eq == 0) continue;
+                            const std::string k = line.substr(0, eq);
+                            const std::string v = line.substr(eq + 1);
+                            if (!k.empty()) putenv_kv(k, v);
+                        }
+                    }
+
+                    if (!native_script_set && std::getenv("COI_NATIVE_SCRIPT") == nullptr && fs::exists(script_path)) {
+                        putenv_kv("COI_NATIVE_SCRIPT", script_path.string());
+                    }
+                } catch (...) {
+                    // Best-effort only; test convenience shouldn't block running.
+                }
+            }
+        }
+
+        if (!capture_dir.empty() || !capture_size.empty() || capture_every >= 0 || capture_max >= 0 || !capture_baseline.empty() ||
+            capture_tolerance >= 0 || capture_overlay || capture_fail) {
+            if (target != "native") {
+                ErrorHandler::cli_error("--capture* options require --target native");
+                return 1;
+            }
+#if defined(_WIN32)
+            auto putenv_kv = [](const std::string& k, const std::string& v) {
+                _putenv_s(k.c_str(), v.c_str());
+            };
+            if (!capture_dir.empty()) putenv_kv("COI_NATIVE_CAPTURE_DIR", capture_dir);
+            if (!capture_size.empty()) putenv_kv("COI_NATIVE_CAPTURE_SIZE", capture_size);
+            if (capture_every >= 0) putenv_kv("COI_NATIVE_CAPTURE_EVERY", std::to_string(capture_every));
+            if (capture_max >= 0) putenv_kv("COI_NATIVE_CAPTURE_MAX", std::to_string(capture_max));
+            if (!capture_baseline.empty()) putenv_kv("COI_NATIVE_CAPTURE_BASELINE", capture_baseline);
+            if (capture_tolerance >= 0) putenv_kv("COI_NATIVE_CAPTURE_TOLERANCE", std::to_string(capture_tolerance));
+            if (capture_overlay) putenv_kv("COI_NATIVE_CAPTURE_OVERLAY", "1");
+            if (capture_fail) putenv_kv("COI_NATIVE_CAPTURE_FAIL_ON_MISMATCH", "1");
+#else
+            if (!capture_dir.empty()) setenv("COI_NATIVE_CAPTURE_DIR", capture_dir.c_str(), 1);
+            if (!capture_size.empty()) setenv("COI_NATIVE_CAPTURE_SIZE", capture_size.c_str(), 1);
+            if (capture_every >= 0) setenv("COI_NATIVE_CAPTURE_EVERY", std::to_string(capture_every).c_str(), 1);
+            if (capture_max >= 0) setenv("COI_NATIVE_CAPTURE_MAX", std::to_string(capture_max).c_str(), 1);
+            if (!capture_baseline.empty()) setenv("COI_NATIVE_CAPTURE_BASELINE", capture_baseline.c_str(), 1);
+            if (capture_tolerance >= 0) setenv("COI_NATIVE_CAPTURE_TOLERANCE", std::to_string(capture_tolerance).c_str(), 1);
+            if (capture_overlay) setenv("COI_NATIVE_CAPTURE_OVERLAY", "1", 1);
+            if (capture_fail) setenv("COI_NATIVE_CAPTURE_FAIL_ON_MISMATCH", "1", 1);
+#endif
+        }
+
+        return run_project(keep_cc, cc_only, target, run_input, window, frames, dump);
     }
 
     // From here on, we're doing actual compilation - load DefSchema
@@ -863,6 +1149,7 @@ int main(int argc, char **argv)
 
     std::string input_file;
     std::string output_dir;
+    target = "web";
 
     for (int i = 1; i < argc; ++i)
     {
@@ -871,6 +1158,18 @@ int main(int argc, char **argv)
             cc_only = true;
         else if (arg == "--keep-cc")
             keep_cc = true;
+        else if (arg == "--target")
+        {
+            if (i + 1 < argc)
+            {
+                target = argv[++i];
+            }
+            else
+            {
+                ErrorHandler::cli_error("--target requires an argument (web|native)");
+                return 1;
+            }
+        }
         else if (arg == "--out" || arg == "-o")
         {
             if (i + 1 < argc)
@@ -895,6 +1194,12 @@ int main(int argc, char **argv)
     if (input_file.empty())
     {
         std::cerr << "No input file specified." << std::endl;
+        return 1;
+    }
+
+    if (target != "web" && target != "native")
+    {
+        ErrorHandler::cli_error("Unknown --target '" + target + "'", "Expected: web or native");
         return 1;
     }
 
@@ -1058,17 +1363,402 @@ int main(int argc, char **argv)
         }
 
         // Code generation - automatically detect required headers
-        std::set<std::string> required_headers = get_required_headers(all_components);
-        for (const auto &header : required_headers)
+        const bool is_web_target = (target == "web");
+        std::set<std::string> required_headers = get_required_headers(all_components, is_web_target);
+
+        if (!is_web_target && !required_headers.empty())
         {
-            out << "#include \"webcc/" << header << ".h\"\n";
+            std::string headers;
+            for (const auto& h : required_headers) {
+                if (!headers.empty()) headers += ", ";
+                headers += h;
+            }
+            ErrorHandler::cli_error("Native target does not support web platform APIs yet",
+                                    "Unsupported def headers: " + headers);
+            return 1;
         }
-        out << "#include \"webcc/core/function.h\"\n";
-        out << "#include \"webcc/core/allocator.h\"\n";
-        out << "#include \"webcc/core/new.h\"\n";
-        out << "#include \"webcc/core/array.h\"\n";
-        out << "#include \"webcc/core/vector.h\"\n";
-        out << "#include \"webcc/core/random.h\"\n";
+
+	        if (is_web_target) {
+	            for (const auto& header : required_headers) {
+	                out << "#include \"webcc/" << header << ".h\"\n";
+	            }
+	            out << "#include \"coi/style/css.h\"\n";
+
+	            out << "#include \"webcc/core/handle.h\"\n";
+	            out << "#include \"webcc/core/string_view.h\"\n";
+	            out << "#include \"webcc/core/string.h\"\n";
+	            out << "#include \"webcc/core/function.h\"\n";
+	            out << "#include \"webcc/core/allocator.h\"\n";
+	            out << "#include \"webcc/core/new.h\"\n";
+	            out << "#include \"webcc/core/array.h\"\n";
+	            out << "#include \"webcc/core/vector.h\"\n";
+	            out << "#include \"webcc/core/random.h\"\n\n";
+	        } else {
+	            // Native target: use standard C++ types (no WebCC core headers, they are WASM-only).
+	            out << "#include <algorithm>\n";
+	            out << "#include <chrono>\n";
+	            out << "#include <cmath>\n";
+	            out << "#include <cstdint>\n";
+	            out << "#include <cstdlib>\n";
+	            out << "#include <cstring>\n";
+	            out << "#include <iostream>\n";
+	            out << "#include <string>\n";
+	            out << "#include <thread>\n";
+	            out << "#include <unordered_map>\n\n";
+	            out << "#include <utility>\n\n";
+	        }
+
+        // Platform-neutral UI wrappers.
+        // These are intentionally tiny: codegen calls coi::ui::* and each target maps those calls to its runtime.
+        if (is_web_target)
+        {
+            out << "namespace coi::ui {\n";
+            out << "    inline webcc::handle next_deferred_handle() { return webcc::handle(webcc::next_deferred_handle()); }\n";
+            out << "    inline webcc::handle get_body() { return webcc::dom::get_body(); }\n";
+            out << "    inline void flush() { webcc::flush(); }\n";
+            out << "    inline void create_element_deferred(webcc::handle h, webcc::string_view tag) { webcc::dom::create_element_deferred(h, tag); }\n";
+            out << "    inline void create_comment_deferred(webcc::handle h, webcc::string_view text) { webcc::dom::create_comment_deferred(h, text); }\n";
+            out << "    static inline bool _coi_sv_eq(webcc::string_view a, const char* b) {\n";
+            out << "        if (!b) return false;\n";
+            out << "        uint32_t bl = 0; while (b[bl]) bl++;\n";
+            out << "        if (a.length() != bl) return false;\n";
+            out << "        const char* ap = a.data();\n";
+	            out << "        for (uint32_t i = 0; i < bl; i++) if (ap[i] != b[i]) return false;\n";
+	            out << "        return true;\n";
+	            out << "    }\n";
+	            out << "    static inline webcc::string _coi_style_from_class(webcc::string_view cls) { return coi::style::css_style_attr_from_class_web(cls); }\n";
+	            out << "#if 0\n";
+	            out << "    static inline bool _coi_is_ws(char c) { return c == ' ' || c == '\\t' || c == '\\n' || c == '\\r'; }\n";
+            out << "    static inline bool _coi_parse_u16(webcc::string_view s, uint16_t& out) {\n";
+            out << "        if (s.length() == 0) return false;\n";
+            out << "        uint32_t v = 0;\n";
+            out << "        const char* p = s.data();\n";
+            out << "        for (uint32_t i = 0; i < s.length(); i++) {\n";
+            out << "            char c = p[i];\n";
+            out << "            if (c < '0' || c > '9') return false;\n";
+            out << "            v = v * 10u + (uint32_t)(c - '0');\n";
+            out << "            if (v > 65535u) return false;\n";
+            out << "        }\n";
+            out << "        out = (uint16_t)v;\n";
+            out << "        return true;\n";
+            out << "    }\n";
+            out << "    static inline bool _coi_sv_starts(webcc::string_view s, const char* prefix) {\n";
+            out << "        uint32_t pl = 0; while (prefix[pl]) pl++;\n";
+            out << "        if (s.length() < pl) return false;\n";
+            out << "        const char* p = s.data();\n";
+            out << "        for (uint32_t i = 0; i < pl; i++) if (p[i] != prefix[i]) return false;\n";
+            out << "        return true;\n";
+            out << "    }\n";
+            out << "    static inline uint32_t _coi_fnv1a(webcc::string_view s) {\n";
+            out << "        uint32_t h = 2166136261u;\n";
+            out << "        const char* p = s.data();\n";
+            out << "        for (uint32_t i = 0; i < s.length(); i++) {\n";
+            out << "            h ^= (uint8_t)p[i];\n";
+            out << "            h *= 16777619u;\n";
+            out << "        }\n";
+            out << "        return h;\n";
+            out << "    }\n";
+            out << "    struct _coi_rgb { uint8_t r, g, b; };\n";
+            out << "    static inline _coi_rgb _coi_pick_color(webcc::string_view cls) {\n";
+            out << "        // Match native runtime: use a hash of the full class string.\n";
+            out << "        const uint32_t h = _coi_fnv1a(cls);\n";
+            out << "        uint32_t rv = 64u + (((h >> 0) & 0xFFu) * 166u) / 255u;\n";
+            out << "        uint32_t gv = 64u + (((h >> 8) & 0xFFu) * 166u) / 255u;\n";
+            out << "        uint32_t bv = 64u + (((h >> 16) & 0xFFu) * 166u) / 255u;\n";
+            out << "        if (rv > 255u) rv = 255u;\n";
+            out << "        if (gv > 255u) gv = 255u;\n";
+            out << "        if (bv > 255u) bv = 255u;\n";
+            out << "        return _coi_rgb{(uint8_t)rv, (uint8_t)gv, (uint8_t)bv};\n";
+            out << "    }\n";
+            out << "    static inline webcc::string _coi_style_from_class(webcc::string_view cls) {\n";
+            out << "        // Layout direction: 0 = none, 1 = row, 2 = col (last token wins)\n";
+            out << "        uint8_t dir = 0;\n";
+	            out << "        bool has_grow = false;\n";
+	            out << "        bool has_fill = false;\n";
+	            out << "        bool bg_none = false;\n";
+	            out << "        bool clip_x = false, clip_y = false;\n";
+	            out << "        bool scroll_x = false, scroll_y = false;\n";
+	            out << "        bool has_border = false;\n";
+	            out << "        uint16_t border = 0;\n";
+	            out << "        bool has_radius = false;\n";
+	            out << "        uint16_t r_all = 0, r_tl = 0, r_tr = 0, r_bl = 0, r_br = 0;\n";
+            out << "        bool has_fx = false, has_fy = false;\n";
+            out << "        uint16_t fx = 0, fy = 0;\n";
+            out << "        bool has_z = false;\n";
+            out << "        uint16_t z = 0;\n";
+            out << "        bool float_root = false, float_parent = false, float_pass = false;\n";
+            out << "        bool has_w = false, has_h = false;\n";
+            out << "        bool has_min_w = false, has_max_w = false, has_min_h = false, has_max_h = false;\n";
+            out << "        uint16_t w = 0, h = 0, min_w = 0, max_w = 0, min_h = 0, max_h = 0;\n";
+            out << "        bool has_pad = false, has_gap = false;\n";
+            out << "        uint16_t pad = 0, gap = 0;\n";
+            out << "        bool has_opacity = false;\n";
+            out << "        uint16_t op_u8 = 255;\n";
+            out << "        bool text_left = false, text_center = false, text_right = false;\n";
+            out << "        bool has_fs = false, has_lh = false, has_ls = false;\n";
+            out << "        uint16_t fs = 0, lh = 0, ls = 0;\n";
+            out << "        bool has_align_x = false, has_align_y = false;\n";
+            out << "        uint8_t align_x = 0, align_y = 0; // 0=start,1=center,2=end\n";
+            out << "\n";
+            out << "        const char* p = cls.data();\n";
+            out << "        uint32_t n = cls.length();\n";
+            out << "        uint32_t i = 0;\n";
+            out << "        while (i < n) {\n";
+            out << "            while (i < n && _coi_is_ws(p[i])) i++;\n";
+            out << "            if (i >= n) break;\n";
+            out << "            uint32_t j = i;\n";
+            out << "            while (j < n && !_coi_is_ws(p[j])) j++;\n";
+            out << "            webcc::string_view t(p + i, j - i);\n";
+            out << "\n";
+            out << "            if (_coi_sv_eq(t, \"row\")) { dir = 1; }\n";
+            out << "            else if (_coi_sv_eq(t, \"col\")) { dir = 2; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"grow\") || _coi_sv_eq(t, \"grow-x\") || _coi_sv_eq(t, \"grow-y\")) { has_grow = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"fill\")) { has_fill = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"bg-none\")) { bg_none = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"clip\")) { clip_x = true; clip_y = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"clip-x\")) { clip_x = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"clip-y\")) { clip_y = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"scroll\")) { scroll_x = true; scroll_y = true; clip_x = true; clip_y = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"scroll-y\")) { scroll_y = true; clip_x = true; clip_y = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"scroll-x\")) { scroll_x = true; clip_x = true; clip_y = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"float\") || _coi_sv_eq(t, \"floating\")) { float_root = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"float-parent\")) { float_parent = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"float-pass\")) { float_pass = true; }\n";
+	            out << "            else if (_coi_sv_eq(t, \"center\")) { has_align_x = true; align_x = 1; has_align_y = true; align_y = 1; }\n";
+            out << "            else if (_coi_sv_eq(t, \"x-center\")) { has_align_x = true; align_x = 1; }\n";
+            out << "            else if (_coi_sv_eq(t, \"x-right\")) { has_align_x = true; align_x = 2; }\n";
+            out << "            else if (_coi_sv_eq(t, \"y-center\")) { has_align_y = true; align_y = 1; }\n";
+            out << "            else if (_coi_sv_eq(t, \"y-bottom\")) { has_align_y = true; align_y = 2; }\n";
+            out << "            else if (_coi_sv_eq(t, \"text-left\")) { text_left = true; }\n";
+            out << "            else if (_coi_sv_eq(t, \"text-center\")) { text_center = true; }\n";
+            out << "            else if (_coi_sv_eq(t, \"text-right\")) { text_right = true; }\n";
+            out << "            else {\n";
+            out << "                uint16_t v = 0;\n";
+            out << "                if (_coi_sv_starts(t, \"w-\") && _coi_parse_u16(webcc::string_view(t.data()+2, t.length()-2), v)) { has_w = true; w = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"h-\") && _coi_parse_u16(webcc::string_view(t.data()+2, t.length()-2), v)) { has_h = true; h = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"min-w-\") && _coi_parse_u16(webcc::string_view(t.data()+6, t.length()-6), v)) { has_min_w = true; min_w = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"max-w-\") && _coi_parse_u16(webcc::string_view(t.data()+6, t.length()-6), v)) { has_max_w = true; max_w = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"min-h-\") && _coi_parse_u16(webcc::string_view(t.data()+6, t.length()-6), v)) { has_min_h = true; min_h = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"max-h-\") && _coi_parse_u16(webcc::string_view(t.data()+6, t.length()-6), v)) { has_max_h = true; max_h = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"pad-\") && _coi_parse_u16(webcc::string_view(t.data()+4, t.length()-4), v)) { has_pad = true; pad = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"gap-\") && _coi_parse_u16(webcc::string_view(t.data()+4, t.length()-4), v)) { has_gap = true; gap = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"border-\") && _coi_parse_u16(webcc::string_view(t.data()+7, t.length()-7), v)) { has_border = true; border = v; }\n";
+            out << "                else if (_coi_sv_eq(t, \"border-none\")) { has_border = false; border = 0; }\n";
+            out << "                else if (_coi_sv_starts(t, \"r-tl-\") && _coi_parse_u16(webcc::string_view(t.data()+5, t.length()-5), v)) { has_radius = true; r_tl = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"r-tr-\") && _coi_parse_u16(webcc::string_view(t.data()+5, t.length()-5), v)) { has_radius = true; r_tr = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"r-bl-\") && _coi_parse_u16(webcc::string_view(t.data()+5, t.length()-5), v)) { has_radius = true; r_bl = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"r-br-\") && _coi_parse_u16(webcc::string_view(t.data()+5, t.length()-5), v)) { has_radius = true; r_br = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"r-\") && _coi_parse_u16(webcc::string_view(t.data()+2, t.length()-2), v)) { has_radius = true; r_all = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"fx-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_fx = true; fx = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"fy-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_fy = true; fy = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"z-\") && _coi_parse_u16(webcc::string_view(t.data()+2, t.length()-2), v)) { has_z = true; z = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"op-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_opacity = true; op_u8 = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"opacity-\") && _coi_parse_u16(webcc::string_view(t.data()+8, t.length()-8), v)) { has_opacity = true; op_u8 = (uint16_t)((v > 100 ? 100 : v) * 255 / 100); }\n";
+            out << "                else if (_coi_sv_starts(t, \"fs-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_fs = true; fs = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"lh-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_lh = true; lh = v; }\n";
+            out << "                else if (_coi_sv_starts(t, \"ls-\") && _coi_parse_u16(webcc::string_view(t.data()+3, t.length()-3), v)) { has_ls = true; ls = v; }\n";
+            out << "            }\n";
+            out << "\n";
+            out << "            i = j;\n";
+            out << "        }\n";
+            out << "\n";
+            out << "        webcc::string st;\n";
+            out << "        st += \"box-sizing:border-box;\";\n";
+            out << "        // Layout\n";
+            out << "        if (dir != 0) {\n";
+            out << "            st += \"display:flex;\";\n";
+            out << "            st += \"flex-direction:\";\n";
+            out << "            st += (dir == 2 ? \"column;\" : \"row;\");\n";
+            out << "        }\n";
+            out << "        // Web flexbox shrinks items by default (flex-shrink:1), which differs from Clay's behavior.\n";
+            out << "        // For COI's token-driven scenes, prefer fixed-size overflow unless explicitly grow.\n";
+            out << "        if (has_grow) { st += \"flex:1 1 0px;min-width:0;min-height:0;\"; }\n";
+            out << "        else { st += \"flex-shrink:0;\"; }\n";
+            out << "        if (has_fill) { st += \"width:100%;height:100%;min-width:100vw;min-height:100vh;\"; }\n";
+            out << "        if (has_w) { st += \"width:\"; st += (int)w; st += \"px;\"; }\n";
+            out << "        if (has_h) { st += \"height:\"; st += (int)h; st += \"px;\"; }\n";
+            out << "        if (has_min_w) { st += \"min-width:\"; st += (int)min_w; st += \"px;\"; }\n";
+            out << "        if (has_max_w) { st += \"max-width:\"; st += (int)max_w; st += \"px;\"; }\n";
+            out << "        if (has_min_h) { st += \"min-height:\"; st += (int)min_h; st += \"px;\"; }\n";
+            out << "        if (has_max_h) { st += \"max-height:\"; st += (int)max_h; st += \"px;\"; }\n";
+            out << "        if (has_pad) { st += \"padding:\"; st += (int)pad; st += \"px;\"; }\n";
+            out << "        if (has_gap) { st += \"gap:\"; st += (int)gap; st += \"px;\"; }\n";
+            out << "\n";
+            out << "        // Alignment (maps Clay's axis-alignment roughly onto flexbox)\n";
+            out << "        if (dir != 0) {\n";
+            out << "            auto jc_for = [&](uint8_t v) -> const char* { return v == 1 ? \"center\" : (v == 2 ? \"flex-end\" : \"flex-start\"); };\n";
+            out << "            auto ai_for = [&](uint8_t v) -> const char* { return v == 1 ? \"center\" : (v == 2 ? \"flex-end\" : \"flex-start\"); };\n";
+            out << "            if (dir == 1) {\n";
+            out << "                if (has_align_x) { st += \"justify-content:\"; st += jc_for(align_x); st += \";\"; }\n";
+            out << "                if (has_align_y) { st += \"align-items:\"; st += ai_for(align_y); st += \";\"; }\n";
+            out << "            } else {\n";
+            out << "                if (has_align_x) { st += \"align-items:\"; st += ai_for(align_x); st += \";\"; }\n";
+            out << "                if (has_align_y) { st += \"justify-content:\"; st += jc_for(align_y); st += \";\"; }\n";
+            out << "            }\n";
+            out << "        }\n";
+            out << "\n";
+            out << "        // Positioning (floating)\n";
+            out << "        if (float_root || float_parent || has_fx || has_fy || has_z) {\n";
+            out << "            st += (float_root ? \"position:fixed;\" : \"position:absolute;\");\n";
+            out << "            if (has_fx) { st += \"left:\"; st += (int)fx; st += \"px;\"; }\n";
+            out << "            if (has_fy) { st += \"top:\"; st += (int)fy; st += \"px;\"; }\n";
+            out << "            if (has_z) { st += \"z-index:\"; st += (int)z; st += \";\"; }\n";
+            out << "        }\n";
+	            out << "        if (float_pass) { st += \"pointer-events:none;\"; }\n";
+	            out << "\n";
+	            out << "        // Clip/scroll\n";
+	            out << "        const bool has_scroll = (scroll_x || scroll_y);\n";
+	            out << "        const bool has_clip = (clip_x || clip_y);\n";
+	            out << "        if (has_scroll) {\n";
+	            out << "            if (scroll_x) { st += \"overflow-x:auto;\"; } else if (clip_x) { st += \"overflow-x:hidden;\"; }\n";
+	            out << "            if (scroll_y) { st += \"overflow-y:auto;\"; } else if (clip_y) { st += \"overflow-y:hidden;\"; }\n";
+	            out << "        } else if (has_clip) {\n";
+	            out << "            // 'overflow-x:visible' can't be combined with 'overflow-y:hidden' (visible is coerced).\n";
+	            out << "            // Use a large clip-path inset to emulate axis-only clipping.\n";
+	            out << "            const int inset = 99999;\n";
+	            out << "            const int top = clip_y ? 0 : -inset;\n";
+	            out << "            const int right = clip_x ? 0 : -inset;\n";
+	            out << "            const int bottom = clip_y ? 0 : -inset;\n";
+	            out << "            const int left = clip_x ? 0 : -inset;\n";
+	            out << "            uint16_t tl = 0, tr = 0, bl = 0, br = 0;\n";
+	            out << "            if (has_radius) {\n";
+	            out << "                tl = r_tl ? r_tl : r_all;\n";
+	            out << "                tr = r_tr ? r_tr : r_all;\n";
+	            out << "                bl = r_bl ? r_bl : r_all;\n";
+	            out << "                br = r_br ? r_br : r_all;\n";
+	            out << "            }\n";
+	            out << "\n";
+	            out << "            auto emit_clip_path = [&](const char* prop) {\n";
+	            out << "                st += prop;\n";
+	            out << "                st += \":inset(\";\n";
+	            out << "                st += top; st += \"px \";\n";
+	            out << "                st += right; st += \"px \";\n";
+	            out << "                st += bottom; st += \"px \";\n";
+	            out << "                st += left; st += \"px\";\n";
+	            out << "                if (tl || tr || bl || br) {\n";
+	            out << "                    st += \" round \";\n";
+	            out << "                    st += (int)tl; st += \"px \";\n";
+	            out << "                    st += (int)tr; st += \"px \";\n";
+	            out << "                    st += (int)br; st += \"px \";\n";
+	            out << "                    st += (int)bl; st += \"px\";\n";
+	            out << "                }\n";
+	            out << "                st += \");\";\n";
+	            out << "            };\n";
+	            out << "            emit_clip_path(\"-webkit-clip-path\");\n";
+	            out << "            emit_clip_path(\"clip-path\");\n";
+	            out << "        }\n";
+	            out << "\n";
+	            out << "        // Text\n";
+	            out << "        if (text_left) st += \"text-align:left;\";\n";
+	            out << "        else if (text_center) st += \"text-align:center;\";\n";
+            out << "        else if (text_right) st += \"text-align:right;\";\n";
+            out << "        if (has_fs) { st += \"font-size:\"; st += (int)fs; st += \"px;\"; }\n";
+            out << "        if (has_lh) { st += \"line-height:\"; st += (int)lh; st += \"px;\"; }\n";
+            out << "        if (has_ls) { st += \"letter-spacing:\"; st += (int)ls; st += \"px;\"; }\n";
+            out << "\n";
+            // Match native runtime alpha defaults:
+            // - fill alpha = 46/255 ~= 0.18
+            // - border alpha = 180/255 ~= 0.71
+            out << "        // Visual defaults for token-driven scenes: assign deterministic colors if not bg-none.\n";
+            out << "        const _coi_rgb col = _coi_pick_color(cls);\n";
+            out << "        if (!bg_none) {\n";
+            out << "            st += \"background-color:rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.18);\";\n";
+            out << "        }\n";
+            out << "        if (has_border && border > 0) {\n";
+            out << "            st += \"border:\"; st += (int)border; st += \"px solid rgba(\"; st += (int)col.r; st += \",\"; st += (int)col.g; st += \",\"; st += (int)col.b; st += \",0.71);\";\n";
+            out << "        }\n";
+            out << "        if (has_radius) {\n";
+            out << "            uint16_t tl = r_tl ? r_tl : r_all;\n";
+            out << "            uint16_t tr = r_tr ? r_tr : r_all;\n";
+            out << "            uint16_t bl = r_bl ? r_bl : r_all;\n";
+            out << "            uint16_t br = r_br ? r_br : r_all;\n";
+            out << "            st += \"border-radius:\"; st += (int)tl; st += \"px \"; st += (int)tr; st += \"px \"; st += (int)br; st += \"px \"; st += (int)bl; st += \"px;\";\n";
+            out << "        }\n";
+            out << "        if (has_opacity) { st += \"opacity:\"; st += ((int)op_u8) / 255.0f; st += \";\"; }\n";
+            out << "\n";
+            out << "        return st;\n";
+	            out << "    }\n";
+	            out << "#endif\n";
+	            out << "    inline void set_attribute(webcc::handle h, webcc::string_view name, webcc::string_view value) {\n";
+            out << "        webcc::dom::set_attribute(webcc::DOMElement(h), name, value);\n";
+            out << "        if (_coi_sv_eq(name, \"class\")) {\n";
+            out << "            webcc::string st = _coi_style_from_class(value);\n";
+            out << "            if (!st.empty()) {\n";
+            out << "                webcc::dom::set_attribute(webcc::DOMElement(h), webcc::string_view(\"style\"), webcc::string_view(st.c_str()));\n";
+            out << "            }\n";
+            out << "        }\n";
+            out << "    }\n";
+            out << "    inline void set_property(webcc::handle h, webcc::string_view name, webcc::string_view value) { webcc::dom::set_property(webcc::DOMElement(h), name, value); }\n";
+            out << "    inline void set_inner_html(webcc::handle h, webcc::string_view html) { webcc::dom::set_inner_html(webcc::DOMElement(h), html); }\n";
+            out << "    inline void set_inner_text(webcc::handle h, webcc::string_view text) { webcc::dom::set_inner_text(webcc::DOMElement(h), text); }\n";
+            out << "    inline void append_child(webcc::handle parent, webcc::handle child) { webcc::dom::append_child(webcc::DOMElement(parent), webcc::DOMElement(child)); }\n";
+            out << "    inline void insert_before(webcc::handle parent, webcc::handle child, webcc::handle ref) { webcc::dom::insert_before(webcc::DOMElement(parent), webcc::DOMElement(child), webcc::DOMElement(ref)); }\n";
+            out << "    inline void remove_element(webcc::handle h) { webcc::dom::remove_element(webcc::DOMElement(h)); }\n";
+            out << "    inline void move_before(webcc::handle parent, webcc::handle node, webcc::handle ref) { webcc::dom::move_before(webcc::DOMElement(parent), webcc::DOMElement(node), webcc::DOMElement(ref)); }\n";
+            out << "    inline void add_click_listener(webcc::handle h) { webcc::dom::add_click_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_input_listener(webcc::handle h) { webcc::dom::add_input_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_change_listener(webcc::handle h) { webcc::dom::add_change_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void add_keydown_listener(webcc::handle h) { webcc::dom::add_keydown_listener(webcc::DOMElement(h)); }\n";
+            out << "    inline void scroll_to_top() { webcc::dom::scroll_to_top(); }\n";
+            out << "} // namespace coi::ui\n\n";
+        }
+        else
+        {
+            out << "#include \"coi/native_runtime.h\"\n\n";
+        }
+
+        // Generic event dispatcher template
+        out << "template<typename Callback, int MaxListeners = 64>\n";
+        out << "struct Dispatcher {\n";
+        out << "    int32_t handles[MaxListeners];\n";
+        out << "    Callback callbacks[MaxListeners];\n";
+        out << "    int count = 0;\n";
+        out << "    void set(webcc::handle h, Callback cb) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i] = cb; return; }\n";
+        out << "        }\n";
+        out << "        if (count < MaxListeners) {\n";
+        out << "            handles[count] = hid;\n";
+        out << "            callbacks[count] = cb;\n";
+        out << "            count++;\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    void remove(webcc::handle h) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) {\n";
+        out << "                handles[i] = handles[count-1];\n";
+        out << "                callbacks[i] = callbacks[count-1];\n";
+        out << "                count--;\n";
+        out << "                return;\n";
+        out << "            }\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    template<typename... Args>\n";
+        out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i](args...); return true; }\n";
+        out << "        }\n";
+        out << "        return false;\n";
+        out << "    }\n";
+        out << "};\n\n";
+        out << "Dispatcher<webcc::function<void()>, 128> g_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_input_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_change_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(int)>> g_keydown_dispatcher;\n";
+        bool uses_websocket = required_headers.count("websocket") > 0;
+        if (uses_websocket) {
+            out << "// WebSocket event dispatchers\n";
+            out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_ws_message_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_open_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_close_dispatcher;\n";
+            out << "Dispatcher<webcc::function<void()>> g_ws_error_dispatcher;\n";
+        }
+        out << "webcc::function<void(const webcc::string&)> g_popstate_callback;\n";
+        out << "bool g_key_state[256] = {};\n";
+        out << "int g_view_depth = 0;\n\n";
 
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
@@ -1155,6 +1845,19 @@ int main(int argc, char **argv)
 
         // Create compiler session for cross-component state
         CompilerSession session;
+
+        if (!is_web_target)
+        {
+            for (auto *comp : sorted_components)
+            {
+                if (comp->router)
+                {
+                    ErrorHandler::cli_error("Native target does not support router yet",
+                                            "Router uses browser history/popstate APIs.");
+                    return 1;
+                }
+            }
+        }
 
         // Populate component info for parent-child reactivity wiring
         for (auto *comp : sorted_components)
@@ -1243,49 +1946,121 @@ int main(int argc, char **argv)
             out << "void g_app_navigate(const webcc::string& route) {}\n";
             out << "webcc::string g_app_get_route() { return \"\"; }\n";
         }
-
-        out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
-        out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
-        out << "        const auto& e = events[i];\n";
-        out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
-        emit_feature_event_handlers(out, features);
-        out << "        }\n";
-        out << "    }\n";
-        out << "}\n\n";
-        out << "void update_wrapper(double time) {\n";
-        out << "    static double last_time = 0;\n";
-        out << "    double dt = (time - last_time) / 1000.0;\n";
-        out << "    last_time = time;\n";
-        out << "    if (dt > 0.1) dt = 0.1; // Cap dt to avoid huge jumps\n";
-        out << "    static webcc::Event events[64];\n";
-        ;
-        out << "    uint32_t count = 0;\n";
-        out << "    webcc::Event e;\n";
-        out << "    while (webcc::poll_event(e) && count < 64) {\n";
-        out << "        events[count++] = e;\n";
-        out << "    }\n";
-        out << "    dispatch_events(events, count);\n";
-        // Only call tick if the root component has a tick method
-        if (session.components_with_tick.count(final_app_config.root_component))
+        
+        
+        if (is_web_target)
         {
-            out << "    if (app) app->tick(dt);\n";
+            out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
+            out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
+            out << "        const auto& e = events[i];\n";
+            out << "        if (e.opcode == webcc::dom::ClickEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::dom::ClickEvent>()) g_dispatcher.dispatch(evt->handle);\n";
+            out << "        } else if (e.opcode == webcc::dom::InputEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::dom::InputEvent>()) g_input_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+            out << "        } else if (e.opcode == webcc::dom::ChangeEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::dom::ChangeEvent>()) g_change_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+            out << "        } else if (e.opcode == webcc::dom::KeydownEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::dom::KeydownEvent>()) g_keydown_dispatcher.dispatch(evt->handle, evt->keycode);\n";
+            out << "        } else if (e.opcode == webcc::input::KeyDownEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::input::KeyDownEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = true; }\n";
+            out << "        } else if (e.opcode == webcc::input::KeyUpEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::input::KeyUpEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = false; }\n";
+            out << "        } else if (e.opcode == webcc::system::PopstateEvent::OPCODE) {\n";
+            out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(webcc::string(evt->path)); }\n";
+            if (uses_websocket) {
+                out << "        } else if (e.opcode == webcc::websocket::MessageEvent::OPCODE) {\n";
+                out << "            if (auto evt = e.as<webcc::websocket::MessageEvent>()) g_ws_message_dispatcher.dispatch(evt->handle, webcc::string(evt->data));\n";
+                out << "        } else if (e.opcode == webcc::websocket::OpenEvent::OPCODE) {\n";
+                out << "            if (auto evt = e.as<webcc::websocket::OpenEvent>()) g_ws_open_dispatcher.dispatch(evt->handle);\n";
+                out << "        } else if (e.opcode == webcc::websocket::CloseEvent::OPCODE) {\n";
+                out << "            if (auto evt = e.as<webcc::websocket::CloseEvent>()) g_ws_close_dispatcher.dispatch(evt->handle);\n";
+                out << "        } else if (e.opcode == webcc::websocket::ErrorEvent::OPCODE) {\n";
+                out << "            if (auto evt = e.as<webcc::websocket::ErrorEvent>()) g_ws_error_dispatcher.dispatch(evt->handle);\n";
+            }
+            out << "        }\n";
+            out << "    }\n";
+            out << "}\n\n";
+            out << "void update_wrapper(double time) {\n";
+            out << "    static double last_time = 0;\n";
+            out << "    double dt = (time - last_time) / 1000.0;\n";
+            out << "    last_time = time;\n";
+            out << "    if (dt > 0.1) dt = 0.1; // Cap dt to avoid huge jumps\n";
+            out << "    static webcc::Event events[64];\n";
+            out << "    uint32_t count = 0;\n";
+            out << "    webcc::Event e;\n";
+            out << "    while (webcc::poll_event(e) && count < 64) {\n";
+            out << "        events[count++] = e;\n";
+            out << "    }\n";
+            out << "    dispatch_events(events, count);\n";
+            // Only call tick if the root component has a tick method
+            if (session.components_with_tick.count(final_app_config.root_component)) {
+                out << "    if (app) app->tick(dt);\n";
+            }
+            out << "    coi::ui::flush();\n";
+            out << "}\n\n";
+
+            out << "int main() {\n";
+            out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
+            out << "    // The app needs to persist for the event loop (update_wrapper).\n";
+            out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
+            out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
+            out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
+            if (features.keyboard)
+            {
+                out << "    webcc::input::init_keyboard();\n";
+            }
+            if (features.router)
+            {
+                out << "    // Set up browser back/forward button handling\n";
+                out << "    g_popstate_callback = [](const webcc::string& path) {\n";
+                out << "        if (app) app->_handle_popstate(path);\n";
+                out << "    };\n";
+                out << "    webcc::system::init_popstate();\n";
+            }
+
+            out << "    app->view();\n";
+            out << "    webcc::system::set_main_loop(update_wrapper);\n";
+            out << "    coi::ui::flush();\n";
+            out << "    return 0;\n";
+            out << "}\n";
+	        } else {
+	            out << "int main() {\n";
+	            out << "    app = new " << final_app_config.root_component << "();\n";
+	            out << "    app->view();\n";
+	            out << "    coi::native::set_click_dispatcher([](webcc::handle h) { return g_dispatcher.dispatch(h); });\n";
+	            out << "    coi::native::flush();\n";
+	            out << "    const char* frames_env = std::getenv(\"COI_NATIVE_FRAMES\");\n";
+	            out << "    int frames = frames_env ? std::atoi(frames_env) : -1;\n";
+	            out << "    if (frames == 0) return 0;\n";
+	            out << "    const char* window_env = std::getenv(\"COI_NATIVE_WINDOW\");\n";
+	            out << "    const bool want_window = (window_env && *window_env && std::string(window_env) != std::string(\"0\"));\n";
+	            out << "    const char* capture_env = std::getenv(\"COI_NATIVE_CAPTURE_DIR\");\n";
+	            out << "    const bool want_capture = (capture_env && *capture_env);\n";
+	            out << "    if (want_window || want_capture) {\n";
+	            out << "#if defined(COI_NATIVE_SOKOL)\n";
+	            out << "        return coi::native::SokolRunner<" << final_app_config.root_component << ">::run(app, frames);\n";
+	            out << "#else\n";
+	            out << "        std::cerr << \"COI native window/capture requested but this binary was built without Sokol support\\n\";\n";
+	            out << "#endif\n";
+	            out << "    }\n";
+	            out << "    using clock = std::chrono::steady_clock;\n";
+	            out << "    auto last = clock::now();\n";
+	            out << "    int i = 0;\n";
+            out << "    while (frames < 0 || i < frames) {\n";
+            out << "        i++;\n";
+            out << "        auto now = clock::now();\n";
+            out << "        double dt = std::chrono::duration<double>(now - last).count();\n";
+            out << "        last = now;\n";
+            out << "        if (dt > 0.1) dt = 0.1;\n";
+            if (session.components_with_tick.count(final_app_config.root_component)) {
+                out << "        if (app) app->tick(dt);\n";
+            }
+            out << "        coi::native::flush();\n";
+            out << "        std::this_thread::sleep_for(std::chrono::milliseconds(16));\n";
+            out << "    }\n";
+            out << "    return 0;\n";
+            out << "}\n";
         }
-        out << "    webcc::flush();\n";
-        out << "}\n\n";
-
-        out << "int main() {\n";
-        out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
-        out << "    // The app needs to persist for the event loop (update_wrapper).\n";
-        out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
-        out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
-        out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
-        emit_feature_init(out, features, final_app_config.root_component);
-
-        out << "    app->view();\n";
-        out << "    webcc::system::set_main_loop(update_wrapper);\n";
-        out << "    webcc::flush();\n";
-        out << "    return 0;\n";
-        out << "}\n";
 
         out.close();
         if (keep_cc)
@@ -1293,13 +2068,65 @@ int main(int argc, char **argv)
             std::cerr << "Generated " << output_cc << std::endl;
         }
 
-        if (!cc_only)
-        {
+        if (!cc_only && is_web_target) {
             // Generate CSS file with all styles
             {
-                fs::path css_path = final_output_dir / "app.css";
-                std::ofstream css_out(css_path);
-                if (css_out)
+            fs::path css_path = final_output_dir / "app.css";
+            std::ofstream css_out(css_path);
+            if (css_out)
+            {
+                // Base styles - modern CSS reset for consistent cross-browser behavior
+                css_out << "/* Base styles */\n";
+                css_out << "*, *::before, *::after {\n";
+                css_out << "    box-sizing: border-box;\n";
+                css_out << "    -webkit-tap-highlight-color: transparent;\n";
+                css_out << "}\n\n";
+                css_out << "html {\n";
+                css_out << "    -webkit-text-size-adjust: 100%;\n";
+                css_out << "    -moz-tab-size: 4;\n";
+                css_out << "    tab-size: 4;\n";
+                css_out << "}\n\n";
+                css_out << "body {\n";
+                css_out << "    margin: 0;\n";
+                // Match native clear color (0.08, 0.08, 0.10) ~= #14141a
+                css_out << "    background: #14141a;\n";
+                css_out << "    color: #f2f2f2;\n";
+                css_out << "    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;\n";
+                css_out << "    line-height: 1.5;\n";
+                css_out << "    -webkit-font-smoothing: antialiased;\n";
+                css_out << "    -moz-osx-font-smoothing: grayscale;\n";
+                css_out << "}\n\n";
+                css_out << "img, picture, video, canvas, svg {\n";
+                css_out << "    display: block;\n";
+                css_out << "    max-width: 100%;\n";
+                css_out << "}\n\n";
+                css_out << "input, textarea, select, button {\n";
+                css_out << "    font: inherit;\n";
+                css_out << "    color: inherit;\n";
+                css_out << "}\n\n";
+                css_out << "button {\n";
+                css_out << "    cursor: pointer;\n";
+                css_out << "}\n\n";
+                css_out << "a {\n";
+                css_out << "    color: inherit;\n";
+                css_out << "    text-decoration: inherit;\n";
+                css_out << "}\n\n";
+                css_out << "a, button {\n";
+                css_out << "    touch-action: manipulation;\n";
+                css_out << "}\n\n";
+                css_out << "p, h1, h2, h3, h4, h5, h6 {\n";
+                css_out << "    overflow-wrap: break-word;\n";
+                css_out << "}\n\n";
+                css_out << "@media (prefers-reduced-motion: reduce) {\n";
+                css_out << "    *, *::before, *::after {\n";
+                css_out << "        animation-duration: 0.01ms !important;\n";
+                css_out << "        animation-iteration-count: 1 !important;\n";
+                css_out << "        transition-duration: 0.01ms !important;\n";
+                css_out << "    }\n";
+                css_out << "}\n\n";
+
+                // Collect all CSS from components
+                for (const auto &comp : all_components)
                 {
                     // Bundle external stylesheets from styles/ folder at project root
                     // Project root is the parent of src/ 
@@ -1523,7 +2350,7 @@ int main(int argc, char **argv)
             }
         } // end if (!cc_only) for CSS
 
-        if (!cc_only)
+        if (!cc_only && is_web_target)
         {
             // Generate HTML template in cache directory
             fs::path template_path = cache_dir / "index.template.html";
@@ -1544,6 +2371,14 @@ int main(int argc, char **argv)
                     {
                         tmpl_out << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
                     }
+                    // Default typography for web output:
+                    // - Use the same default font as native (Roboto) when available.
+                    // - Pin font-size/line-height so UA defaults don't drift between environments.
+                    tmpl_out << "    <style>\n";
+                    tmpl_out << "      @font-face{font-family:'coi-default';src:url('coi-default.ttf') format('truetype');font-weight:400;font-style:normal;}\n";
+                    tmpl_out << "      html,body{margin:0;padding:0;}\n";
+                    tmpl_out << "      body{font-family:'coi-default',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:18px;}\n";
+                    tmpl_out << "    </style>\n";
                     // Auto-include generated CSS
                     tmpl_out << "    <link rel=\"stylesheet\" href=\"app.css\">\n";
                     tmpl_out << "</head>\n";
@@ -1571,6 +2406,8 @@ int main(int argc, char **argv)
             }
 
             std::string cmd = webcc_path.string() + " " + abs_output_cc.string();
+            // Ensure WebCC can find COI headers included by generated code (e.g. coi/style/css.h).
+            cmd += " --include-dir " + fs::absolute(exe_dir / "include").string();
             cmd += " --out " + abs_output_dir.string();
             cmd += " --cache-dir " + webcc_cache_dir.string();
             cmd += " --template " + abs_template.string();
@@ -1590,13 +2427,133 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << colors::RED << "Error:" << colors::RESET << " " << e.what() << std::endl;
-        return 1;
-    }
 
-    return 0;
+            // Copy default font next to index.html so the @font-face above can load it.
+            // Prefer COI_WEB_FONT when provided; otherwise use the same Roboto file used by native.
+            {
+                fs::path font_path;
+                if (const char* fp = std::getenv("COI_WEB_FONT"); fp && *fp) {
+                    font_path = fs::path(fp);
+                } else {
+                    font_path = exe_dir / "deps" / "clay" / "examples" / "sokol-video-demo" / "resources" / "Roboto-Regular.ttf";
+                }
+                std::error_code ec;
+                if (!fs::exists(font_path, ec)) {
+                    static const char* kFallbacks[] = {
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                        "/Library/Fonts/Arial.ttf",
+                    };
+                    for (const char* cand : kFallbacks) {
+                        fs::path p(cand);
+                        if (fs::exists(p, ec)) {
+                            font_path = p;
+                            break;
+                        }
+                    }
+                }
+                if (fs::exists(font_path, ec)) {
+                    fs::path out_font = abs_output_dir / "coi-default.ttf";
+                    fs::create_directories(abs_output_dir);
+                    fs::copy_file(font_path, out_font, fs::copy_options::overwrite_existing, ec);
+                    if (ec) {
+                        std::cerr << "warn: failed to copy web font from " << font_path << " to " << out_font << ": " << ec.message() << "\n";
+                    }
+                } else {
+                    std::cerr << "warn: COI web font not found; set COI_WEB_FONT to a .ttf path\n";
+                }
+            }
+	        }
+
+		        if (!cc_only && !is_web_target)
+		        {
+		            fs::path exe_dir = get_executable_dir();
+		            if (exe_dir.empty())
+		            {
+		                ErrorHandler::cli_error("Could not determine executable directory");
+		                return 1;
+		            }
+
+			            fs::path coi_include_dir = exe_dir / "include";
+				            fs::path native_runtime_h = coi_include_dir / "coi" / "native_runtime.h";
+				            if (!fs::exists(native_runtime_h))
+				            {
+				                ErrorHandler::cli_error("Could not find COI native runtime headers",
+				                                        "Expected: " + native_runtime_h.string());
+				                return 1;
+				            }
+
+				            fs::path native_runtime_lib = exe_dir / "build" / "libcoi_native_runtime.a";
+				            if (!fs::exists(native_runtime_lib))
+				            {
+				                // Build on-demand (keeps `./build.sh` fast for web-only users).
+				                std::string build_cmd = "ninja -C " + exe_dir.string() + " coi_native_runtime";
+				                std::cerr << "Building native runtime: " << build_cmd << std::endl;
+				                if (system(build_cmd.c_str()) != 0 || !fs::exists(native_runtime_lib))
+				                {
+				                    ErrorHandler::cli_error("Could not build COI native runtime library",
+				                                            "Expected: " + native_runtime_lib.string());
+				                    return 1;
+				                }
+				            }
+
+				            fs::path sokol_dir = exe_dir / "deps" / "sokol";
+				            const bool has_sokol = fs::exists(sokol_dir / "sokol_app.h");
+				            fs::path rmlui_dir = exe_dir / "deps" / "rmlui";
+				            const bool has_rmlui = fs::exists(rmlui_dir / "Include" / "RmlUi" / "Core.h");
+
+		            fs::path abs_output_cc = fs::absolute(output_cc);
+		            fs::path abs_output_dir = fs::absolute(final_output_dir);
+		            fs::path out_bin = abs_output_dir / "app";
+
+				            std::string cmd = "clang++ -std=c++20 -O2 -pthread";
+				            std::string link_tail;
+				            cmd += " -I" + coi_include_dir.string();
+				            cmd += " -DCOI_NATIVE";
+				            if (has_rmlui) {
+				                fs::path rmlui_build_dir;
+				                if (build_rmlui_if_needed(exe_dir, rmlui_build_dir)) {
+					                link_tail += " -L" + rmlui_build_dir.string();
+					                link_tail += " -lrmlui -lrmlui_debugger -lfreetype";
+				                } else {
+				                    std::cerr << "warn: RmlUI detected but not built; continuing without COI_NATIVE_RMLUI\n";
+				                }
+				            }
+				            if (has_sokol) {
+#if defined(__linux__) || defined(__unix__)
+				                cmd += " -DCOI_NATIVE_SOKOL";
+			                cmd += " -lGL -lX11 -lXi -lXcursor -ldl -lm";
+#endif
+				            }
+				            cmd += " " + abs_output_cc.string();
+				            cmd += " " + native_runtime_lib.string();
+				            cmd += " -o " + out_bin.string();
+				            cmd += link_tail;
+
+		            std::cerr << "Running: " << cmd << std::endl;
+		            int ret = system(cmd.c_str());
+		            if (ret != 0)
+		            {
+		                ErrorHandler::cli_error("Native compilation failed",
+		                                        "Try installing a C++20 compiler toolchain (clang++ or g++).\n"
+		                                        "If you enabled the Sokol window backend, install X11/GL dev libs or run:\n"
+		                                        "  git submodule update --init --recursive");
+		                return 1;
+		            }
+
+	            if (!keep_cc)
+	            {
+	                fs::remove(output_path);
+	            }
+	        }
+	    }
+	}
+	catch (const std::exception &e)
+	{
+	    std::cerr << colors::RED << "Error:" << colors::RESET << " " << e.what() << std::endl;
+	    return 1;
+	}
+
+	return 0;
 }
