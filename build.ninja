@@ -1,5 +1,6 @@
 builddir = build
 cxx = clang++
+ar = ar
 cflags = -std=c++20 -O0 -Isrc
 rule cxx
   command = $cxx $cflags -MD -MF $out.d -c $in -o $out
@@ -9,6 +10,17 @@ rule cxx
 rule link
   command = $cxx $$LDFLAGS_LIBCXX -o $out $in
   description = LINK $out
+
+rule ar
+  command = rm -f $out && $ar rcs $out $in
+  description = AR $out
+
+native_runtime_cflags = -std=c++20 -O2 -pthread -Isrc -Iinclude -Ideps/sokol -Ideps/sokol/util -Ideps/sokol/tests/ext -Ideps/stb -Ideps/rmlui/Include -DCOI_NATIVE -DCOI_NATIVE_SOKOL -DCOI_NATIVE_RMLUI -DRMLUI_STATIC_LIB -DCOI_NATIVE_FONTSTASH -DCOI_NATIVE_CAPTURE
+
+rule cxx_native_runtime
+  command = $cxx $native_runtime_cflags -MD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  description = CXX_NATIVE $in
 
 rule gen_schema_cxx
   command = clang++ -std=c++20 -O0 -Ideps/webcc/src/cli -MD -MF $out.d -c $in -o $out
@@ -52,6 +64,19 @@ build build/obj/json_codegen.o: cxx src/json_codegen.cc
 
 # Link Coi
 build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/type_checker.o build/obj/cli.o build/obj/def_parser.o build/obj/json_codegen.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o
+
+# Native runtime (optional; built on-demand by `coi run`).
+build build/obj/runtime/vendor_impl.o: cxx_native_runtime src/runtime/vendor_impl.cc
+build build/obj/runtime/ui_tree.o: cxx_native_runtime src/runtime/ui_tree.cc
+build build/obj/runtime/capture.o: cxx_native_runtime src/runtime/capture.cc
+build build/obj/runtime/util.o: cxx_native_runtime src/runtime/util.cc
+build build/obj/runtime/sokol_runner.o: cxx_native_runtime src/runtime/sokol_runner.cc
+build build/obj/runtime/debug_tools.o: cxx_native_runtime src/runtime/debug_tools.cc
+build build/obj/runtime/backends/tree_backend.o: cxx_native_runtime src/runtime/backends/tree_backend.cc
+build build/obj/runtime/backends/rmlui_backend.o: cxx_native_runtime src/runtime/backends/rmlui_backend.cc
+build build/obj/runtime/backends/registry.o: cxx_native_runtime src/runtime/backends/registry.cc
+build build/libcoi_native_runtime.a: ar build/obj/runtime/vendor_impl.o build/obj/runtime/ui_tree.o build/obj/runtime/capture.o build/obj/runtime/util.o build/obj/runtime/sokol_runner.o build/obj/runtime/debug_tools.o build/obj/runtime/backends/tree_backend.o build/obj/runtime/backends/rmlui_backend.o build/obj/runtime/backends/registry.o
+build coi_native_runtime: phony build/libcoi_native_runtime.a
 
 # Generate def cache at build time
 rule gen_def_cache
